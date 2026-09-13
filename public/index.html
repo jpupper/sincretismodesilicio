@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sincretismo de Silicio • Campo Semántico Vectorial Word2Vec</title>
+    <meta name="description" content="Explorador de campos semánticos vectoriales y videojuego de distancia semántica (Significado vs. Significante) con Word2Vec y FastText 300D en español." />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Loading Overlay -->
+      <div id="loader-overlay" class="loader-overlay">
+        <div class="loader-content">
+          <div class="loader-spinner"></div>
+          <div class="loader-title">SINCRETISMO DE SILICIO</div>
+          <div class="loader-subtitle" id="loader-status">Sincronizando espacio vectorial 300D...</div>
+          <div class="loader-bar-bg">
+            <div class="loader-bar-fill" id="loader-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Navigation / Header -->
+      <header class="app-header">
+        <div class="header-brand">
+          <div class="brand-badge">S•S</div>
+          <div>
+            <h1 class="brand-title">SINCRETISMO DE SILICIO</h1>
+            <div class="brand-sub">CAMPO VECTORIAL WORD2VEC (300D) • ESPAÑOL</div>
+          </div>
+        </div>
+
+        <nav class="nav-tabs">
+          <button class="nav-tab active" id="tab-explorer-btn" data-tab="explorer">
+            <span class="tab-icon">☍</span>
+            <span class="tab-text">Explorador Nodal (8 Vecinos)</span>
+          </button>
+          <button class="nav-tab" id="tab-game-btn" data-tab="game">
+            <span class="tab-icon">🎮</span>
+            <span class="tab-text">Videojuego: Duelo Semántico</span>
+          </button>
+          <button class="nav-tab" id="tab-cosmos-btn" data-tab="cosmos">
+            <span class="tab-icon">🚀</span>
+            <span class="tab-text">Universo 3D (WASD)</span>
+          </button>
+        </nav>
+
+        <div class="header-actions">
+          <button class="btn-icon" id="btn-sound-toggle" title="Alternar Sonido">
+            <span id="sound-icon">🔊</span>
+          </button>
+          <button class="btn-icon" id="btn-info-modal" title="Acerca del Significado vs Significante">
+            <span>ℹ</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Workspace -->
+      <main class="main-content">
+        <!-- TAB 1: EXPLORADOR NODAL (8 Vecinos) -->
+        <section id="view-explorer" class="view-panel active">
+          <!-- Floating Controls Bar -->
+          <div class="explorer-control-bar">
+            <div class="search-container">
+              <span class="search-icon">🔍</span>
+              <input 
+                type="text" 
+                id="word-search-input" 
+                placeholder="Escribe una palabra en español (ej: tiempo, fuego, libertad)..." 
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="btn btn-search" id="btn-search-word">Explorar</button>
+              <!-- Autocomplete dropdown -->
+              <div class="autocomplete-dropdown" id="search-autocomplete" style="display: none;"></div>
+            </div>
+
+            <button class="btn btn-secondary" id="btn-random-word" title="Cargar palabra aleatoria">
+              <span>🎲 Palabra al Azar</span>
+            </button>
+
+            <!-- Filter Toggle: Significante vs Significado -->
+            <label class="filter-toggle" title="Excluye palabras que solo difieren morfológicamente (plurales, sufijos) para centrarse en significado puro.">
+              <input type="checkbox" id="toggle-filter-signifier" checked />
+              <span class="toggle-slider"></span>
+              <span class="toggle-label">Filtrar flexiones morfológicas (Significado puro)</span>
+            </label>
+          </div>
+
+          <!-- Canvas Container -->
+          <div class="canvas-viewport" id="canvas-container">
+            <canvas id="graph-canvas"></canvas>
+
+            <!-- Canvas Floating Controls Overlay -->
+            <div class="canvas-floating-controls">
+              <button class="btn-ctrl" id="btn-zoom-in" title="Acercar">+</button>
+              <button class="btn-ctrl" id="btn-zoom-out" title="Alejar">−</button>
+              <button class="btn-ctrl" id="btn-reset-cam" title="Centrar Vista">⌖</button>
+            </div>
+
+            <!-- Canvas Legend Badge -->
+            <div class="canvas-legend">
+              <div class="legend-item"><span class="legend-dot center"></span> Centro (Palabra Actual)</div>
+              <div class="legend-item"><span class="legend-dot semantic"></span> 8 Vecinos Más Cercanos</div>
+              <div class="legend-tip">💡 Haz clic en cualquier nodo para pivotar y hacerlo el centro</div>
+            </div>
+
+            <!-- Side Inspector Drawer -->
+            <aside class="inspector-drawer" id="node-inspector">
+              <div class="inspector-header">
+                <span class="inspector-badge">INSPECCIÓN VECTORIAL</span>
+                <button class="btn-close-inspector" id="btn-close-inspector">&times;</button>
+              </div>
+              <div class="inspector-body" id="inspector-content">
+                <div class="inspected-word-title" id="inspect-word">...</div>
+                
+                <div class="metric-row">
+                  <div class="metric-col">
+                    <span class="metric-label">DISTANCIA SEMÁNTICA</span>
+                    <span class="metric-val" id="inspect-distance">0.000</span>
+                    <span class="metric-sub">1 - cos(θ)</span>
+                  </div>
+                  <div class="metric-col">
+                    <span class="metric-label">SIMILITUD COSENO</span>
+                    <span class="metric-val accent" id="inspect-similarity">100%</span>
+                    <span class="metric-sub">cos(θ)</span>
+                  </div>
+                </div>
+
+                <div class="metric-row">
+                  <div class="metric-col">
+                    <span class="metric-label">SEPARACIÓN ANGULAR</span>
+                    <span class="metric-val" id="inspect-angle">0.0°</span>
+                  </div>
+                  <div class="metric-col">
+                    <span class="metric-label">TIPO RELACIONAL</span>
+                    <span class="metric-val" id="inspect-type">Significado</span>
+                  </div>
+                </div>
+
+                <div class="vector-radar-section">
+                  <span class="metric-label">MUESTRA DE DIMENSIONES VECTORIALES (300D)</span>
+                  <div class="vector-sparkline" id="vector-sparkline"></div>
+                </div>
+
+                <button class="btn btn-primary btn-block" id="btn-pivot-inspect">
+                  Hacer este el nuevo Centro ☍
+                </button>
+              </div>
+            </aside>
+          </div>
+
+          <!-- Bottom Quick Chips Bar -->
+          <div class="presets-bar">
+            <span class="presets-label">EJEMPLOS CURADOS:</span>
+            <div class="presets-chips" id="preset-chips">
+              <button class="chip" data-word="filosofía">filosofía</button>
+              <button class="chip" data-word="tiempo">tiempo</button>
+              <button class="chip" data-word="fuego">fuego</button>
+              <button class="chip" data-word="universo">universo</button>
+              <button class="chip" data-word="música">música</button>
+              <button class="chip" data-word="libertad">libertad</button>
+              <button class="chip" data-word="memoria">memoria</button>
+              <button class="chip" data-word="perro">perro</button>
+              <button class="chip" data-word="rey">rey</button>
+              <button class="chip" data-word="robot">robot</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: VIDEOJUEGO (5 Opciones de Menor Distancia) -->
+        <section id="view-game" class="view-panel">
+          <div id="game-root"></div>
+        </section>
+
+        <!-- TAB 3: UNIVERSO 3D (WASD Flight Visualizer) -->
+        <section id="view-cosmos" class="view-panel">
+          <div class="cosmos-container" id="cosmos-viewport">
+            <div class="cosmos-crosshair"></div>
+
+            <div class="cosmos-top-bar">
+              <div class="cosmos-search-box">
+                <input type="text" id="cosmos-search-input" placeholder="Buscar y volar a palabra en 3D (ej: universo, perro, tiempo)..." autocomplete="off" spellcheck="false" />
+                <button class="btn btn-search" id="btn-cosmos-warp">Volar ⚡</button>
+              </div>
+              <button class="btn btn-secondary" id="btn-cosmos-random">🎲 Palabra al Azar</button>
+              <button class="btn btn-secondary" id="btn-toggle-calibration">⚙️ Calibrar Vista</button>
+            </div>
+
+            <!-- Floating Calibration Controls Panel -->
+            <div class="cosmos-calibration-panel" id="cosmos-calibration-panel" style="display: none;">
+              <div class="calib-header">
+                <div class="calib-title">
+                  <span>⚙️ Calibración del Universo 3D</span>
+                  <span class="calib-badge">Tiempo Real</span>
+                </div>
+                <button class="btn-close-calib" id="btn-close-calib">&times;</button>
+              </div>
+
+              <div class="calib-body">
+                <!-- 1. Distancia de detección de palabras -->
+                <div class="calib-control-group">
+                  <div class="calib-label-row">
+                    <label for="calib-label-dist">Distancia de Rótulos:</label>
+                    <span class="calib-val" id="val-label-dist">260 u</span>
+                  </div>
+                  <input type="range" id="calib-label-dist" min="80" max="900" value="260" step="10" />
+                  <span class="calib-hint">Distancia máx. desde la cámara para mostrar nombres flotantes.</span>
+                </div>
+
+                <!-- 2. Cantidad máx. de palabras -->
+                <div class="calib-control-group">
+                  <div class="calib-label-row">
+                    <label for="calib-label-count">Cantidad de Palabras:</label>
+                    <span class="calib-val" id="val-label-count">45</span>
+                  </div>
+                  <input type="range" id="calib-label-count" min="10" max="90" value="45" step="5" />
+                  <span class="calib-hint">Número simultáneo de carteles en pantalla.</span>
+                </div>
+
+                <!-- 3. Tamaño de palabras -->
+                <div class="calib-control-group">
+                  <div class="calib-label-row">
+                    <label for="calib-label-size">Tamaño de Palabras:</label>
+                    <span class="calib-val" id="val-label-size">1.0x</span>
+                  </div>
+                  <input type="range" id="calib-label-size" min="0.5" max="2.6" value="1.0" step="0.1" />
+                  <span class="calib-hint">Escala visual de los carteles de texto.</span>
+                </div>
+
+                <!-- 4. Tamaño de esferas -->
+                <div class="calib-control-group">
+                  <div class="calib-label-row">
+                    <label for="calib-sphere-size">Tamaño de Esferas:</label>
+                    <span class="calib-val" id="val-sphere-size">1.0x</span>
+                  </div>
+                  <input type="range" id="calib-sphere-size" min="0.4" max="2.8" value="1.0" step="0.1" />
+                  <span class="calib-hint">Radio de las 10.000 esferas vectoriales.</span>
+                </div>
+
+                <!-- 5. Velocidad de vuelo -->
+                <div class="calib-control-group">
+                  <div class="calib-label-row">
+                    <label for="calib-flight-speed">Velocidad de Vuelo:</label>
+                    <span class="calib-val" id="val-flight-speed">4.5x</span>
+                  </div>
+                  <input type="range" id="calib-flight-speed" min="1.0" max="15.0" value="4.5" step="0.5" />
+                  <span class="calib-hint">Velocidad de traslación con WASD / QE.</span>
+                </div>
+
+                <div class="calib-footer">
+                  <button class="btn btn-outline" id="btn-reset-calibration">↺ Restablecer Calibración</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cosmos-controls-guide">
+              <div class="guide-header">
+                <span class="guide-icon">🎮</span>
+                <span class="guide-title">Controles de Vuelo</span>
+              </div>
+              <div class="guide-grid">
+                <div class="guide-cell key-cell"><kbd>W</kbd> <kbd>S</kbd></div>
+                <div class="guide-cell label-cell">Avanzar / Retroceder</div>
+
+                <div class="guide-cell key-cell"><kbd>A</kbd> <kbd>D</kbd></div>
+                <div class="guide-cell label-cell">Desplazamiento Lateral</div>
+
+                <div class="guide-cell key-cell"><kbd class="highlight">Q</kbd></div>
+                <div class="guide-cell label-cell"><span class="cyan">Subir Cámara</span> ⬆</div>
+
+                <div class="guide-cell key-cell"><kbd class="highlight">E</kbd></div>
+                <div class="guide-cell label-cell"><span class="purple">Bajar Cámara</span> ⬇</div>
+
+                <div class="guide-cell key-cell"><kbd>Arrastrar</kbd></div>
+                <div class="guide-cell label-cell">Mirar en 360°</div>
+
+                <div class="guide-cell key-cell"><kbd>Rueda</kbd></div>
+                <div class="guide-cell label-cell">Velocidad de Vuelo</div>
+
+                <div class="guide-cell key-cell"><kbd class="highlight">Hover</kbd></div>
+                <div class="guide-cell label-cell"><span class="cyan">Resaltar &amp; Ver Palabra</span></div>
+
+                <div class="guide-cell key-cell"><kbd class="highlight">Doble Click</kbd></div>
+                <div class="guide-cell label-cell"><span class="cyan">Volar a la Esfera</span> ⚡</div>
+
+                <div class="guide-cell key-cell"><kbd>Click</kbd></div>
+                <div class="guide-cell label-cell">Seleccionar Palabra</div>
+              </div>
+            </div>
+
+            <div class="cosmos-hud-telemetry">
+              <div class="telemetry-item">
+                <span class="tel-label">PALABRA OBJETIVO:</span>
+                <span class="tel-val highlight" id="cosmos-hud-target">Ninguna</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="tel-label">COORDENADAS 3D:</span>
+                <span class="tel-val" id="cosmos-hud-coords">X: 0 Y: 0 Z: 0</span>
+              </div>
+              <div class="telemetry-item">
+                <span class="tel-label">VELOCIDAD:</span>
+                <span class="tel-val" id="cosmos-hud-speed">4.5x</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Theory Modal (Significado vs Significante) -->
+      <div class="modal-backdrop" id="info-modal" style="display: none;">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>Significado vs. Significante en Espacios Vectoriales</h3>
+            <button class="btn-close-modal" id="btn-close-modal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p>
+              En la lingüística:
+            </p>
+            <ul>
+              <li><strong>Significante:</strong> La forma acústica o gráfica de la palabra (letras, fonemas, morfología, sufijos de plural o flexiones gramaticales).</li>
+              <li><strong>Significado:</strong> El concepto abstracto, la idea o la representación semántica que evoca.</li>
+            </ul>
+            <p>
+              En modelos como <strong>Word2Vec</strong> y <strong>FastText</strong>, cada palabra habita un espacio de <strong>300 dimensiones continuas</strong> donde el ángulo entre vectores mide la afinidad semántica.
+            </p>
+            <p>
+              Este sistema implementa un filtro morfológico para descartar falsos positivos donde dos palabras se parecen en sus letras (significante) y destacar la cercanía real de conceptos (significado).
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
