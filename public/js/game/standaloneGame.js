@@ -7,6 +7,89 @@ import { SemanticVectorEngine } from '../engine/semanticVectorEngine.js';
 import { AsciiShaderBackground } from '../shaders/asciiShaderBackground.js';
 import { soundFX } from '../audio/soundFX.js';
 
+// Lista por defecto de palabras personalizadas (modo Custom).
+// Extraida de la lista colaborativa guardada en la base de datos de
+// https://artedigitaldata.com/visualeffects.html (API public/particles-words).
+const DEFAULT_CUSTOM_WORDS = [
+  'ARTE GENERATIVO',
+  'FUTUROS POSIBLES',
+  'LED',
+  'MICROLED',
+  'INOVACIÓN',
+  'TIC',
+  'BIOTECNOLOGÍA',
+  'CIENCIA',
+  'SHARE',
+  'MEREQUETENGUE',
+  'TXT',
+  'MAIN',
+  'NULL POINTER EXCEPTION',
+  'CODING',
+  'HACKING',
+  'CRACKING',
+  'LUXURY COMMUNISM',
+  'SOLARPUNK',
+  'STEAM PUNK',
+  'VIDEOJUEGO',
+  'PERSONAJE',
+  'GUION',
+  'GUION TECNICO',
+  'SETAV',
+  'INSTALACION',
+  'PÁGINA WEB',
+  'LORA',
+  'CHAGPT',
+  'OPENAI',
+  'DISTOPIA',
+  'GEMINI',
+  'HERMES',
+  'UNIDAD LATINOAMERICANA',
+  'TECNOCRACIAS',
+  'HLSL',
+  'GLSL',
+  'MATERIAL',
+  'NORMAL MAP',
+  'UV',
+  'GL_FRAGCOORD.XY',
+  'UNIFORM',
+  'INDEPENDENCIA ECONOMICA',
+  'SOBERANIA POLITICA',
+  '360',
+  'DOMO',
+  'PERFORMANCE',
+  'MULTIMEDIAL',
+  'SONIDO',
+  'VISUALES',
+  'INMERSIVO',
+  'SINCRONIZACION',
+  'OPEN SOUND CONTROL',
+  'OSC',
+  'HYDRA',
+  'AUDIORITMICO',
+  'TOUCH DESIGNER',
+  'UNITY',
+  'BLENDER',
+  'ASADO',
+  'STREAMING',
+  'SOCIALIZACION DE LOS MEDIOS DE PRODUCCION',
+  'VJING',
+  'UNREAL ENGINE',
+  'RESOLUME',
+  'TOUCHDESIGNER',
+  'GUIPPER',
+  'KINECT',
+  'COMUNIDAD',
+  'LIVECODING',
+  'JUSTICIA SOCIAL',
+  'CONECTAR',
+  'DIGITAL',
+  'DATA',
+  'CREATIVIDAD',
+  'CODIGO',
+  'VIRTUAL',
+  'ARTE',
+];
+
 // Configuration state with default fallbacks
 let config = {
   gameplay: {
@@ -52,7 +135,7 @@ let config = {
   },
   customWording: {
     mode: 'random',
-    words: ['TIEMPO', 'FUEGO', 'LIBERTAD', 'UNIVERSO', 'MEMORIA', 'FILOSOFÍA']
+    words: [...DEFAULT_CUSTOM_WORDS]
   }
 };
 
@@ -774,7 +857,7 @@ function syncSettingsUI() {
 
   // Custom Wording
   if (!config.customWording) {
-    config.customWording = { mode: 'random', words: ['TIEMPO', 'FUEGO', 'LIBERTAD', 'UNIVERSO', 'MEMORIA', 'FILOSOFÍA'] };
+    config.customWording = { mode: 'random', words: [...DEFAULT_CUSTOM_WORDS] };
   }
   setCustomWordingMode(config.customWording.mode || 'random');
   renderCustomWordsList();
@@ -787,8 +870,8 @@ function readSettingsUI() {
   // Gameplay
   config.gameplay.initialLives = parseInt(getVal('cfg-initial-lives')) || 3;
   config.gameplay.wordLifetime = parseFloat(getVal('cfg-word-lifetime')) || 10;
-  config.gameplay.minSpeed = parseFloat(getVal('cfg-min-speed')) || 0.5;
-  config.gameplay.maxSpeed = parseFloat(getVal('cfg-max-speed')) || 4.5;
+  config.gameplay.minSpeed = parseFloatOr(getVal('cfg-min-speed'), 0.5);
+  config.gameplay.maxSpeed = parseFloatOr(getVal('cfg-max-speed'), 4.5);
   config.gameplay.spawnInterval = Math.max(0.1, parseFloat(Number(getVal('cfg-spawn-interval')).toFixed(2)) || 1.0);
   config.gameplay.maxWordsOnScreen = Math.min(100, Math.max(1, parseInt(getVal('cfg-max-words')) || 14));
   config.gameplay.thresholdPointsMinus = Math.max(0, Math.min(1, parseFloat(Number(getVal('cfg-thresh-points-minus')).toFixed(2)) || 0.5));
@@ -812,7 +895,7 @@ function readSettingsUI() {
   config.shaderBg.enabled = getCheck('cfg-shader-enabled');
   config.shaderBg.asciiNoiseOnly = getCheck('cfg-shader-noise-only');
   config.shaderBg.opacity = parseFloat(getVal('cfg-shader-opacity')) || 0.75;
-  config.shaderBg.speed = parseFloat(getVal('cfg-shader-speed')) || 0.35;
+  config.shaderBg.speed = parseFloatOr(getVal('cfg-shader-speed'), 0.35);
   config.shaderBg.tile = parseFloat(getVal('cfg-shader-tile')) || 2.0;
   config.shaderBg.charSize = parseFloat(getVal('cfg-shader-charsize')) || 14;
   config.shaderBg.glyphScale = parseFloat(getVal('cfg-shader-glyphscale')) || 0.85;
@@ -973,6 +1056,16 @@ function getVal(id) {
   return el ? el.value : null;
 }
 
+/**
+ * parseFloat seguro: acepta 0 y valores negativos como validos
+ * (con `parseFloat(x) || fallback` un 0 volvia al valor por defecto,
+ * lo que rompia los sliders de velocidad con step 0.001).
+ */
+function parseFloatOr(raw, fallback) {
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function setCheck(id, bool) {
   const el = document.getElementById(id);
   if (el) el.checked = Boolean(bool);
@@ -988,7 +1081,9 @@ function updateValBadges() {
     const inputId = badge.getAttribute('data-bind-badge');
     const input = document.getElementById(inputId);
     if (input) {
-      if (input.step === '0.01' || input.id.includes('thresh')) {
+      if (input.step === '0.001') {
+        badge.textContent = Number(input.value).toFixed(3);
+      } else if (input.step === '0.01' || input.id.includes('thresh')) {
         badge.textContent = Number(input.value).toFixed(2);
       } else if (input.id === 'cfg-spawn-interval') {
         badge.textContent = Number(input.value).toFixed(2);
