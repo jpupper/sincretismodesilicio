@@ -217,6 +217,19 @@ html, body {
   font-weight: 700;
 }
 
+.nav-tab-link {
+  text-decoration: none;
+  border: 1px dashed rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+}
+
+.nav-tab-link:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: #00f0ff;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -1821,5 +1834,42 @@ html, body {
   width: 100%;
   font-size: 11px;
   padding: 6px 12px;
+}
+
+.calib-select {
+  background: rgba(14, 20, 42, 0.95);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: var(--radius-sm);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calib-select:focus,
+.calib-select:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+}
+
+.calib-select option {
+  background: #090e1f;
+  color: #ffffff;
+}
+
+.calib-toast {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid var(--accent-green);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: #a7f3d0;
+  text-align: center;
+  font-family: var(--font-mono);
+  animation: fadeInDown 0.2s ease;
 }
 

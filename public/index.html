@@ -48,6 +48,10 @@
             <span class="tab-icon">🚀</span>
             <span class="tab-text">Universo 3D (WASD)</span>
           </button>
+          <a href="http://localhost:6932/game" class="nav-tab nav-tab-link" target="_blank" rel="noopener noreferrer" title="Abrir Juego Standalone (p5.js + Shaders ASCII) en nueva pestaña">
+            <span class="tab-icon">⚡</span>
+            <span class="tab-text">Juego Standalone</span>
+          </a>
         </nav>
 
         <div class="header-actions">
@@ -203,6 +207,20 @@
               </div>
 
               <div class="calib-body">
+                <!-- 0. Modelo de Representación Dimensional -->
+                <div class="calib-control-group">
+                  <div class="calib-label-row">
+                    <label for="calib-projection-mode">Modelo de Espacio 3D:</label>
+                    <span class="calib-badge" id="badge-projection-mode">UMAP</span>
+                  </div>
+                  <select id="calib-projection-mode" class="calib-select">
+                    <option value="umap" selected>🔭 UMAP Semántico (Preserva Vecindad Real)</option>
+                    <option value="pca">📐 PCA Lineal (Varianza Global 300D)</option>
+                    <option value="clusters">🌌 Cúmulos Galácticos (Sectores Temáticos)</option>
+                  </select>
+                  <span class="calib-hint">Determina cómo se reducen los vectores de 300D al espacio 3D.</span>
+                </div>
+
                 <!-- 1. Distancia de detección de palabras -->
                 <div class="calib-control-group">
                   <div class="calib-label-row">
@@ -254,7 +272,9 @@
                 </div>
 
                 <div class="calib-footer">
-                  <button class="btn btn-outline" id="btn-reset-calibration">↺ Restablecer Calibración</button>
+                  <button class="btn btn-primary" id="btn-save-calibration" style="margin-bottom: 8px;">💾 Guardar Configuración</button>
+                  <button class="btn btn-outline" id="btn-reset-calibration">↺ Restablecer Valores</button>
+                  <div id="calib-save-toast" class="calib-toast" style="display: none;">✓ Configuración guardada en tu navegador</div>
                 </div>
               </div>
             </div>

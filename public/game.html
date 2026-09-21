@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sincretismo de Silicio - Modo Juego</title>
+  <meta name="description" content="Juego semántico en p5.js con física de palabras y fondo procedural de shaders ASCII y ruido.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="css/game.css">
+  <!-- Carga local de p5.js con fallback a CDN -->
+  <script src="js/libs/p5.min.js"></script>
+  <script>
+    if (typeof window.p5 === 'undefined') {
+      const cdn = document.createElement('script');
+      cdn.src = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js';
+      document.head.appendChild(cdn);
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Capa 1: Fondo Shader WebGL (Noise + ASCII) -->
+  <canvas id="shader-canvas"></canvas>
+
+  <!-- Capa 2: Contenedor del Canvas Interactivo p5.js -->
+  <div id="p5-container"></div>
+
+  <!-- Capa 3: HUD Flotante del Juego -->
+  <div id="game-hud">
+    <!-- Parte superior: Vidas a la izquierda, Controles a la derecha -->
+    <div class="hud-top">
+      <!-- Vidas arriba a la izquierda -->
+      <div class="hud-lives-panel">
+        <div class="hud-label">
+          <span>VIDAS</span>
+        </div>
+        <div class="hud-lives-container" id="hud-lives-list">
+          <span class="life-heart">❤️</span>
+          <span class="life-heart">❤️</span>
+          <span class="life-heart">❤️</span>
+        </div>
+        <div class="hud-score-panel">
+          <span>PTS:</span>
+          <span class="hud-score-value" id="hud-score-display">0</span>
+        </div>
+      </div>
+
+      <!-- Controles arriba a la derecha -->
+      <div class="hud-controls">
+        <button class="btn-icon" id="btn-open-settings" title="Abrir configuración">
+          <span>⚙️ Configuración</span>
+          <kbd>P</kbd>
+        </button>
+        <button class="btn-icon" id="btn-fullscreen" title="Pantalla Completa">
+          <span>⛶ Fullscreen</span>
+          <kbd>F</kbd>
+        </button>
+        <button class="btn-icon" id="btn-mute-audio" title="Silenciar / Activar sonido">
+          <span>🔊</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Guía flotante inferior -->
+    <div class="hud-bottom">
+      <div class="hud-guide">
+        <span class="rule-good"><strong>D &gt; 0.5</strong>: +PUNTOS</span>
+        <span class="rule-bad"><strong>D &lt; 0.5</strong>: -PUNTOS</span>
+        <span class="rule-good"><strong>D &gt; 0.9</strong>: +1 VIDA ❤️</span>
+        <span class="rule-bad"><strong>D &lt; 0.4</strong>: -1 VIDA 💔</span>
+        <span>AJUSTA TODO CON <kbd style="color:var(--accent-cyan);">P</kbd></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Capa 4: Panel Lateral de Configuración (Tecla P) -->
+  <div id="settings-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <span>⚙️ PARÁMETROS DEL JUEGO</span>
+      </div>
+      <button class="drawer-close" id="btn-close-settings" title="Cerrar panel">&times;</button>
+    </div>
+
+    <div class="drawer-body">
+      <!-- SECCIÓN 1: REGLAS Y MECÁNICAS -->
+      <div class="settings-section">
+        <div class="section-title">
+          <span class="icon">🎮</span>
+          <span>Reglas y Mecánicas</span>
+        </div>
+
+        <div class="form-row">
+          <label for="cfg-initial-lives">Vidas Iniciales:</label>
+          <span class="val-badge" data-bind-badge="cfg-initial-lives">3</span>
+        </div>
+        <input type="range" id="cfg-initial-lives" min="1" max="10" step="1" value="3">
+
+        <div class="form-row">
+          <label for="cfg-word-lifetime">Tiempo de Vida (segundos):</label>
+          <span class="val-badge" data-bind-badge="cfg-word-lifetime">10</span>
+        </div>
+        <input type="range" id="cfg-word-lifetime" min="3" max="30" step="1" value="10">
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-min-speed">Vel. Mín:</label>
+              <span class="val-badge" data-bind-badge="cfg-min-speed">0.5</span>
+            </div>
+            <input type="range" id="cfg-min-speed" min="0" max="4" step="0.2" value="0.5">
+          </div>
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-max-speed">Vel. Máx:</label>
+              <span class="val-badge" data-bind-badge="cfg-max-speed">4.5</span>
+            </div>
+            <input type="range" id="cfg-max-speed" min="1" max="8" step="0.2" value="4.5">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="cfg-max-words">Máx Palabras / Partículas:</label>
+          <span class="val-badge" data-bind-badge="cfg-max-words">25</span>
+        </div>
+        <input type="range" id="cfg-max-words" min="4" max="100" step="1" value="25">
+
+        <div class="form-row">
+          <label for="cfg-spawn-interval">Intervalo de Spawn (seg):</label>
+          <span class="val-badge" data-bind-badge="cfg-spawn-interval">1.50</span>
+        </div>
+        <input type="range" id="cfg-spawn-interval" min="0.1" max="5.0" step="0.05" value="1.50">
+
+        <!-- Umbrales semánticos (Rango 0 a 1 con step 0.01) -->
+        <div class="form-row-2col">
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-thresh-points-plus">Suma Pts (d &gt;):</label>
+              <span class="val-badge" data-bind-badge="cfg-thresh-points-plus">0.50</span>
+            </div>
+            <input type="range" id="cfg-thresh-points-plus" min="0" max="1" step="0.01" value="0.50">
+          </div>
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-thresh-points-minus">Resta Pts (d &lt;):</label>
+              <span class="val-badge" data-bind-badge="cfg-thresh-points-minus">0.50</span>
+            </div>
+            <input type="range" id="cfg-thresh-points-minus" min="0" max="1" step="0.01" value="0.50">
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-thresh-life-plus">+1 Vida (d &gt;):</label>
+              <span class="val-badge" data-bind-badge="cfg-thresh-life-plus">0.90</span>
+            </div>
+            <input type="range" id="cfg-thresh-life-plus" min="0" max="1" step="0.01" value="0.90">
+          </div>
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-thresh-life-minus">-1 Vida (d &lt;):</label>
+              <span class="val-badge" data-bind-badge="cfg-thresh-life-minus">0.40</span>
+            </div>
+            <input type="range" id="cfg-thresh-life-minus" min="0" max="1" step="0.01" value="0.40">
+          </div>
+        </div>
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-points-gain">+Pts Base:</label>
+              <span class="val-badge" data-bind-badge="cfg-points-gain">100</span>
+            </div>
+            <input type="range" id="cfg-points-gain" min="10" max="500" step="10" value="100">
+          </div>
+          <div class="form-group">
+            <div class="form-row">
+              <label for="cfg-points-loss">-Pts Base:</label>
+              <span class="val-badge" data-bind-badge="cfg-points-loss">50</span>
+            </div>
+            <input type="range" id="cfg-points-loss" min="10" max="300" step="10" value="50">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: ESTILO Y TIPOGRAFÍA DE PALABRAS -->
+      <div class="settings-section">
+        <div class="section-title">
+          <span class="icon">🎨</span>
+          <span>Tipografía &amp; Estilo de Palabras</span>
+        </div>
+
+        <div class="form-group">
+          <label for="cfg-font-family">Tipografía:</label>
+          <select id="cfg-font-family">
+            <option value="Space Mono">Space Mono (Cyber / Monospace)</option>
+            <option value="Inter">Inter (Moderna y Limpia)</option>
+            <option value="Outfit">Outfit (Geométrica Premium)</option>
+            <option value="Cinzel">Cinzel (Clásica Solemne)</option>
+            <option value="Syne">Syne (Futurista Bold)</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="cfg-font-size">Tamaño de Fuente:</label>
+          <span class="val-badge" data-bind-badge="cfg-font-size">18</span>
+        </div>
+        <input type="range" id="cfg-font-size" min="12" max="32" step="1" value="18">
+
+        <div class="form-row-2col">
+          <div class="form-group">
+            <label for="cfg-text-color">Color de Palabra:</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="color" id="cfg-text-color" value="#ffffff">
+              <span style="font-size: 11px; color: var(--text-muted);">Texto</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="cfg-border-color">Color de Reborde:</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="color" id="cfg-border-color" value="#00f0ff">
+              <span style="font-size: 11px; color: var(--text-muted);">Borde</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="cfg-border-width">Grosor de Reborde:</label>
+          <span class="val-badge" data-bind-badge="cfg-border-width">2</span>
+        </div>
+        <input type="range" id="cfg-border-width" min="1" max="6" step="1" value="2">
+
+        <div style="margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
+          <label class="checkbox-row" style="margin-bottom: 8px;">
+            <input type="checkbox" id="cfg-show-network" checked>
+            <span>Líneas de Conexión Semántica</span>
+          </label>
+
+          <div class="form-row">
+            <label for="cfg-max-line-dist">Distancia de Red (px):</label>
+            <span class="val-badge" data-bind-badge="cfg-max-line-dist">200</span>
+          </div>
+          <input type="range" id="cfg-max-line-dist" min="80" max="400" step="10" value="200">
+
+          <div class="form-row" style="margin-top: 8px;">
+            <label for="cfg-line-width">Grosor de Líneas:</label>
+            <span class="val-badge" data-bind-badge="cfg-line-width">1.5</span>
+          </div>
+          <input type="range" id="cfg-line-width" min="0.5" max="4.0" step="0.5" value="1.5">
+
+          <div class="network-legend" style="margin-top: 12px; padding: 10px; background: rgba(0,0,0,0.35); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase;">
+              Mapeo de Color Semántico:
+            </div>
+            <div class="legend-bar" style="height: 8px; border-radius: 4px; background: linear-gradient(90deg, #ff1744 0%, #ffab00 40%, #00f0ff 70%, #00e676 90%, #e040fb 100%); margin-bottom: 6px;"></div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: 600;">
+              <span style="color: #ff1744;">CERCANO (RESTA)</span>
+              <span style="color: #ffab00;">MEDIO</span>
+              <span style="color: #00f0ff;">LEJANO (+PTS)</span>
+              <span style="color: #00e676;">OPUESTO (+VIDA)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 3: SHADER DE FONDO (NOISE & ASCII) -->
+      <div class="settings-section">
+        <div class="section-title">
+          <span class="icon">🌌</span>
+          <span>Shader de Fondo (Noise + ASCII)</span>
+        </div>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="cfg-shader-enabled" checked>
+          <span>Activar Shader de Fondo</span>
+        </label>
+
+        <label class="checkbox-row">
+          <input type="checkbox" id="cfg-shader-noise-only">
+          <span>Modo Solo Ruido (Sin ASCII)</span>
+        </label>
+
+        <div class="form-row">
+          <label for="cfg-shader-opacity">Opacidad del Shader:</label>
+          <span class="val-badge" data-bind-badge="cfg-shader-opacity">0.75</span>
+        </div>
+        <input type="range" id="cfg-shader-opacity" min="0.1" max="1.0" step="0.05" value="0.75">
+
+        <div class="form-row">
+          <label for="cfg-shader-speed">Velocidad de Animación:</label>
+          <span class="val-badge" data-bind-badge="cfg-shader-speed">0.35</span>
+        </div>
+        <input type="range" id="cfg-shader-speed" min="0.05" max="1.5" step="0.05" value="0.35">
+
+        <div class="form-row">
+          <label for="cfg-shader-tile">Escala de Ruido (Tile):</label>
+          <span class="val-badge" data-bind-badge="cfg-shader-tile">2.0</span>
+        </div>
+        <input type="range" id="cfg-shader-tile" min="0.5" max="6.0" step="0.2" value="2.0">
+
+        <div class="form-row">
+          <label for="cfg-shader-charsize">Tamaño Grilla ASCII (px):</label>
+          <span class="val-badge" data-bind-badge="cfg-shader-charsize">14</span>
+        </div>
+        <input type="range" id="cfg-shader-charsize" min="6" max="32" step="1" value="14">
+
+        <div class="form-row">
+          <label for="cfg-shader-glyphscale">Escala de Letra ASCII:</label>
+          <span class="val-badge" data-bind-badge="cfg-shader-glyphscale">0.85</span>
+        </div>
+        <input type="range" id="cfg-shader-glyphscale" min="0.2" max="1.5" step="0.05" value="0.85">
+
+        <div class="form-group">
+          <label for="cfg-shader-fontmode">Modo Tipográfico ASCII:</label>
+          <select id="cfg-shader-fontmode">
+            <option value="0">0: Estándar Completo (32 caracteres)</option>
+            <option value="1">1: Binario (0 y 1)</option>
+            <option value="2">2: Matrix Hex (0-9, A-F)</option>
+            <option value="3">3: Minimal Dots (+, *, :)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Paleta de 4 Colores del Ruido:</label>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px;">
+            <input type="color" id="cfg-shader-color1" value="#00e5ff" title="Color 1">
+            <input type="color" id="cfg-shader-color2" value="#7c4dff" title="Color 2">
+            <input type="color" id="cfg-shader-color3" value="#ff1744" title="Color 3">
+            <input type="color" id="cfg-shader-color4" value="#00e676" title="Color 4">
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 4: CUSTOM WORDING (PALABRAS PERSONALIZADAS) -->
+      <div class="settings-section">
+        <div class="section-title">
+          <span class="icon">📝</span>
+          <span>Custom Wording (Palabras Personalizadas)</span>
+        </div>
+
+        <!-- Mode Toggle Switch -->
+        <div class="mode-switch-container">
+          <label class="mode-switch-label">Modo de Palabras:</label>
+          <div class="segmented-control">
+            <button type="button" class="segmented-btn active" id="btn-mode-random" data-mode="random">🎲 Random (Modelo 300D)</button>
+            <button type="button" class="segmented-btn" id="btn-mode-custom" data-mode="custom">📜 Custom (Lista Ordenada)</button>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label for="cfg-custom-word-input">Agregar Palabra a la Lista:</label>
+          <div class="input-group-row">
+            <input type="text" id="cfg-custom-word-input" placeholder="Escribe una palabra (ej: tiempo)..." autocomplete="off" spellcheck="false" />
+            <button type="button" class="btn-add-word" id="btn-add-custom-word">+ Agregar</button>
+          </div>
+        </div>
+
+        <!-- List Header -->
+        <div class="custom-words-header">
+          <span>Lista de Palabras (<span id="custom-words-count">0</span>)</span>
+          <span class="custom-hint-badge">Se respeta el orden secuencial</span>
+        </div>
+
+        <!-- Interactive Words List -->
+        <div id="custom-words-list" class="custom-words-list">
+          <!-- Dynamic word items inserted here -->
+        </div>
+
+        <div class="custom-info-note">
+          💡 <strong>Nota:</strong> En modo Custom, el juego spawnea solo estas palabras manteniendo estrictamente el orden ingresado.
+        </div>
+      </div>
+    </div>
+
+    <!-- PIE DEL PANEL: BOTÓN GUARDAR DIRECTO AL SERVIDOR -->
+    <div class="drawer-footer">
+      <button class="btn-primary" id="btn-save-settings">
+        <span>💾 GUARDAR PARÁMETROS EN SERVIDOR</span>
+      </button>
+      <button class="btn-secondary" id="btn-close-settings-footer" onclick="document.getElementById('settings-drawer').classList.remove('open')">
+        Cerrar Panel [P]
+      </button>
+    </div>
+  </div>
+
+  <!-- Capa 5: Modal de Inicio y Pantalla Completa -->
+  <div class="game-modal-overlay" id="start-overlay">
+    <div class="game-modal-card">
+      <div class="modal-title">SINCRETISMO DE SILICIO</div>
+      <div class="modal-subtitle">Juego Dinámico de Distancia y Fusión Semántica en p5.js</div>
+
+      <div class="modal-instructions">
+        <div class="instruction-item">
+          <span class="instruction-bullet">1.</span>
+          <span>Las palabras flotan en la pantalla con velocidades aleatorias y tienen <strong>10 segundos de vida</strong>.</span>
+        </div>
+        <div class="instruction-item">
+          <span class="instruction-bullet">2.</span>
+          <span><strong>Arrastra con el mouse</strong> una palabra sobre otra para colisionarlas.</span>
+        </div>
+        <div class="instruction-item">
+          <span class="instruction-bullet">3.</span>
+          <span>Diferencia semántica <strong>d &gt; 0.5</strong> suma puntos; <strong>d &lt; 0.5</strong> resta puntos.</span>
+        </div>
+        <div class="instruction-item">
+          <span class="instruction-bullet">4.</span>
+          <span>Contraste supremo <strong>d &gt; 0.9</strong> suma una vida; cercanía excesiva <strong>d &lt; 0.4</strong> resta una vida.</span>
+        </div>
+        <div class="instruction-item">
+          <span class="instruction-bullet">5.</span>
+          <span>Presiona <kbd style="color:var(--accent-cyan);">P</kbd> en cualquier momento para modificar todos los parámetros y guardarlos en el servidor.</span>
+        </div>
+      </div>
+
+      <button class="modal-btn" id="btn-start-game">
+        🎮 ENTRAR EN PANTALLA COMPLETA &amp; JUGAR
+      </button>
+    </div>
+  </div>
+
+  <!-- Capa 6: Modal de Game Over -->
+  <div class="game-modal-overlay hidden" id="gameover-modal">
+    <div class="game-modal-card gameover-card">
+      <div class="modal-title gameover-title">SIN VIDAS</div>
+      <div class="modal-subtitle">Has agotado tus reservas cognitivas.</div>
+
+      <div style="padding: 16px; background: rgba(0,0,0,0.4); border-radius: 12px;">
+        <span style="color: var(--text-muted); font-size: 13px;">PUNTUACIÓN FINAL:</span>
+        <div id="final-score-val" style="font-size: 38px; color: var(--accent-cyan); font-weight: 800; margin-top: 4px;">0</div>
+      </div>
+
+      <button class="modal-btn" id="btn-retry-game">
+        🔄 REINTENTAR
+      </button>
+    </div>
+  </div>
+
+  <!-- Capa 7: Contenedor de Notificaciones Toast -->
+  <div id="toast-container"></div>
+
+  <!-- Script principal del juego -->
+  <script type="module" src="js/game/standaloneGame.js"></script>
+</body>
+</html>

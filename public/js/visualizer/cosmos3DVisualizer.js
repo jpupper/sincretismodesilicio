@@ -815,12 +815,39 @@ export class Cosmos3DVisualizer {
     }
   }
 
+  async setProjectionMode(mode) {
+    this.projectionMode = mode;
+    const newCoords = await semanticEngine.loadProjection(mode);
+    if (!newCoords || !this.instancedMesh) return;
+
+    const dummy = new THREE.Object3D();
+    const count = semanticEngine.vocab.length;
+
+    for (let i = 0; i < count; i++) {
+      dummy.position.set(newCoords[i * 3], newCoords[i * 3 + 1], newCoords[i * 3 + 2]);
+      dummy.scale.set(this.sphereScale, this.sphereScale, this.sphereScale);
+      dummy.updateMatrix();
+      this.instancedMesh.setMatrixAt(i, dummy.matrix);
+    }
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    this.instancedMesh.computeBoundingSphere();
+    this.instancedMesh.computeBoundingBox();
+
+    // Re-place electric shader on selected sphere if present
+    if (this.currentTargetWord) {
+      this.selectSphere(this.currentTargetWord);
+    }
+
+    soundFX.playActivate();
+  }
+
   resetCalibration() {
     this.labelDistance = 260;
     this.maxVisibleLabels = 45;
     this.labelScale = 1.0;
     this.setSphereScale(1.0);
     this.speed = 4.5;
+    this.setProjectionMode('umap');
     this.updateHUD();
   }
 

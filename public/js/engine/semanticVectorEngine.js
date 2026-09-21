@@ -47,27 +47,60 @@ export class SemanticVectorEngine {
     }
 
     this.matrix = new Float32Array(arrayBuffer);
+    this.projections = new Map();
 
-    // Load 3D PCA coordinates
+    // Cargar proyección semántica 3D inicial (UMAP por defecto)
+    await this.loadProjection('umap');
+
+    this.isLoaded = true;
+    onProgress({ status: 'Espacio vectorial y cosmos 3D sincronizados', progress: 1.0 });
+  }
+
+  /**
+   * Carga cualquiera de los modelos de reducción dimensional disponibles:
+   * - 'umap': Manifold no lineal k-NN (preserva cúmulos semánticos)
+   * - 'pca': Análisis de componentes principales (varianza lineal global)
+   * - 'clusters': Cúmulos temáticos galácticos
+   */
+  async loadProjection(mode = 'umap') {
+    if (this.projections && this.projections.has(mode)) {
+      this.coords3d = this.projections.get(mode);
+      return this.coords3d;
+    }
+
+    const filename = mode === 'pca'
+      ? 'coords3d_pca.bin'
+      : (mode === 'clusters' ? 'coords3d_clusters.bin' : 'coords3d_umap.bin');
+
     try {
       if (typeof window === 'undefined') {
         const fs = await import('fs');
         const path = await import('path');
-        const bin3d = fs.readFileSync(path.resolve('public/data/coords3d.bin'));
-        this.coords3d = new Float32Array(bin3d.buffer, bin3d.byteOffset, bin3d.byteLength / 4);
+        const file = path.resolve(`public/data/${filename}`);
+        const bin3d = fs.existsSync(file) ? fs.readFileSync(file) : fs.readFileSync(path.resolve('public/data/coords3d.bin'));
+        const coords = new Float32Array(bin3d.buffer, bin3d.byteOffset, bin3d.byteLength / 4);
+        if (!this.projections) this.projections = new Map();
+        this.projections.set(mode, coords);
+        this.coords3d = coords;
+        return coords;
       } else {
-        const res3d = await fetch('./data/coords3d.bin');
-        if (res3d.ok) {
-          const buf3d = await res3d.arrayBuffer();
-          this.coords3d = new Float32Array(buf3d);
+        let res = await fetch(`./data/${filename}`);
+        if (!res.ok) {
+          res = await fetch('./data/coords3d.bin');
+        }
+        if (res.ok) {
+          const buf = await res.arrayBuffer();
+          const coords = new Float32Array(buf);
+          if (!this.projections) this.projections = new Map();
+          this.projections.set(mode, coords);
+          this.coords3d = coords;
+          return coords;
         }
       }
     } catch (e) {
-      console.warn('Coords3d loading fallback:', e);
+      console.warn(`Error al cargar proyección 3D (${mode}):`, e);
     }
-
-    this.isLoaded = true;
-    onProgress({ status: 'Espacio vectorial y cosmos 3D sincronizados', progress: 1.0 });
+    return this.coords3d;
   }
 
   getWordCoord3D(word) {

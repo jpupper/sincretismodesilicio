@@ -342,6 +342,11 @@ function setupControls() {
   const calibPanel = document.getElementById('cosmos-calibration-panel');
   const btnCloseCalib = document.getElementById('btn-close-calib');
   const btnResetCalib = document.getElementById('btn-reset-calibration');
+  const btnSaveCalib = document.getElementById('btn-save-calibration');
+  const calibSaveToast = document.getElementById('calib-save-toast');
+
+  const selectProjection = document.getElementById('calib-projection-mode');
+  const badgeProjection = document.getElementById('badge-projection-mode');
 
   const sliderLabelDist = document.getElementById('calib-label-dist');
   const valLabelDist = document.getElementById('val-label-dist');
@@ -353,6 +358,19 @@ function setupControls() {
   const valSphereSize = document.getElementById('val-sphere-size');
   const sliderFlightSpeed = document.getElementById('calib-flight-speed');
   const valFlightSpeed = document.getElementById('val-flight-speed');
+
+  // Cambiar modelo de proyección dimensional (UMAP, PCA, Cúmulos)
+  if (selectProjection) {
+    selectProjection.addEventListener('change', async (e) => {
+      const mode = e.target.value;
+      if (badgeProjection) {
+        badgeProjection.textContent = mode.toUpperCase();
+      }
+      if (cosmosVisualizer) {
+        await cosmosVisualizer.setProjectionMode(mode);
+      }
+    });
+  }
 
   if (btnToggleCalib && calibPanel) {
     btnToggleCalib.addEventListener('click', () => {
@@ -407,9 +425,40 @@ function setupControls() {
     });
   }
 
+  // Guardar configuración en localStorage
+  if (btnSaveCalib) {
+    btnSaveCalib.addEventListener('click', () => {
+      const config = {
+        projectionMode: selectProjection ? selectProjection.value : 'umap',
+        labelDistance: sliderLabelDist ? Number(sliderLabelDist.value) : 260,
+        maxVisibleLabels: sliderLabelCount ? Number(sliderLabelCount.value) : 45,
+        labelScale: sliderLabelSize ? Number(sliderLabelSize.value) : 1.0,
+        sphereScale: sliderSphereSize ? Number(sliderSphereSize.value) : 1.0,
+        flightSpeed: sliderFlightSpeed ? Number(sliderFlightSpeed.value) : 4.5
+      };
+
+      try {
+        localStorage.setItem('sincretismo_cosmos_config', JSON.stringify(config));
+        soundFX.playCorrect();
+
+        if (calibSaveToast) {
+          calibSaveToast.style.display = 'block';
+          setTimeout(() => {
+            calibSaveToast.style.display = 'none';
+          }, 2800);
+        }
+      } catch (err) {
+        console.warn('Error al guardar configuración en localStorage:', err);
+      }
+    });
+  }
+
+  // Restablecer valores por defecto
   if (btnResetCalib) {
     btnResetCalib.addEventListener('click', () => {
       if (cosmosVisualizer) cosmosVisualizer.resetCalibration();
+      if (selectProjection) selectProjection.value = 'umap';
+      if (badgeProjection) badgeProjection.textContent = 'UMAP';
       if (sliderLabelDist) sliderLabelDist.value = 260;
       if (valLabelDist) valLabelDist.textContent = '260 u';
       if (sliderLabelCount) sliderLabelCount.value = 45;
@@ -421,6 +470,46 @@ function setupControls() {
       if (sliderFlightSpeed) sliderFlightSpeed.value = 4.5;
       if (valFlightSpeed) valFlightSpeed.textContent = '4.5x';
     });
+  }
+
+  // Cargar configuración guardada al iniciar si existe
+  try {
+    const savedRaw = localStorage.getItem('sincretismo_cosmos_config');
+    if (savedRaw) {
+      const cfg = JSON.parse(savedRaw);
+      if (cfg.projectionMode && selectProjection) {
+        selectProjection.value = cfg.projectionMode;
+        if (badgeProjection) badgeProjection.textContent = cfg.projectionMode.toUpperCase();
+        if (cosmosVisualizer) cosmosVisualizer.setProjectionMode(cfg.projectionMode);
+      }
+      if (cfg.labelDistance !== undefined && sliderLabelDist) {
+        sliderLabelDist.value = cfg.labelDistance;
+        if (valLabelDist) valLabelDist.textContent = `${cfg.labelDistance} u`;
+        if (cosmosVisualizer) cosmosVisualizer.setLabelDistance(cfg.labelDistance);
+      }
+      if (cfg.maxVisibleLabels !== undefined && sliderLabelCount) {
+        sliderLabelCount.value = cfg.maxVisibleLabels;
+        if (valLabelCount) valLabelCount.textContent = cfg.maxVisibleLabels;
+        if (cosmosVisualizer) cosmosVisualizer.setMaxVisibleLabels(cfg.maxVisibleLabels);
+      }
+      if (cfg.labelScale !== undefined && sliderLabelSize) {
+        sliderLabelSize.value = cfg.labelScale;
+        if (valLabelSize) valLabelSize.textContent = `${Number(cfg.labelScale).toFixed(1)}x`;
+        if (cosmosVisualizer) cosmosVisualizer.setLabelScale(cfg.labelScale);
+      }
+      if (cfg.sphereScale !== undefined && sliderSphereSize) {
+        sliderSphereSize.value = cfg.sphereScale;
+        if (valSphereSize) valSphereSize.textContent = `${Number(cfg.sphereScale).toFixed(1)}x`;
+        if (cosmosVisualizer) cosmosVisualizer.setSphereScale(cfg.sphereScale);
+      }
+      if (cfg.flightSpeed !== undefined && sliderFlightSpeed) {
+        sliderFlightSpeed.value = cfg.flightSpeed;
+        if (valFlightSpeed) valFlightSpeed.textContent = `${Number(cfg.flightSpeed).toFixed(1)}x`;
+        if (cosmosVisualizer) cosmosVisualizer.setFlightSpeed(cfg.flightSpeed);
+      }
+    }
+  } catch (err) {
+    console.warn('Error al restaurar configuración guardada:', err);
   }
 }
 

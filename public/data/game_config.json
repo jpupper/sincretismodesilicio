@@ -1,0 +1,12 @@
+{
+  "gameplay": {
+    "initialLives": 3
+  },
+  "customWording": {
+    "mode": "custom",
+    "words": [
+      "TIEMPO",
+      "FUEGO"
+    ]
+  }
+}
