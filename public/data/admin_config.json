@@ -1,0 +1,7 @@
+{
+  "guardianModel": "gemini-3.6-flash",
+  "storyPlot": "Trama distópica personalizada",
+  "agentRules": "Relatos de 2 oraciones. Opciones max 3 palabras",
+  "agentPersona": "Analítico",
+  "gameDuration": 8
+}

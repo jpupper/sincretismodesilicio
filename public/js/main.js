@@ -1,12 +1,19 @@
 import { semanticEngine } from './engine/semanticVectorEngine.js';
 import { GraphVisualizer } from './visualizer/graphVisualizer.js';
 import { Cosmos3DVisualizer } from './visualizer/cosmos3DVisualizer.js';
+import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js';
+import { DistanceCalculatorUI } from './components/distanceCalculator.js';
+import { ClusterLibraryUI } from './components/clusterLibraryUI.js';
 import { GameMode } from './game/gameMode.js';
 import { soundFX } from './audio/soundFX.js';
 
 let visualizer = null;
 let cosmosVisualizer = null;
+let clusterCosmosVisualizer = null;
+let distanceCalculatorUI = null;
+let clusterLibraryUI = null;
 let gameMode = null;
+
 let currentWord = 'filosofía';
 let filterSignifier = true;
 let inspectedNode = null;
@@ -22,13 +29,25 @@ const autocompleteDropdown = document.getElementById('search-autocomplete');
 const randomWordBtn = document.getElementById('btn-random-word');
 const filterToggle = document.getElementById('toggle-filter-signifier');
 
+// Tabs & Views
+const tabHubBtn = document.getElementById('tab-hub-btn');
 const tabExplorerBtn = document.getElementById('tab-explorer-btn');
-const tabGameBtn = document.getElementById('tab-game-btn');
+const tabDistanceBtn = document.getElementById('tab-distance-btn');
+const tabClusterLibBtn = document.getElementById('tab-cluster-lib-btn');
+const tabCosmosClustersBtn = document.getElementById('tab-cosmos-clusters-btn');
 const tabCosmosBtn = document.getElementById('tab-cosmos-btn');
+const tabGameBtn = document.getElementById('tab-game-btn');
+
+const viewHub = document.getElementById('view-hub');
 const viewExplorer = document.getElementById('view-explorer');
-const viewGame = document.getElementById('view-game');
+const viewDistance = document.getElementById('view-distance');
+const viewClusterLib = document.getElementById('view-cluster-lib');
+const viewCosmosClusters = document.getElementById('view-cosmos-clusters');
 const viewCosmos = document.getElementById('view-cosmos');
+const viewGame = document.getElementById('view-game');
+
 const cosmosViewport = document.getElementById('cosmos-viewport');
+const cosmosClustersViewport = document.getElementById('cosmos-clusters-viewport');
 const cosmosSearchInput = document.getElementById('cosmos-search-input');
 const btnCosmosWarp = document.getElementById('btn-cosmos-warp');
 const btnCosmosRandom = document.getElementById('btn-cosmos-random');
@@ -53,6 +72,7 @@ const soundIcon = document.getElementById('sound-icon');
 const infoModalBtn = document.getElementById('btn-info-modal');
 const infoModal = document.getElementById('info-modal');
 const btnCloseModal = document.getElementById('btn-close-modal');
+const brandLogoBtn = document.getElementById('brand-logo-btn');
 
 const presetChipsContainer = document.getElementById('preset-chips');
 
@@ -85,17 +105,28 @@ async function initApp() {
       }
     });
 
-    // 4. Initialize 3D Cosmos Visualizer
+    // 4. Initialize 3D Cosmos Visualizers
     cosmosVisualizer = new Cosmos3DVisualizer(cosmosViewport, {
-      onSelectWord: (word) => {
-        // Targeted word in 3D
-      }
+      onSelectWord: (word) => {}
     });
 
-    // 5. Setup Event Listeners
+    clusterCosmosVisualizer = new ClusterCosmos3D(cosmosClustersViewport, {});
+
+    // 5. Initialize UI Components
+    const distCalcRoot = document.getElementById('distance-calc-root');
+    if (distCalcRoot) {
+      distanceCalculatorUI = new DistanceCalculatorUI(distCalcRoot);
+    }
+
+    const clusterLibRoot = document.getElementById('cluster-lib-root');
+    if (clusterLibRoot) {
+      clusterLibraryUI = new ClusterLibraryUI(clusterLibRoot);
+    }
+
+    // 6. Setup Event Listeners
     setupControls();
 
-    // 6. Initial Search
+    // 7. Initial Search for 2D Graph
     exploreWord(currentWord);
 
   } catch (err) {
@@ -131,7 +162,6 @@ function exploreWord(word) {
   visualizer.setData(data);
   visualizer.resetCamera();
 
-  // Show center node details in inspector initially
   showNodeInspector(visualizer.centerNode);
 }
 
@@ -148,11 +178,7 @@ function handleNodeClick(node) {
   }, 150);
 }
 
-function handleNodeHover(node) {
-  if (node && !nodeInspector.classList.contains('open')) {
-    // Optional preview
-  }
-}
+function handleNodeHover(node) {}
 
 function showNodeInspector(node) {
   if (!node) return;
@@ -199,6 +225,19 @@ function showNodeInspector(node) {
 }
 
 function setupControls() {
+  // Brand logo -> Hub
+  if (brandLogoBtn) {
+    brandLogoBtn.addEventListener('click', () => switchTab('hub'));
+  }
+
+  // Hub Cards Launch Buttons
+  document.querySelectorAll('.hub-card[data-launch]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      const targetTab = card.getAttribute('data-launch');
+      if (targetTab) switchTab(targetTab);
+    });
+  });
+
   searchBtn.addEventListener('click', () => {
     const val = searchInput.value.trim();
     if (val) exploreWord(val);
@@ -285,8 +324,14 @@ function setupControls() {
     }
   });
 
-  tabExplorerBtn.addEventListener('click', () => switchTab('explorer'));
-  tabGameBtn.addEventListener('click', () => switchTab('game'));
+  // Tab Navigation Click Listeners
+  if (tabHubBtn) tabHubBtn.addEventListener('click', () => switchTab('hub'));
+  if (tabExplorerBtn) tabExplorerBtn.addEventListener('click', () => switchTab('explorer'));
+  if (tabDistanceBtn) tabDistanceBtn.addEventListener('click', () => switchTab('distance'));
+  if (tabClusterLibBtn) tabClusterLibBtn.addEventListener('click', () => switchTab('cluster-lib'));
+  if (tabCosmosClustersBtn) tabCosmosClustersBtn.addEventListener('click', () => switchTab('cosmos-clusters'));
+  if (tabCosmosBtn) tabCosmosBtn.addEventListener('click', () => switchTab('cosmos'));
+  if (tabGameBtn) tabGameBtn.addEventListener('click', () => switchTab('game'));
 
   soundToggleBtn.addEventListener('click', () => {
     const isEnabled = soundFX.toggle();
@@ -308,9 +353,7 @@ function setupControls() {
     }
   });
 
-  // 3D Cosmos Controls
-  tabCosmosBtn.addEventListener('click', () => switchTab('cosmos'));
-
+  // 3D Cosmos Flight Controls
   btnCosmosWarp.addEventListener('click', () => {
     const val = cosmosSearchInput.value.trim();
     if (val && cosmosVisualizer) {
@@ -359,7 +402,6 @@ function setupControls() {
   const sliderFlightSpeed = document.getElementById('calib-flight-speed');
   const valFlightSpeed = document.getElementById('val-flight-speed');
 
-  // Cambiar modelo de proyección dimensional (UMAP, PCA, Cúmulos)
   if (selectProjection) {
     selectProjection.addEventListener('change', async (e) => {
       const mode = e.target.value;
@@ -425,7 +467,6 @@ function setupControls() {
     });
   }
 
-  // Guardar configuración en localStorage
   if (btnSaveCalib) {
     btnSaveCalib.addEventListener('click', () => {
       const config = {
@@ -453,7 +494,6 @@ function setupControls() {
     });
   }
 
-  // Restablecer valores por defecto
   if (btnResetCalib) {
     btnResetCalib.addEventListener('click', () => {
       if (cosmosVisualizer) cosmosVisualizer.resetCalibration();
@@ -471,78 +511,60 @@ function setupControls() {
       if (valFlightSpeed) valFlightSpeed.textContent = '4.5x';
     });
   }
-
-  // Cargar configuración guardada al iniciar si existe
-  try {
-    const savedRaw = localStorage.getItem('sincretismo_cosmos_config');
-    if (savedRaw) {
-      const cfg = JSON.parse(savedRaw);
-      if (cfg.projectionMode && selectProjection) {
-        selectProjection.value = cfg.projectionMode;
-        if (badgeProjection) badgeProjection.textContent = cfg.projectionMode.toUpperCase();
-        if (cosmosVisualizer) cosmosVisualizer.setProjectionMode(cfg.projectionMode);
-      }
-      if (cfg.labelDistance !== undefined && sliderLabelDist) {
-        sliderLabelDist.value = cfg.labelDistance;
-        if (valLabelDist) valLabelDist.textContent = `${cfg.labelDistance} u`;
-        if (cosmosVisualizer) cosmosVisualizer.setLabelDistance(cfg.labelDistance);
-      }
-      if (cfg.maxVisibleLabels !== undefined && sliderLabelCount) {
-        sliderLabelCount.value = cfg.maxVisibleLabels;
-        if (valLabelCount) valLabelCount.textContent = cfg.maxVisibleLabels;
-        if (cosmosVisualizer) cosmosVisualizer.setMaxVisibleLabels(cfg.maxVisibleLabels);
-      }
-      if (cfg.labelScale !== undefined && sliderLabelSize) {
-        sliderLabelSize.value = cfg.labelScale;
-        if (valLabelSize) valLabelSize.textContent = `${Number(cfg.labelScale).toFixed(1)}x`;
-        if (cosmosVisualizer) cosmosVisualizer.setLabelScale(cfg.labelScale);
-      }
-      if (cfg.sphereScale !== undefined && sliderSphereSize) {
-        sliderSphereSize.value = cfg.sphereScale;
-        if (valSphereSize) valSphereSize.textContent = `${Number(cfg.sphereScale).toFixed(1)}x`;
-        if (cosmosVisualizer) cosmosVisualizer.setSphereScale(cfg.sphereScale);
-      }
-      if (cfg.flightSpeed !== undefined && sliderFlightSpeed) {
-        sliderFlightSpeed.value = cfg.flightSpeed;
-        if (valFlightSpeed) valFlightSpeed.textContent = `${Number(cfg.flightSpeed).toFixed(1)}x`;
-        if (cosmosVisualizer) cosmosVisualizer.setFlightSpeed(cfg.flightSpeed);
-      }
-    }
-  } catch (err) {
-    console.warn('Error al restaurar configuración guardada:', err);
-  }
 }
 
 function switchTab(tabId) {
-  tabExplorerBtn.classList.remove('active');
-  tabGameBtn.classList.remove('active');
-  tabCosmosBtn.classList.remove('active');
-  viewExplorer.classList.remove('active');
-  viewGame.classList.remove('active');
-  viewCosmos.classList.remove('active');
+  // Clear active tab buttons
+  [tabHubBtn, tabExplorerBtn, tabDistanceBtn, tabClusterLibBtn, tabCosmosClustersBtn, tabCosmosBtn, tabGameBtn].forEach(btn => {
+    if (btn) btn.classList.remove('active');
+  });
 
-  if (tabId === 'explorer') {
-    tabExplorerBtn.classList.add('active');
-    viewExplorer.classList.add('active');
-    visualizer.resize();
-    if (cosmosVisualizer) cosmosVisualizer.stop();
-  } else if (tabId === 'game') {
-    tabGameBtn.classList.add('active');
-    viewGame.classList.add('active');
-    if (cosmosVisualizer) cosmosVisualizer.stop();
-    if (gameMode) {
-      if (gameMode.screen === 'start') {
-        gameMode.render();
-      }
+  // Clear active view panels
+  [viewHub, viewExplorer, viewDistance, viewClusterLib, viewCosmosClusters, viewCosmos, viewGame].forEach(panel => {
+    if (panel) panel.classList.remove('active');
+  });
+
+  // Stop 3D animations when leaving 3D tabs
+  if (cosmosVisualizer) cosmosVisualizer.stop();
+  if (clusterCosmosVisualizer) clusterCosmosVisualizer.stop();
+
+  if (tabId === 'hub') {
+    if (tabHubBtn) tabHubBtn.classList.add('active');
+    if (viewHub) viewHub.classList.add('active');
+  } else if (tabId === 'explorer') {
+    if (tabExplorerBtn) tabExplorerBtn.classList.add('active');
+    if (viewExplorer) viewExplorer.classList.add('active');
+    if (visualizer) visualizer.resize();
+  } else if (tabId === 'distance') {
+    if (tabDistanceBtn) tabDistanceBtn.classList.add('active');
+    if (viewDistance) viewDistance.classList.add('active');
+    if (distanceCalculatorUI) distanceCalculatorUI.calculateAndRenderResults();
+  } else if (tabId === 'cluster-lib') {
+    if (tabClusterLibBtn) tabClusterLibBtn.classList.add('active');
+    if (viewClusterLib) viewClusterLib.classList.add('active');
+  } else if (tabId === 'cosmos-clusters') {
+    if (tabCosmosClustersBtn) tabCosmosClustersBtn.classList.add('active');
+    if (viewCosmosClusters) viewCosmosClusters.classList.add('active');
+    if (clusterCosmosVisualizer) {
+      clusterCosmosVisualizer.handleResize();
+      clusterCosmosVisualizer.start();
     }
   } else if (tabId === 'cosmos') {
-    tabCosmosBtn.classList.add('active');
-    viewCosmos.classList.add('active');
+    if (tabCosmosBtn) tabCosmosBtn.classList.add('active');
+    if (viewCosmos) viewCosmos.classList.add('active');
     if (cosmosVisualizer) {
       cosmosVisualizer.handleResize();
       cosmosVisualizer.start();
     }
+  } else if (tabId === 'game') {
+    if (tabGameBtn) tabGameBtn.classList.add('active');
+    if (viewGame) viewGame.classList.add('active');
+    if (gameMode && gameMode.screen === 'start') {
+      gameMode.render();
+    }
   }
+
+  soundFX.playClick();
 }
 
 window.addEventListener('DOMContentLoaded', initApp);

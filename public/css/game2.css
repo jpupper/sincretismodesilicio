@@ -1,0 +1,567 @@
+/* ==========================================================================
+   GAME 2: COSMOS DE HAIKUS SEMÁNTICOS - STYLESHEET
+   Estética: Cyberpunk Zen, Constelaciones Gravitatorias y Caligrafía Etérea
+   ========================================================================== */
+
+:root {
+  --haiku-gold: #ffcf33;
+  --haiku-amber: #f59e0b;
+  --haiku-violet: #a855f7;
+  --haiku-cyan: #00f0ff;
+  --haiku-jade: #10b981;
+  --haiku-glow-gold: 0 0 20px rgba(255, 207, 51, 0.45);
+  --haiku-glow-violet: 0 0 20px rgba(168, 85, 247, 0.45);
+  --font-serif: 'Cinzel', 'Outfit', serif;
+  --font-haiku: 'Cinzel', serif;
+}
+
+/* Radar / Indicador de Resonancia Flotante */
+.radar-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(6, 12, 24, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 12px 22px;
+  border-radius: 14px;
+  border: 1px solid var(--border-cyan);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.08);
+  pointer-events: auto;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.radar-panel:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 10px 40px rgba(0, 240, 255, 0.2), inset 0 0 20px rgba(0, 240, 255, 0.15);
+}
+
+.radar-core-word {
+  font-family: var(--font-haiku);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--haiku-gold);
+  text-shadow: 0 0 10px rgba(255, 207, 51, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.radar-triad-slots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.triad-slot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(0, 240, 255, 0.3);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  transition: all 0.4s ease;
+}
+
+.triad-slot.filled {
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  font-weight: 700;
+}
+
+.triad-slot.seed {
+  background: rgba(255, 207, 51, 0.15);
+  border: 1px solid var(--haiku-gold);
+  color: var(--haiku-gold);
+  box-shadow: 0 0 12px rgba(255, 207, 51, 0.35);
+  font-weight: 700;
+}
+
+.triad-slot .slot-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Hover HUD / Inspector de Distancia en tiempo real */
+#distance-inspector-hud {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 14, 26, 0.9);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 12px;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  z-index: 15;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+}
+
+#distance-inspector-hud.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.inspector-word {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1.5px;
+}
+
+.inspector-affinity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--accent-cyan);
+}
+
+.affinity-bar-bg {
+  width: 90px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.affinity-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-magenta), var(--accent-cyan));
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
+.inspector-status-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.badge-close {
+  background: rgba(0, 230, 118, 0.2);
+  color: var(--accent-green);
+  border: 1px solid var(--accent-green);
+}
+
+.badge-medium {
+  background: rgba(255, 171, 0, 0.2);
+  color: var(--accent-yellow);
+  border: 1px solid var(--accent-yellow);
+}
+
+.badge-far {
+  background: rgba(255, 23, 68, 0.2);
+  color: var(--accent-red);
+  border: 1px solid var(--accent-red);
+}
+
+/* Modal de Semilla Cósmica */
+.seed-modal-card {
+  max-width: 620px;
+  width: 92%;
+  background: linear-gradient(135deg, rgba(8, 14, 26, 0.95) 0%, rgba(13, 20, 36, 0.92) 100%);
+  border: 1px solid var(--border-cyan);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 240, 255, 0.15);
+}
+
+.seed-presets-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.seed-preset-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: var(--text-main);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-family: var(--font-game);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.seed-preset-pill:hover,
+.seed-preset-pill.active {
+  background: rgba(0, 240, 255, 0.18);
+  border-color: var(--accent-cyan);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Altar de Síntesis del Haiku */
+.haiku-altar-card {
+  max-width: 680px;
+  width: 92%;
+  background: linear-gradient(180deg, rgba(7, 12, 22, 0.96) 0%, rgba(12, 18, 32, 0.97) 100%);
+  border: 1px solid rgba(255, 207, 51, 0.4);
+  border-radius: 20px;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9), 0 0 40px rgba(255, 207, 51, 0.15);
+  padding: 34px 30px;
+  position: relative;
+  overflow: hidden;
+}
+
+.haiku-altar-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--haiku-cyan), var(--haiku-gold), var(--haiku-violet));
+}
+
+.haiku-triad-banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.triad-chip {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.triad-chip.seed {
+  background: rgba(255, 207, 51, 0.15);
+  border-color: var(--haiku-gold);
+  color: var(--haiku-gold);
+}
+
+.triad-chip.word2 {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.triad-chip.word3 {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: var(--haiku-violet);
+  color: var(--haiku-violet);
+}
+
+/* Caja de versos del Haiku */
+.haiku-scroll-container {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 24px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.haiku-verse-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.haiku-verse-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 207, 51, 0.2);
+}
+
+.verse-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.verse-syllables-badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 240, 255, 0.12);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  font-family: var(--font-game);
+  min-width: 36px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.verse-text-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-family: var(--font-haiku);
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 1px;
+  outline: none;
+  padding: 4px 0;
+  transition: color 0.2s ease;
+}
+
+.verse-text-input:focus {
+  color: var(--haiku-gold);
+}
+
+.btn-verse-reroll {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.btn-verse-reroll:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: var(--accent-cyan);
+  color: #fff;
+  transform: rotate(45deg);
+}
+
+/* Selector de Tono Poético */
+.poetic-tone-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tone-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.tone-pills-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tone-pill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tone-pill:hover,
+.tone-pill.active {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: var(--haiku-violet);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+}
+
+/* Botonera de acciones en el altar */
+.altar-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .altar-actions-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.btn-altar {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: var(--font-game);
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+}
+
+.btn-altar-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-altar-secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: #fff;
+  transform: translateY(-2px);
+}
+
+.btn-altar-primary {
+  background: linear-gradient(135deg, var(--haiku-amber) 0%, #d97706 100%);
+  color: #050b14;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);
+}
+
+.btn-altar-primary:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 6px 22px rgba(245, 158, 11, 0.55);
+  transform: translateY(-2px);
+}
+
+/* Códice de Haikus (Drawer Lateral) */
+#codex-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 420px;
+  max-width: 90vw;
+  height: 100vh;
+  background: rgba(6, 12, 22, 0.97);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border-cyan);
+  z-index: 100;
+  transform: translateX(-100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 20px 0 60px rgba(0, 0, 0, 0.7);
+}
+
+#codex-drawer.open {
+  transform: translateX(0);
+}
+
+.codex-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.codex-item-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.codex-item-card:hover {
+  background: rgba(0, 240, 255, 0.06);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.15);
+}
+
+.codex-item-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.codex-item-triad {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--haiku-gold);
+  margin-bottom: 12px;
+  font-weight: 700;
+  flex-wrap: wrap;
+}
+
+.codex-item-verses {
+  font-family: var(--font-haiku);
+  font-size: 14px;
+  line-height: 1.7;
+  color: #fff;
+  border-left: 2px solid var(--haiku-amber);
+  padding-left: 10px;
+  margin-bottom: 10px;
+}
+
+.codex-item-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-codex-action {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-codex-action:hover {
+  color: #fff;
+  border-color: var(--accent-cyan);
+}
+
+/* Indicador de ayuda sutil en pantalla */
+.game-hint-overlay {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 1px;
+  pointer-events: none;
+  z-index: 5;
+}

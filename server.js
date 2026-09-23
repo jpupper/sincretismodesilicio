@@ -24,6 +24,7 @@ app.use((err, req, res, next) => {
 // Servir la carpeta public donde se encuentra el html, css, js y datos
 const publicPath = path.join(__dirname, 'public');
 const configFilePath = path.join(publicPath, 'data', 'game_config.json');
+const clustersFilePath = path.join(publicPath, 'data', 'user_clusters.json');
 
 // API: Obtener configuración del juego
 app.get('/api/game-config', (req, res) => {
@@ -59,6 +60,74 @@ app.post('/api/game-config', (req, res) => {
     console.error('Error al escribir game_config.json:', err);
     return res.status(500).json({ error: 'Error al guardar la configuración en el servidor' });
   }
+});
+
+// API: Obtener lista de Clusters/Categorías personalizadas
+app.get('/api/clusters', (req, res) => {
+  try {
+    if (fs.existsSync(clustersFilePath)) {
+      const data = fs.readFileSync(clustersFilePath, 'utf-8');
+      return res.json(JSON.parse(data));
+    }
+    // Si no existe aún el archivo, devolver clusters por defecto
+    const defaultClusters = [
+      {
+        id: 'poder',
+        name: 'PODER Y POLÍTICA',
+        color: '#ef4444',
+        words: ['política', 'izquierda', 'derecha', 'fascismo', 'comunismo', 'gobierno', 'estado', 'democracia']
+      },
+      {
+        id: 'animales',
+        name: 'ANIMALES & FAUNA',
+        color: '#10b981',
+        words: ['perro', 'gato', 'elefante', 'tigre', 'león', 'caballo', 'lobo', 'águila']
+      },
+      {
+        id: 'filosofia',
+        name: 'FILOSOFÍA & COSMOS',
+        color: '#8b5cf6',
+        words: ['existencia', 'tiempo', 'filosofía', 'mente', 'alma', 'verdad', 'conciencia', 'universo']
+      },
+      {
+        id: 'tecnologia',
+        name: 'TECNOLOGÍA & SILICIO',
+        color: '#06b6d4',
+        words: ['computadora', 'robot', 'código', 'algoritmo', 'futuro', 'silicio', 'red', 'memoria']
+      }
+    ];
+    return res.json(defaultClusters);
+  } catch (err) {
+    console.error('Error al leer user_clusters.json:', err);
+    return res.status(500).json({ error: 'Error al leer la biblioteca de clusters' });
+  }
+});
+
+// API: Guardar / Actualizar Biblioteca de Clusters
+app.post('/api/clusters', (req, res) => {
+  try {
+    const clusters = req.body;
+    if (!Array.isArray(clusters)) {
+      return res.status(400).json({ error: 'Formato de clusters inválido, debe ser una lista de categorías' });
+    }
+
+    const dataDir = path.join(publicPath, 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
+    fs.writeFileSync(clustersFilePath, JSON.stringify(clusters, null, 2), 'utf-8');
+    console.log('[API] Biblioteca de Clusters actualizada en user_clusters.json exitosamente.');
+    return res.json({ success: true, message: 'Clusters guardados correctamente en el servidor', clusters });
+  } catch (err) {
+    console.error('Error al escribir user_clusters.json:', err);
+    return res.status(500).json({ error: 'Error al guardar los clusters en el servidor' });
+  }
+});
+
+// Ruta explícita para el juego de Haikus Semánticos (game2)
+app.get(['/game2', '/game2.html'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'game2.html'));
 });
 
 // Ruta explícita para el nuevo juego independiente
