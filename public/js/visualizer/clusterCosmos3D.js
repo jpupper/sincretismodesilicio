@@ -361,14 +361,29 @@ export class ClusterCosmos3D {
 
   warpToNode(node) {
     if (!node) return;
-    const targetPos = node.position.clone();
-    const camPos = this.camera.position.clone();
-    const toNode = new THREE.Vector3().subVectors(targetPos, camPos).normalize();
+    const targetPos = new THREE.Vector3();
+    if (node.mesh) {
+      node.mesh.getWorldPosition(targetPos);
+    } else if (node.position) {
+      targetPos.copy(node.position);
+    } else {
+      return;
+    }
 
-    const standoff = node.isClusterCenter ? 140 : 45;
-    this.warpTarget.copy(targetPos).sub(toNode.multiplyScalar(standoff));
+    const camPos = this.camera.position.clone();
+    const toNode = new THREE.Vector3().subVectors(targetPos, camPos);
+    const dist = toNode.length();
+
+    if (dist < 0.001) {
+      toNode.set(0, 0, 1);
+    } else {
+      toNode.normalize();
+    }
+
+    const standoff = node.isClusterCenter ? 120 : 40;
+    this.warpTarget.copy(targetPos).sub(toNode.clone().multiplyScalar(standoff));
     this.warpTargetYaw = Math.atan2(-toNode.x, -toNode.z);
-    this.warpTargetPitch = Math.asin(Math.max(-0.99, Math.min(0.99, toNode.y)));
+    this.warpTargetPitch = Math.asin(Math.max(-0.999, Math.min(0.999, toNode.y)));
 
     this.isWarping = true;
     this.warpProgress = 0;
@@ -511,15 +526,31 @@ export class ClusterCosmos3D {
   update(dt, now) {
     if (this.isWarping) {
       this.warpProgress = Math.min(1, this.warpProgress + dt * 0.0035);
-      this.camera.position.lerp(this.warpTarget, 0.08);
+
+      if (this.targetNode && this.targetNode.mesh) {
+        const currentPos = new THREE.Vector3();
+        this.targetNode.mesh.getWorldPosition(currentPos);
+        const camPos = this.camera.position.clone();
+        const toNode = new THREE.Vector3().subVectors(currentPos, camPos);
+        const dist = toNode.length();
+        if (dist > 0.001) toNode.normalize();
+        else toNode.set(0, 0, 1);
+
+        const standoff = this.targetNode.isClusterCenter ? 120 : 40;
+        this.warpTarget.copy(currentPos).sub(toNode.clone().multiplyScalar(standoff));
+        this.warpTargetYaw = Math.atan2(-toNode.x, -toNode.z);
+        this.warpTargetPitch = Math.asin(Math.max(-0.999, Math.min(0.999, toNode.y)));
+      }
+
+      this.camera.position.lerp(this.warpTarget, 0.09);
 
       let diffYaw = this.warpTargetYaw - this.yaw;
       while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
       while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
-      this.yaw += diffYaw * 0.08;
-      this.pitch += (this.warpTargetPitch - this.pitch) * 0.08;
+      this.yaw += diffYaw * 0.09;
+      this.pitch += (this.warpTargetPitch - this.pitch) * 0.09;
 
-      if (this.warpProgress >= 1 || this.camera.position.distanceTo(this.warpTarget) < 1.5) {
+      if (this.warpProgress >= 1 || this.camera.position.distanceTo(this.warpTarget) < 1.0) {
         this.isWarping = false;
         this.camera.position.copy(this.warpTarget);
         this.yaw = this.warpTargetYaw;

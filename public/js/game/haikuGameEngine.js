@@ -301,7 +301,7 @@ export class HaikuGameApp {
   async init() {
     this.initShaders();
     this.bindDOM();
-    this.showToast('Sincronizando espacio vectorial 300D...', 'info');
+    this.showToast('Sincronizando espacio vectorial Laya ONNX (384D)...', 'info');
 
     try {
       await this.vectorEngine.load((p) => {

@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 async function run() {
   const publicDataDir = path.join(__dirname, '..', 'public', 'data');
-  const binPath = path.join(publicDataDir, 'embeddings.bin');
+  const binPath = path.join(publicDataDir, 'laya_embeddings.bin');
   const vocabPath = path.join(publicDataDir, 'vocab.json');
 
   console.log('Loading embeddings and vocab...');
@@ -15,7 +15,7 @@ async function run() {
   const vocabData = JSON.parse(vocabRaw);
   const vocab = vocabData.words;
   const N = vocab.length;
-  const D = vocabData.dimensions || 300;
+  const D = vocabData.dimensions || 384;
 
   const binBuffer = fs.readFileSync(binPath);
   const flatMatrix = new Float32Array(binBuffer.buffer, binBuffer.byteOffset, N * D);

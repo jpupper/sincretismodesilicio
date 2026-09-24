@@ -138,24 +138,29 @@ async function initApp() {
   }
 }
 
-function exploreWord(word) {
+async function exploreWord(word) {
   const cleanWord = word.toLowerCase().trim();
-  if (!semanticEngine.hasWord(cleanWord)) {
-    alert(`La palabra "${cleanWord}" no se encuentra en el vocabulario vectorial actual. Intenta con otra palabra o selecciona una de los ejemplos.`);
-    return;
-  }
+  if (!cleanWord) return;
 
   currentWord = cleanWord;
   searchInput.value = cleanWord;
   autocompleteDropdown.style.display = 'none';
 
-  const data = semanticEngine.getNearestNeighbors(cleanWord, {
+  let data = semanticEngine.getNearestNeighbors(cleanWord, {
     k: 8,
     filterSignifier: filterSignifier
   });
 
   if (!data || data.neighbors.length === 0) {
-    alert(`No se encontraron suficientes vecinos semánticos para "${cleanWord}".`);
+    // Si la palabra es externa al vocabulario estático base, inferirla dinámicamente con Laya ONNX
+    data = await semanticEngine.getNearestNeighborsAsync(cleanWord, {
+      k: 8,
+      filterSignifier: filterSignifier
+    });
+  }
+
+  if (!data || data.neighbors.length === 0) {
+    alert(`No se pudieron calcular vecinos semánticos para "${cleanWord}".`);
     return;
   }
 

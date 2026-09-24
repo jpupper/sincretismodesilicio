@@ -1141,7 +1141,8 @@ function findDistantWord(targetText) {
     if (!cVec) continue;
 
     let dot = 0;
-    for (let j = 0; j < 300; j++) dot += targetVec[j] * cVec[j];
+    const dims = Math.min(targetVec.length, cVec.length);
+    for (let j = 0; j < dims; j++) dot += targetVec[j] * cVec[j];
     const d = 1 - dot;
 
     if (d >= 0.90) {
@@ -1168,7 +1169,7 @@ function spawnRandomWord(p) {
     text = customList[wordIndex];
     gameState.customWordIndex++;
   } else {
-    // Normal random mode using 300D model
+    // Normal random mode using LAYA ONNX (384D) model
     if (!gameState.filteredVocab || !gameState.filteredVocab.length) return;
     const roll = Math.random();
 

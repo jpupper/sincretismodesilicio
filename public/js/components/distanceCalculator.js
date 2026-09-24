@@ -19,10 +19,10 @@ export class DistanceCalculatorUI {
       <div class="distance-calc-container">
         <div class="calc-header">
           <div class="calc-title-box">
-            <span class="calc-badge">EXPLORADOR VECTORIAL 300D</span>
+            <span class="calc-badge">MOTOR LAYA ONNX (384D)</span>
             <h2>Medidor &amp; Calculadora de Distancia Semántica</h2>
             <p class="calc-sub">
-              Ingresa una palabra de referencia y compara la distancia semántica pura en el espacio de 300 dimensiones (\(d = 1 - \cos\theta\)).
+              Ingresa una palabra de referencia y compara la distancia semántica pura en el espacio de 384 dimensiones de LAYA ONNX (\(d = 1 - \cos\theta\)). Cobertura universal de todas las palabras en español.
             </p>
           </div>
         </div>
@@ -93,7 +93,7 @@ export class DistanceCalculatorUI {
     this.calculateAndRenderResults();
   }
 
-  calculateAndRenderResults() {
+  async calculateAndRenderResults() {
     const listEl = document.getElementById('comp-results-list');
     const statusEl = document.getElementById('ref-word-status');
     const countEl = document.getElementById('comp-words-count');
@@ -101,29 +101,11 @@ export class DistanceCalculatorUI {
     if (!listEl) return;
 
     const cleanRef = this.refWord.toLowerCase().trim();
-    const hasRef = semanticEngine.hasWord(cleanRef);
-
     if (countEl) countEl.textContent = this.compWords.length;
 
     if (statusEl) {
-      if (hasRef) {
-        statusEl.textContent = '✓ En Vocabulario Vectorial (300D)';
-        statusEl.className = 'ref-status valid';
-      } else {
-        statusEl.textContent = '⚠ Palabra no encontrada en el vocabulario';
-        statusEl.className = 'ref-status invalid';
-      }
-    }
-
-    if (!hasRef) {
-      listEl.innerHTML = `
-        <div class="calc-empty-state">
-          <span class="icon">⚠️</span>
-          <h3>La palabra de referencia "${cleanRef}" no está en el vocabulario.</h3>
-          <p>Intenta con otra palabra como <strong>tiempo, fuego, agua, libertad, mente, música</strong>...</p>
-        </div>
-      `;
-      return;
+      statusEl.textContent = '⚡ Procesando con Motor Laya ONNX (100% Cobertura)...';
+      statusEl.className = 'ref-status valid';
     }
 
     if (this.compWords.length === 0) {
@@ -137,16 +119,21 @@ export class DistanceCalculatorUI {
       return;
     }
 
-    // Calculate similarity for each word
+    // Calculate similarity for each word using Laya ONNX engine fallback
     const results = [];
     for (const w of this.compWords) {
       const cleanW = w.toLowerCase().trim();
-      const sim = semanticEngine.calculateSimilarity(cleanRef, cleanW);
+      const sim = await semanticEngine.calculateSimilarityAsync(cleanRef, cleanW);
       results.push({
         word: cleanW,
         data: sim,
         valid: !!sim
       });
+    }
+
+    if (statusEl) {
+      statusEl.textContent = '✓ Motor Laya ONNX Activo (100% Cobertura Español)';
+      statusEl.className = 'ref-status valid';
     }
 
     // Sort valid results by distance (closest first)
@@ -211,8 +198,8 @@ export class DistanceCalculatorUI {
               </div>
 
               <div class="card-actions-right">
-                <button class="btn-make-ref" data-word="${item.word}" title="Convertir en la nueva palabra de referencia">
-                  🎯 Hacer Núcleo
+                <button class="btn-make-ref btn-mini-ref-arrow" data-word="${item.word}" title="Establecer como palabra núcleo de referencia">
+                  ➔
                 </button>
                 <button class="btn-remove-card" data-word="${item.word}" title="Eliminar">&times;</button>
               </div>
@@ -228,17 +215,17 @@ export class DistanceCalculatorUI {
               <div class="metric-box">
                 <span class="m-label">DISTANCIA SEMÁNTICA (d)</span>
                 <span class="m-val highlight">${d.toFixed(4)}</span>
-                <span class="m-sub">1 - cos(θ)</span>
+                <span class="m-sub">Métrica LAYA System-1</span>
               </div>
               <div class="metric-box">
-                <span class="m-label">SIMILITUD COSENO</span>
+                <span class="m-label">AFINIDAD LAYA ONNX</span>
                 <span class="m-val">${simPct}%</span>
-                <span class="m-sub">Afinidad Vectorial</span>
+                <span class="m-sub">Resonancia Conceptual</span>
               </div>
               <div class="metric-box">
-                <span class="m-label">SEPARACIÓN ANGULAR</span>
+                <span class="m-label">DIVERGENCIA VECTORIAL</span>
                 <span class="m-val">${angle}°</span>
-                <span class="m-sub">Ángulo en 300D</span>
+                <span class="m-sub">Espacio LAYA (384D)</span>
               </div>
             </div>
           </div>
@@ -331,9 +318,13 @@ export class DistanceCalculatorUI {
     }
 
     if (fillNeighborsBtn) {
-      fillNeighborsBtn.addEventListener('click', () => {
+      fillNeighborsBtn.addEventListener('click', async () => {
         const cleanRef = this.refWord.toLowerCase().trim();
-        const neighbors = semanticEngine.getNearestNeighbors(cleanRef, { k: 6, filterSignifier: true });
+        fillNeighborsBtn.disabled = true;
+        fillNeighborsBtn.textContent = '🔭 Buscando...';
+        const neighbors = await semanticEngine.getNearestNeighborsAsync(cleanRef, { k: 6, filterSignifier: true });
+        fillNeighborsBtn.disabled = false;
+        fillNeighborsBtn.textContent = '🔭 Cargar Vecinos Cercanos';
         if (neighbors && neighbors.neighbors) {
           neighbors.neighbors.forEach(n => {
             if (!this.compWords.includes(n.word)) {

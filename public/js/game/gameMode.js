@@ -76,7 +76,7 @@ export class GameMode {
       <div class="start-card">
         <div class="start-badge">MODO VIDEOJUEGO • ESPACIO VECTORIAL</div>
         <h2 class="start-title">DUELO SEMÁNTICO</h2>
-        <div class="start-subtitle">Significado vs. Significante (300 Dimensiones)</div>
+        <div class="start-subtitle">Significado vs. Significante • Motor Laya ONNX (384D)</div>
 
         <div class="start-rules-grid">
           <div class="rule-box">

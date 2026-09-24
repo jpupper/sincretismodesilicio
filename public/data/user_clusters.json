@@ -1,0 +1,26 @@
+[
+  {
+    "id": "poder",
+    "name": "PODER Y POLÍTICA",
+    "color": "#ef4444",
+    "words": ["política", "izquierda", "derecha", "fascismo", "comunismo", "gobierno", "estado", "democracia"]
+  },
+  {
+    "id": "animales",
+    "name": "ANIMALES & FAUNA",
+    "color": "#10b981",
+    "words": ["perro", "gato", "elefante", "tigre", "león", "caballo", "lobo", "águila"]
+  },
+  {
+    "id": "filosofia",
+    "name": "FILOSOFÍA & COSMOS",
+    "color": "#8b5cf6",
+    "words": ["existencia", "tiempo", "filosofía", "mente", "alma", "verdad", "conciencia", "universo"]
+  },
+  {
+    "id": "tecnologia",
+    "name": "TECNOLOGÍA & SILICIO",
+    "color": "#06b6d4",
+    "words": ["computadora", "robot", "código", "algoritmo", "futuro", "silicio", "red", "memoria"]
+  }
+]
