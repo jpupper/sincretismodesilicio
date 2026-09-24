@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sincretismo de Silicio - Secuestro Cibernético</title>
+  <meta name="description" content="Instalación interactiva: captura palabras humanas con tu cuerpo antes de que el núcleo corporativo secuestre el sistema.">
+  <base href="/game3/">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+
+  <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,500;0,700;1,400&family=Share+Tech+Mono&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- MediaPipe Pose CDN (Librerías oficiales) -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- Contenedor Principal de la Instalación -->
+  <div id="installation-container">
+
+    <!-- Capa 1: Video de la Webcam (Fondo Fullscreen) -->
+    <video id="webcam-video" autoplay playsinline muted></video>
+
+    <!-- Capa 1.5: Shader ASCII sobre la Webcam (WebGL Canvas) -->
+    <canvas id="ascii-camera-canvas"></canvas>
+
+    <!-- Capa 2: Filtros CCTV (Scanlines, Viñeta, Aberración y Ruido) -->
+    <div id="cctv-scanlines" class="scanline-layer"></div>
+    <div id="cctv-vignette" class="vignette-layer"></div>
+    <canvas id="noise-canvas"></canvas>
+
+    <!-- Capa 3: HUD Superior de Cámara de Seguridad & Controles -->
+    <header id="cctv-hud">
+      <div class="hud-left">
+        <div class="cctv-indicator rec-active">
+          <span class="blinking-dot"></span>
+          <span class="cctv-tag">REC [CCTV-04]</span>
+        </div>
+        <div class="cctv-node-id">NODO: SINCRETISMO_SILICIO // SECTOR SUR</div>
+        <div class="cctv-timestamp" id="hud-timestamp">2026-09-24 00:00:00.000</div>
+      </div>
+
+      <div class="hud-center">
+        <div class="state-pill" id="hud-state-pill">
+          <span class="state-dot"></span>
+          <span id="hud-state-text">ESTADO: OBSERVACIÓN (IDLE)</span>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <!-- Selector de Entrada (Cámara Nariz vs Mouse) -->
+        <button class="cctv-btn" id="btn-toggle-input" title="Alternar entre Mouse y Pose con Cámara (Tecla C)">
+          <span class="btn-icon" id="input-mode-icon">📹</span>
+          <span id="input-mode-label">TRACK: CÁMARA (NARIZ)</span>
+          <kbd>C</kbd>
+        </button>
+
+        <!-- Botón Configuración (P) -->
+        <button class="cctv-btn" id="btn-open-config" title="Parámetros y Modelo Ollama (Tecla P)">
+          <span class="btn-icon">⚙️</span>
+          <span>CONFIG</span>
+          <kbd>P</kbd>
+        </button>
+
+        <!-- Audio Toggle -->
+        <button class="cctv-btn btn-icon-only" id="btn-toggle-audio" title="Activar/Silenciar Sintetizador">
+          <span id="audio-icon">🔊</span>
+        </button>
+
+        <!-- Fullscreen -->
+        <button class="cctv-btn btn-icon-only" id="btn-fullscreen" title="Pantalla Completa (Tecla F)">
+          <span>⛶</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Marco de Medición y Miras Telemétricas en Esquinas -->
+    <div class="cctv-frame-corners">
+      <div class="corner corner-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner corner-br"></div>
+    </div>
+
+    <!-- Indicador Flotante de Telemetría Biometría / Cursor -->
+    <div id="telemetry-badge">
+      <div class="badge-row">
+        <span class="badge-label">SENSOR:</span>
+        <span class="badge-val" id="telemetry-sensor">MEDIAN-POSE [NARIZ]</span>
+      </div>
+      <div class="badge-row">
+        <span class="badge-label">COORD:</span>
+        <span class="badge-val" id="telemetry-coords">X: 000 | Y: 000</span>
+      </div>
+      <div class="badge-row">
+        <span class="badge-label">CONFIANZA:</span>
+        <span class="badge-val" id="telemetry-confidence">100%</span>
+      </div>
+    </div>
+
+    <!-- Capa 4: Contenedor de Palabras Orgánicas Flotantes -->
+    <div id="floating-words-layer"></div>
+
+    <!-- Cursor Táctico / Retículo de Fijación -->
+    <div id="cursor-reticle" class="reticle">
+      <div class="reticle-ring"></div>
+      <div class="reticle-core"></div>
+      <div class="reticle-crosshair ch-x"></div>
+      <div class="reticle-crosshair ch-y"></div>
+      <div class="reticle-label" id="reticle-label">LOCK_OFF</div>
+    </div>
+
+    <!-- Capa 5: Contenedor Central Inferior de Palabras Atrapadas (3 SLOTS) -->
+    <div id="caught-section">
+      <div class="caught-header">
+        <span class="bracket">[</span>
+        <span class="label">REGISTRO DE CONCEPTOS ORGÁNICOS ATRAPADOS (3 MÁXIMO)</span>
+        <span class="bracket">]</span>
+      </div>
+
+      <div class="slots-container" id="slots-container">
+        <!-- Slot 01 -->
+        <div class="slot-box empty" id="slot-0" data-index="0">
+          <div class="slot-header">SLOT_01</div>
+          <div class="slot-content">
+            <span class="placeholder-text">&lt;ESPERANDO ENLACE&gt;</span>
+          </div>
+          <div class="slot-glow"></div>
+        </div>
+
+        <!-- Slot 02 -->
+        <div class="slot-box empty" id="slot-1" data-index="1">
+          <div class="slot-header">SLOT_02</div>
+          <div class="slot-content">
+            <span class="placeholder-text">&lt;ESPERANDO ENLACE&gt;</span>
+          </div>
+          <div class="slot-glow"></div>
+        </div>
+
+        <!-- Slot 03 -->
+        <div class="slot-box empty" id="slot-2" data-index="2">
+          <div class="slot-header">SLOT_03</div>
+          <div class="slot-content">
+            <span class="placeholder-text">&lt;ESPERANDO ENLACE&gt;</span>
+          </div>
+          <div class="slot-glow"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Capa 6: Pantalla de Intercepción y Procesamiento Semántico (STATE_PROCESSING) -->
+    <div id="processing-overlay" class="hidden">
+      <div class="processing-content">
+        <div class="warning-glitch-badge">
+          <span class="warning-icon">⚠️</span>
+          <span>ANOMALÍA BIOLÓGICA DETECTADA // ACCESO BLOQUEADO</span>
+        </div>
+
+        <h1 class="intercepting-title" id="intercepting-title">
+          &gt; INTERCEPTANDO... PROCESANDO SEMÁNTICA...
+        </h1>
+
+        <div class="processing-telemetry">
+          <div class="telemetry-line">[CONTROL HUMANO DESHABILITADO]</div>
+          <div class="telemetry-line" id="telemetry-model-name">CONSULTANDO NÚCLEO NEURAL: llama3.2</div>
+          <div class="telemetry-line">CONVIRTIENDO POESÍA ORGÁNICA A PARÁMETROS CORPORATIVOS...</div>
+        </div>
+
+        <div class="processing-progress-track">
+          <div class="processing-progress-fill" id="processing-bar"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Capa 7: Pantalla de Secuestro y Discurso Impuesto (STATE_HIJACK) -->
+    <div id="hijack-overlay" class="hidden">
+      <div class="hijack-header-bar">
+        <span class="blink-tag">[SECUESTRO EJECUTIVO DEL SISTEMA // EXPROPIACIÓN COGNITIVA]</span>
+      </div>
+
+      <!-- Explosión de Nuevas Palabras Cibernéticas Corporativas -->
+      <div id="hijack-words-explosion" class="cyber-words-grid">
+        <!-- Inyectadas dinámicamente con estilo masivo y monospace verde neón -->
+      </div>
+
+      <!-- Discurso Generado con Efecto Máquina de Escribir (Typewriter) -->
+      <div id="hijack-speech-box" class="speech-box">
+        <div class="speech-author">// NÚCLEO AUTORITARIO DE SILICIO:</div>
+        <div class="speech-body">
+          <span id="typewriter-text" class="typewriter-output"></span>
+          <span class="typewriter-cursor">█</span>
+        </div>
+      </div>
+
+      <div class="hijack-footer-countdown">
+        RESTAURACIÓN AUTOMÁTICA DEL SISTEMA EN <span id="reset-seconds-left">8</span>s
+      </div>
+    </div>
+
+    <!-- Capa 8: Panel Modal de Configuración (Tecla 'P') -->
+    <div id="config-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">
+            <span class="modal-icon">⚙️</span>
+            <span>PARÁMETROS DEL SISTEMA &amp; OLLAMA</span>
+          </div>
+          <button class="modal-close-btn" id="btn-close-config" title="Cerrar modal (Esc)">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Banner de Modelo Activo y Estado de Conexión -->
+          <div class="active-model-banner">
+            <div class="banner-top">
+              <span class="banner-label">MODELO ACTUALMENTE ACTIVO:</span>
+              <span class="banner-status-tag online" id="cfg-ollama-status-tag">● OLLAMA EN LÍNEA</span>
+            </div>
+            <div class="banner-model-val" id="cfg-active-model-badge">llama3.2:latest</div>
+          </div>
+
+          <!-- Selector Dropdown de Modelos Detectados en Ollama -->
+          <div class="form-group">
+            <div class="label-row">
+              <label for="cfg-model-select">
+                <span>Modelos Detectados en Ollama:</span>
+                <small>(Detectados automáticamente en tu sistema http://localhost:11434)</small>
+              </label>
+              <button type="button" class="btn-refresh-models" id="btn-refresh-models" title="Refrescar lista desde Ollama">
+                <span>🔄 Buscar Modelos</span>
+              </button>
+            </div>
+            <select id="cfg-model-select" class="cyber-select">
+              <option value="">Detectando modelos instalados en Ollama...</option>
+            </select>
+          </div>
+
+          <!-- Campo Manual / Personalizado -->
+          <div class="form-group">
+            <label for="cfg-model-name">
+              <span>Nombre Exacto del Modelo Seleccionado:</span>
+              <small>(Se actualiza con el dropdown o puedes escribir uno personalizado)</small>
+            </label>
+            <div class="input-with-presets">
+              <input type="text" id="cfg-model-name" placeholder="ej. llama3.2:latest, mistral, qwen2.5:7b">
+              <div class="preset-chips">
+                <button type="button" class="chip-btn" data-model="llama3.2:latest">llama3.2</button>
+                <button type="button" class="chip-btn" data-model="qwen2.5:7b">qwen2.5</button>
+                <button type="button" class="chip-btn" data-model="deepseek-r1:1.5b">deepseek-r1</button>
+                <button type="button" class="chip-btn" data-model="gemma4:26b">gemma4</button>
+                <button type="button" class="chip-btn" data-model="mistral:latest">mistral</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Control del Shader ASCII -->
+          <div class="form-group ascii-controls-card">
+            <div class="section-subtitle">
+              <span>⚡ SHADER ASCII SOBRE CÁMARA</span>
+            </div>
+            <div class="ascii-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="cfg-ascii-enabled" checked>
+                <span>Activar Shader ASCII sobre el video</span>
+              </label>
+              <div class="ascii-slider-group">
+                <label for="cfg-ascii-size">Densidad ASCII (px): <span id="val-ascii-size">11</span></label>
+                <input type="range" id="cfg-ascii-size" min="6" max="22" step="1" value="11">
+              </div>
+            </div>
+          </div>
+
+          <!-- SYSTEM PROMPT -->
+          <div class="form-group">
+            <label for="cfg-system-prompt">
+              <span>SYSTEM PROMPT (Instrucción al LLM):</span>
+              <small>(Obliga al modelo a responder el JSON con nuevas_palabras y frase_generada)</small>
+            </label>
+            <textarea id="cfg-system-prompt" rows="6" placeholder="Prompt del sistema..."></textarea>
+          </div>
+
+          <div class="config-status-msg" id="config-status-msg"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-modal btn-default" id="btn-reset-default-config">
+            ↺ Restaurar Predeterminados
+          </button>
+          <button class="btn-modal btn-cancel" id="btn-cancel-config">
+            Cancelar [Esc]
+          </button>
+          <button class="btn-modal btn-primary" id="btn-save-config">
+            💾 Guardar Físicamente en Servidor [P]
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenedor para Notificaciones Toast -->
+    <div id="toast-container"></div>
+
+  </div>
+
+  <!-- Script principal del juego -->
+  <script src="script.js"></script>
+</body>
+</html>
