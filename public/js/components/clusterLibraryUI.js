@@ -349,28 +349,21 @@ export class ClusterLibraryUI {
           const matchedCluster = this.clusters.find(c => c.name.toLowerCase() === topClassification.category.toLowerCase()) || this.clusters[0];
           const pct = (topClassification.probability * 100).toFixed(1);
 
+          // REQUERIMIENTO 11: Auto-agregar inmediatamente al cluster al presionar Enter
+          this.addWordToCluster(matchedCluster.id, word);
+          input.value = '';
+
           resultContainer.style.display = 'block';
           resultContainer.innerHTML = `
             <div class="automap-result-card" style="border-left-color: ${matchedCluster.color};">
               <div class="automap-result-text">
-                ✦ La palabra <strong>"${word}"</strong> pertenece con <strong>${pct}%</strong> de afinidad Laya al cluster: 
+                ✓ Palabra <strong>"${word}"</strong> auto-agregada al cluster: 
                 <span style="color: ${matchedCluster.color}; font-weight: 700; text-transform: uppercase;">${matchedCluster.name}</span>
+                (${pct}% afinidad semántica Laya).
               </div>
-              <button class="btn btn-secondary btn-sm" id="btn-automap-add-now" style="border-color: ${matchedCluster.color}; color: ${matchedCluster.color};">
-                ➕ Añadir a "${matchedCluster.name}"
-              </button>
             </div>
           `;
-
-          const addBtn = document.getElementById('btn-automap-add-now');
-          if (addBtn) {
-            addBtn.addEventListener('click', () => {
-              this.addWordToCluster(matchedCluster.id, word);
-              input.value = '';
-              resultContainer.style.display = 'none';
-              soundFX.playCorrect();
-            });
-          }
+          soundFX.playCorrect();
         }
       }
     } catch (e) {
@@ -463,6 +456,40 @@ export class ClusterLibraryUI {
           this.handleAutoMapWord();
         }
       });
+    }
+
+    // REQUERIMIENTO 12: Si apretas la letra L en la interfaz te genera una palabra automáticamente
+    window.addEventListener('keydown', (e) => {
+      if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // Ignorar si el usuario está escribiendo dentro de un input o textarea
+        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+          return;
+        }
+        e.preventDefault();
+        this.handleAutoGenerateWord();
+      }
+    });
+  }
+
+  /**
+   * REQUERIMIENTO 12: Genera y asocia una palabra automáticamente con LAYA al presionar la letra L
+   */
+  async handleAutoGenerateWord() {
+    if (!this.clusters || this.clusters.length === 0) {
+      this.createNewCluster();
+    }
+    const randCluster = this.clusters[Math.floor(Math.random() * this.clusters.length)];
+    if (!randCluster) return;
+
+    await this.handleAutoAddRelatedWord(randCluster.id, null);
+
+    const toast = document.getElementById('cluster-save-toast');
+    if (toast) {
+      toast.textContent = `⚡ [TECLA L] Palabra afín generada automáticamente con Laya y agregada a "${randCluster.name}"`;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
     }
   }
 }

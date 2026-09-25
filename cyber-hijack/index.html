@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,500;0,700;1,400&family=Share+Tech+Mono&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.7">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -29,7 +29,17 @@
     <!-- Capa 1.5: Shader ASCII sobre la Webcam (WebGL Canvas) -->
     <canvas id="ascii-camera-canvas"></canvas>
 
-    <!-- Capa 2: Filtros CCTV (Scanlines, Viñeta, Aberración y Ruido) -->
+    <!-- Capa 1.6: Shader Frame Difference con Feedback (WebGL2 Canvas) -->
+    <canvas id="framediff-camera-canvas"></canvas>
+
+    <!-- Capa 1.8: Superposición Cinemática de Esqueleto y Articulaciones OpenPose -->
+    <canvas id="openpose-overlay-canvas"></canvas>
+
+    <!-- Capa 1.9: Punteros de Interacción Unificados (Retículas HUD) -->
+    <canvas id="pointers-overlay-canvas"></canvas>
+
+    <!-- Capa 2: Filtros CCTV (Scanlines, Viñeta, Aberración, Ruido y VHS Glitch) -->
+    <div id="vhs-glitch-layer" class="vhs-glitch-layer"></div>
     <div id="cctv-scanlines" class="scanline-layer"></div>
     <div id="cctv-vignette" class="vignette-layer"></div>
     <canvas id="noise-canvas"></canvas>
@@ -43,6 +53,7 @@
         </div>
         <div class="cctv-node-id">NODO: SINCRETISMO_SILICIO // SECTOR SUR</div>
         <div class="cctv-timestamp" id="hud-timestamp">2026-09-24 00:00:00.000</div>
+        <div class="cctv-fps-badge" id="hud-general-fps">60 FPS</div>
       </div>
 
       <div class="hud-center">
@@ -55,9 +66,16 @@
       <div class="hud-right">
         <!-- Selector de Entrada (Cámara Nariz vs Mouse) -->
         <button class="cctv-btn" id="btn-toggle-input" title="Alternar entre Mouse y Pose con Cámara (Tecla C)">
-          <span class="btn-icon" id="input-mode-icon">📹</span>
-          <span id="input-mode-label">TRACK: CÁMARA (NARIZ)</span>
+          <span class="btn-icon" id="input-mode-icon">🖱️</span>
+          <span id="input-mode-label">TRACK: MOUSE</span>
           <kbd>C</kbd>
+        </button>
+
+        <!-- Botón Universo 3D por Cúmulos -->
+        <button class="cctv-btn" id="btn-open-cosmos-clusters" title="Abrir Universo 3D por Cúmulos (Tecla U)">
+          <span class="btn-icon">🌌</span>
+          <span>CÚMULO 3D</span>
+          <kbd>U</kbd>
         </button>
 
         <!-- Botón Configuración (P) -->
@@ -91,7 +109,7 @@
     <div id="telemetry-badge">
       <div class="badge-row">
         <span class="badge-label">SENSOR:</span>
-        <span class="badge-val" id="telemetry-sensor">MEDIAN-POSE [NARIZ]</span>
+        <span class="badge-val" id="telemetry-sensor">MOUSE [CLIC DIRECTO]</span>
       </div>
       <div class="badge-row">
         <span class="badge-label">COORD:</span>
@@ -153,52 +171,104 @@
       </div>
     </div>
 
-    <!-- Capa 6: Pantalla de Intercepción y Procesamiento Semántico (STATE_PROCESSING) -->
-    <div id="processing-overlay" class="hidden">
-      <div class="processing-content">
-        <div class="warning-glitch-badge">
-          <span class="warning-icon">⚠️</span>
-          <span>ANOMALÍA BIOLÓGICA DETECTADA // ACCESO BLOQUEADO</span>
+    <!-- Capa 6: Escenario Central de Resignificación y Síntesis IA -->
+    <div id="mutation-stage" class="mutation-stage hidden">
+      <div class="mutation-backdrop-glitch"></div>
+      <!-- Lluvia de partículas corporativas de fondo (👔 😊 💪 💵) -->
+      <canvas id="corporate-rain-canvas"></canvas>
+      
+      <!-- Cartel de DESPROCESANDO mientras giran las letras y procesa la IA -->
+      <div id="desprocesando-banner" class="desprocesando-banner hidden">
+        <div class="desp-glitch-border"></div>
+        <div class="desp-content">
+          <span class="desp-pulse-dot"></span>
+          <span class="desp-title">&gt;&gt; DESPROCESANDO &lt;&lt;</span>
+          <span class="desp-sub">[DESMANTELANDO FACTOR ORGÁNICO // PROCESANDO SÍNTESIS...]</span>
         </div>
+      </div>
 
-        <h1 class="intercepting-title" id="intercepting-title">
-          &gt; INTERCEPTANDO... PROCESANDO SEMÁNTICA...
-        </h1>
-
-        <div class="processing-telemetry">
-          <div class="telemetry-line">[CONTROL HUMANO DESHABILITADO]</div>
-          <div class="telemetry-line" id="telemetry-model-name">CONSULTANDO NÚCLEO NEURAL: llama3.2</div>
-          <div class="telemetry-line">CONVIRTIENDO POESÍA ORGÁNICA A PARÁMETROS CORPORATIVOS...</div>
+      <!-- Contenedor de las 3 Palabras Centrales en Grande -->
+      <div id="mutation-words-container" class="mutation-words-container">
+        <div class="mutation-word-card" id="mut-card-0">
+          <div class="mutation-word-text" id="mut-text-0"></div>
+          <div class="mutation-sub-badge" id="mut-badge-0">[CONCEPTO 01]</div>
         </div>
+        <div class="mutation-word-card" id="mut-card-1">
+          <div class="mutation-word-text" id="mut-text-1"></div>
+          <div class="mutation-sub-badge" id="mut-badge-1">[CONCEPTO 02]</div>
+        </div>
+        <div class="mutation-word-card" id="mut-card-2">
+          <div class="mutation-word-text" id="mut-text-2"></div>
+          <div class="mutation-sub-badge" id="mut-badge-2">[CONCEPTO 03]</div>
+        </div>
+      </div>
 
-        <div class="processing-progress-track">
-          <div class="processing-progress-fill" id="processing-bar"></div>
+      <!-- Discurso Final de la IA (Aparece abajo tras la resignificación) -->
+      <div id="final-speech-box" class="final-speech-box hidden">
+        <div class="speech-body">
+          <span id="final-typewriter-text" class="speech-text-output"></span>
+          <span class="speech-cursor">█</span>
         </div>
       </div>
     </div>
 
-    <!-- Capa 7: Pantalla de Secuestro y Discurso Impuesto (STATE_HIJACK) -->
-    <div id="hijack-overlay" class="hidden">
-      <div class="hijack-header-bar">
-        <span class="blink-tag">[SECUESTRO EJECUTIVO DEL SISTEMA // EXPROPIACIÓN COGNITIVA]</span>
-      </div>
-
-      <!-- Explosión de Nuevas Palabras Cibernéticas Corporativas -->
-      <div id="hijack-words-explosion" class="cyber-words-grid">
-        <!-- Inyectadas dinámicamente con estilo masivo y monospace verde neón -->
-      </div>
-
-      <!-- Discurso Generado con Efecto Máquina de Escribir (Typewriter) -->
-      <div id="hijack-speech-box" class="speech-box">
-        <div class="speech-author">// NÚCLEO AUTORITARIO DE SILICIO:</div>
-        <div class="speech-body">
-          <span id="typewriter-text" class="typewriter-output"></span>
-          <span class="typewriter-cursor">█</span>
+    <!-- Capa 7: Monitores Tácticos PiP (Depth Map y Cámara Facial de Calibración) -->
+    <div id="depth-map-pip" class="tactical-pip-card pip-bottom-right hidden">
+      <div class="pip-header">
+        <div class="pip-title">
+          <span class="pip-status-dot"></span>
+          <span class="pip-title-text">DEPTH MAP // SENSOR SEGMENTACIÓN</span>
+        </div>
+        <div class="pip-actions">
+          <span class="pip-tag" id="depth-pip-fps">60 FPS</span>
+          <button type="button" class="pip-close-btn" id="btn-close-depth-pip" title="Ocultar monitor PiP (Configurable en P)">✕</button>
         </div>
       </div>
+      <div class="pip-canvas-wrapper">
+        <canvas id="depth-map-canvas" width="240" height="160"></canvas>
+        <div class="pip-scanline"></div>
+        <div class="pip-overlay-meta">
+          <div class="meta-row"><span>COBERTURA:</span><span id="depth-meta-coverage">0%</span></div>
+          <div class="meta-row"><span>PROFUNDIDAD Z:</span><span id="depth-meta-z">0.00m</span></div>
+        </div>
+      </div>
+      <div class="pip-footer">
+        <span>MODO: <span id="depth-footer-mode">CYBERPUNK</span></span>
+        <span>RES: 240x160</span>
+      </div>
+    </div>
 
-      <div class="hijack-footer-countdown">
-        RESTAURACIÓN AUTOMÁTICA DEL SISTEMA EN <span id="reset-seconds-left">8</span>s
+    <div id="face-cam-pip" class="tactical-pip-card pip-top-left hidden">
+      <div class="pip-header">
+        <div class="pip-title">
+          <span class="pip-status-dot face-dot"></span>
+          <span class="pip-title-text">BIOMETRÍA // SEGUIMIENTO FACIAL</span>
+        </div>
+        <div class="pip-actions">
+          <span class="pip-tag" id="face-pip-status">LOCK</span>
+          <button type="button" class="pip-close-btn" id="btn-close-face-pip" title="Ocultar monitor PiP (Configurable en P)">✕</button>
+        </div>
+      </div>
+      <div class="pip-canvas-wrapper">
+        <canvas id="face-cam-canvas" width="220" height="220"></canvas>
+        <div class="pip-scanline"></div>
+        <div class="face-target-corners">
+          <span class="fc fc-tl"></span><span class="fc fc-tr"></span>
+          <span class="fc fc-bl"></span><span class="fc fc-br"></span>
+        </div>
+        <div class="face-biometric-reticle">
+          <div class="f-circle"></div>
+          <div class="f-line f-h"></div>
+          <div class="f-line f-v"></div>
+        </div>
+        <div class="pip-overlay-meta">
+          <div class="meta-row"><span>SUJETO:</span><span>HUMANO_01</span></div>
+          <div class="meta-row"><span>CONFIANZA:</span><span id="face-meta-conf">0%</span></div>
+        </div>
+      </div>
+      <div class="pip-footer">
+        <span>ZOOM: <span id="face-footer-zoom">1.8x</span></span>
+        <span id="face-footer-tracking">TRACKING: ACTIVO</span>
       </div>
     </div>
 
@@ -213,74 +283,589 @@
           <button class="modal-close-btn" id="btn-close-config" title="Cerrar modal (Esc)">&times;</button>
         </div>
 
+        <!-- Pestañas de Navegación del Sistema -->
+        <div class="modal-tabs-nav" id="modal-tabs-nav">
+          <button type="button" class="modal-tab-btn active" data-tab="tab-model-prompt">
+            <span class="tab-icon">🧠</span>
+            <span class="tab-text">MODELO &amp; PROMPT</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-words-pool">
+            <span class="tab-icon">🌐</span>
+            <span class="tab-text">BANCO DE PALABRAS</span>
+            <span class="tab-badge" id="tab-words-count-badge">154</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-shader">
+            <span class="tab-icon">⚡</span>
+            <span class="tab-text">SHADER ASCII</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-tracking">
+            <span class="tab-icon">🎯</span>
+            <span class="tab-text">TRACKING &amp; CALIBRACIÓN</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-render">
+            <span class="tab-icon">🎛️</span>
+            <span class="tab-text">RENDER &amp; CAPAS</span>
+          </button>
+        </div>
+
         <div class="modal-body">
-          <!-- Banner de Modelo Activo y Estado de Conexión -->
-          <div class="active-model-banner">
-            <div class="banner-top">
-              <span class="banner-label">MODELO ACTUALMENTE ACTIVO:</span>
-              <span class="banner-status-tag online" id="cfg-ollama-status-tag">● OLLAMA EN LÍNEA</span>
+          <!-- TAB 1: NOMBRE DEL MODELO & SYSTEM PROMPT -->
+          <div class="modal-tab-pane active" id="tab-model-prompt">
+            <!-- Banner de Modelo Activo y Estado de Conexión -->
+            <div class="active-model-banner">
+              <div class="banner-top">
+                <span class="banner-label">MODELO ACTUALMENTE ACTIVO:</span>
+                <span class="banner-status-tag online" id="cfg-ollama-status-tag">● OLLAMA EN LÍNEA</span>
+              </div>
+              <div class="banner-model-val" id="cfg-active-model-badge">llama3.2:latest</div>
             </div>
-            <div class="banner-model-val" id="cfg-active-model-badge">llama3.2:latest</div>
-          </div>
 
-          <!-- Selector Dropdown de Modelos Detectados en Ollama -->
-          <div class="form-group">
-            <div class="label-row">
-              <label for="cfg-model-select">
-                <span>Modelos Detectados en Ollama:</span>
-                <small>(Detectados automáticamente en tu sistema http://localhost:11434)</small>
+            <!-- Selector Dropdown de Modelos Detectados en Ollama -->
+            <div class="form-group">
+              <div class="label-row">
+                <label for="cfg-model-select">
+                  <span>Modelos Detectados en Ollama:</span>
+                  <small>(Detectados automáticamente en tu sistema http://localhost:11434)</small>
+                </label>
+                <button type="button" class="btn-refresh-models" id="btn-refresh-models" title="Refrescar lista desde Ollama">
+                  <span>🔄 Buscar Modelos</span>
+                </button>
+              </div>
+              <select id="cfg-model-select" class="cyber-select">
+                <option value="">Detectando modelos instalados en Ollama...</option>
+              </select>
+            </div>
+
+            <!-- Campo Manual / Personalizado -->
+            <div class="form-group">
+              <label for="cfg-model-name">
+                <span>Nombre Exacto del Modelo Seleccionado:</span>
+                <small>(Se actualiza con el dropdown o puedes escribir uno personalizado)</small>
               </label>
-              <button type="button" class="btn-refresh-models" id="btn-refresh-models" title="Refrescar lista desde Ollama">
-                <span>🔄 Buscar Modelos</span>
-              </button>
+              <div class="input-with-presets">
+                <input type="text" id="cfg-model-name" placeholder="ej. llama3.2:latest, mistral, qwen2.5:7b">
+                <div class="preset-chips">
+                  <button type="button" class="chip-btn" data-model="llama3.2:latest">llama3.2</button>
+                  <button type="button" class="chip-btn" data-model="qwen2.5:7b">qwen2.5</button>
+                  <button type="button" class="chip-btn" data-model="deepseek-r1:1.5b">deepseek-r1</button>
+                  <button type="button" class="chip-btn" data-model="gemma4:26b">gemma4</button>
+                  <button type="button" class="chip-btn" data-model="mistral:latest">mistral</button>
+                </div>
+              </div>
             </div>
-            <select id="cfg-model-select" class="cyber-select">
-              <option value="">Detectando modelos instalados en Ollama...</option>
-            </select>
+
+            <!-- SYSTEM PROMPT CON EXPAND/COLLAPSE Y MAYOR ALTURA -->
+            <div class="form-group system-prompt-group">
+              <div class="system-prompt-header">
+                <label for="cfg-system-prompt">
+                  <span>SYSTEM PROMPT (Instrucción de Resignificación &amp; Motivación):</span>
+                  <small>(Indica al modelo generar las 3 nuevas palabras y la frase inspiracional)</small>
+                </label>
+                <button type="button" class="btn-toggle-expand" id="btn-toggle-prompt-expand" title="Expandir o colapsar vista amplia del prompt">
+                  <span class="expand-icon">⤢</span>
+                  <span class="expand-label">Expandir</span>
+                </button>
+              </div>
+              <textarea id="cfg-system-prompt" rows="9" placeholder="Prompt del sistema para Ollama..."></textarea>
+            </div>
           </div>
 
-          <!-- Campo Manual / Personalizado -->
-          <div class="form-group">
-            <label for="cfg-model-name">
-              <span>Nombre Exacto del Modelo Seleccionado:</span>
-              <small>(Se actualiza con el dropdown o puedes escribir uno personalizado)</small>
-            </label>
-            <div class="input-with-presets">
-              <input type="text" id="cfg-model-name" placeholder="ej. llama3.2:latest, mistral, qwen2.5:7b">
-              <div class="preset-chips">
-                <button type="button" class="chip-btn" data-model="llama3.2:latest">llama3.2</button>
-                <button type="button" class="chip-btn" data-model="qwen2.5:7b">qwen2.5</button>
-                <button type="button" class="chip-btn" data-model="deepseek-r1:1.5b">deepseek-r1</button>
-                <button type="button" class="chip-btn" data-model="gemma4:26b">gemma4</button>
-                <button type="button" class="chip-btn" data-model="mistral:latest">mistral</button>
+          <!-- TAB 2: BANCO DE PALABRAS -->
+          <div class="modal-tab-pane" id="tab-words-pool">
+            <div class="words-pool-card">
+              <div class="section-subtitle">
+                <span>🌐 BANCO DE PALABRAS ORGÁNICAS (<span id="words-count-badge">154</span> ACTIVAS)</span>
+              </div>
+              <p class="words-help-text">
+                Pega o escribe múltiples palabras separadas por comas o saltos de línea para que floten en la pantalla interactiva:
+              </p>
+              <div class="words-input-group">
+                <textarea id="cfg-words-input" rows="3" placeholder="ej. amor, nostalgia, recuerdo, latido, esperanza, silencio, libertad, ternura..."></textarea>
+                <div class="words-actions-row">
+                  <button type="button" class="btn-word-action btn-add-words" id="btn-add-words">
+                    ➕ Agregar al Banco
+                  </button>
+                  <button type="button" class="btn-word-action btn-replace-words" id="btn-replace-words">
+                    🔄 Reemplazar Todo el Banco
+                  </button>
+                  <button type="button" class="btn-word-action btn-default-words" id="btn-default-words">
+                    ↺ Restaurar Palabras Poéticas
+                  </button>
+                </div>
+              </div>
+              <!-- Visualizador interactivo de etiquetas de palabras -->
+              <div class="words-chips-container" id="words-chips-container"></div>
+            </div>
+          </div>
+
+          <!-- TAB 3: SHADER ASCII -->
+          <div class="modal-tab-pane" id="tab-shader">
+            <div class="ascii-controls-card">
+              <div class="section-subtitle">
+                <span>⚡ SHADER ASCII SOBRE CÁMARA (WEBGL)</span>
+              </div>
+              <p class="words-help-text">
+                Efecto visual que renderiza el feed de video en tiempo real mediante una matriz tipográfica procedural de fósforo CCTV:
+              </p>
+              <div class="ascii-row-stacked">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cfg-ascii-enabled" checked>
+                  <span>Activar Shader ASCII sobre el fondo de video</span>
+                </label>
+                <div class="ascii-slider-group">
+                  <label for="cfg-ascii-size">Densidad de Caracteres ASCII: <span id="val-ascii-size">11</span>px</label>
+                  <input type="range" id="cfg-ascii-size" min="6" max="22" step="1" value="11">
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Control del Shader ASCII -->
-          <div class="form-group ascii-controls-card">
-            <div class="section-subtitle">
-              <span>⚡ SHADER ASCII SOBRE CÁMARA</span>
+          <!-- TAB 4: TRACKING & CALIBRACIÓN (OPENPOSE, DEPTH MAP, CÁMARA FACIAL) -->
+          <div class="modal-tab-pane" id="tab-tracking">
+            <!-- 1) Master Toggle OpenPose y Articulaciones/Puntos -->
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>🎯 1) SUPERPOSICIÓN OPENPOSE EN PANTALLA PRINCIPAL</span>
+                </div>
+                <label class="switch-toggle" title="Activar/Desactivar Overlay de OpenPose">
+                  <input type="checkbox" id="cfg-track-openpose">
+                  <span class="slider-round"></span>
+                </label>
+              </div>
+              <p class="words-help-text">
+                Proyecta el esqueleto cinemático y los 33 nodos anatómicos calculados por MediaPipe Pose en tiempo real sobre el feed interactivo.
+              </p>
+
+              <div class="calibration-grid">
+                <!-- 1.1) Graficar Articulaciones / Huesos -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-bones" checked>
+                    <strong>Graficar Articulaciones / Huesos</strong>
+                  </label>
+                  <div class="calib-subslider">
+                    <label for="cfg-track-bone-width">Grosor de líneas: <span id="val-track-bone-width">4</span>px</label>
+                    <input type="range" id="cfg-track-bone-width" min="1" max="10" step="1" value="4">
+                  </div>
+                </div>
+
+                <!-- 1.2) Graficar Puntos del Cuerpo (Landmarks) -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-points" checked>
+                    <strong>Graficar Puntos del Cuerpo (33 Nodos)</strong>
+                  </label>
+                  <div class="calib-subslider">
+                    <label for="cfg-track-point-radius">Radio de articulación: <span id="val-track-point-radius">5</span>px</label>
+                    <input type="range" id="cfg-track-point-radius" min="2" max="14" step="1" value="5">
+                  </div>
+                </div>
+
+                <!-- Umbral de Confianza Mínima -->
+                <div class="calib-item">
+                  <label for="cfg-track-confidence">
+                    <strong>Filtro de Confianza Mínima:</strong> <span id="val-track-confidence">50</span>%
+                  </label>
+                  <input type="range" id="cfg-track-confidence" min="10" max="95" step="5" value="50">
+                  <small class="item-desc">Descarta articulaciones de baja visibilidad o ruidosas</small>
+                </div>
+
+                <!-- Paleta de Color -->
+                <div class="calib-item">
+                  <label for="cfg-track-theme">
+                    <strong>Paleta Visual de Articulaciones:</strong>
+                  </label>
+                  <select id="cfg-track-theme" class="cyber-select-sm">
+                    <option value="classic">OpenPose Clásico (Multicolor Anatómico)</option>
+                    <option value="cyberpunk" selected>CCTV Cyberpunk (Cyan &amp; Verde Neón)</option>
+                    <option value="phosphor">Fósforo Militar (Verde Monocromo CRT)</option>
+                    <option value="thermal">Alerta Térmica (Infrarrojo Naranja / Magenta)</option>
+                  </select>
+                </div>
+
+                <!-- 6) Colisión Multi-articular con Palabras -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-body-collision" checked>
+                    <strong>6) Colisión Corporal con Palabras</strong>
+                  </label>
+                  <small class="item-desc">Tus manos (muñecas e índices) y articulaciones pueden tocar y atrapar palabras directamente</small>
+                </div>
+              </div>
             </div>
-            <div class="ascii-row">
-              <label class="checkbox-label">
-                <input type="checkbox" id="cfg-ascii-enabled" checked>
-                <span>Activar Shader ASCII sobre el video</span>
-              </label>
-              <div class="ascii-slider-group">
-                <label for="cfg-ascii-size">Densidad ASCII (px): <span id="val-ascii-size">11</span></label>
-                <input type="range" id="cfg-ascii-size" min="6" max="22" step="1" value="11">
+
+            <!-- 2) DEPTH MAP (Mapa de Profundidad / Segmentación & Máscara de Silueta) -->
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>🗺️ 2) MAPA DE PROFUNDIDAD (DEPTH MAP &amp; MÁSCARA SILUETA)</span>
+                </div>
+                <label class="switch-toggle" title="Mostrar/Ocultar Monitor PiP de Profundidad">
+                  <input type="checkbox" id="cfg-track-depth">
+                  <span class="slider-round"></span>
+                </label>
+              </div>
+              <p class="words-help-text">
+                Procesa la máscara de segmentación humana de MediaPipe para aislar tu cuerpo del fondo y proyectar la profundidad espacial Z.
+              </p>
+
+              <div class="calibration-grid">
+                <!-- 3) Máscara de Silueta en Shader ASCII -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-depth-shader" checked>
+                    <strong>3) Máscara Depth en Shader ASCII</strong>
+                  </label>
+                  <small class="item-desc">Pinta las letras de tu silueta corporal en un color diferente al fondo</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-body-color"><strong>Color de Letras en tu Cuerpo:</strong></label>
+                  <select id="cfg-track-body-color" class="cyber-select-sm">
+                    <option value="neon-green" selected>Verde Neón Tóxico (#39ff14)</option>
+                    <option value="gold">Oro Sintético (#ffcc00)</option>
+                    <option value="magenta">Alerta Magenta (#ff0055)</option>
+                    <option value="cyan">Cyan Luminoso (#00f0ff)</option>
+                    <option value="white">Blanco Fósforo (#ffffff)</option>
+                  </select>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-depth-mode"><strong>Modo del Monitor PiP:</strong></label>
+                  <select id="cfg-track-depth-mode" class="cyber-select-sm">
+                    <option value="cyberpunk" selected>Cyberpunk Glow (Gradiente Térmico Cyan-Magenta)</option>
+                    <option value="thermal">Infrarrojo FLIR (Heatmap Turbo)</option>
+                    <option value="monochrome">Monocromático Estricto (Matriz Binaria de Silicio)</option>
+                  </select>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-depth-contrast">
+                    <strong>Ganancia de Contraste / Profundidad:</strong> <span id="val-track-depth-contrast">1.5</span>x
+                  </label>
+                  <input type="range" id="cfg-track-depth-contrast" min="0.5" max="3.0" step="0.1" value="1.5">
+                </div>
+              </div>
+            </div>
+
+            <!-- 3) CÁMARA DE LA CARA & CUADRITO DE RASTREO FACIAL -->
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>👤 3) SEGUIMIENTO FACIAL (CUADRO EN PANTALLA &amp; PiP)</span>
+                </div>
+                <label class="switch-toggle" title="Mostrar/Ocultar Monitor PiP de Rostro">
+                  <input type="checkbox" id="cfg-track-face">
+                  <span class="slider-round"></span>
+                </label>
+              </div>
+              <p class="words-help-text">
+                Rastreo cefálico de alta precisión. Dibuja el cuadrito de telemetría directamente sobre tu rostro en pantalla y permite activar la cámara facial PiP.
+              </p>
+
+              <div class="calibration-grid">
+                <!-- 10) Cuadrito de rastreo facial en la posición donde está -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-face-box" checked>
+                    <strong>10) Dibujar Cuadro Facial en Pantalla</strong>
+                  </label>
+                  <small class="item-desc">Dibuja el marco de fijación biométrica en la posición real de tu rostro</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-face-zoom">
+                    <strong>Nivel de Zoom Monitor PiP:</strong> <span id="val-track-face-zoom">1.8</span>x
+                  </label>
+                  <input type="range" id="cfg-track-face-zoom" min="1.0" max="3.5" step="0.1" value="1.8">
+                </div>
+
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-face-reticle" checked>
+                    <strong>Retículo Biométrico y Scanline Láser</strong>
+                  </label>
+                  <small class="item-desc">Miras en esquinas y haz de escaneo vertical</small>
+                </div>
+
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-face-smooth" checked>
+                    <strong>Estabilización Dinámica (Anti-Jitter)</strong>
+                  </label>
+                  <small class="item-desc">Suavizado exponencial de encuadre para eliminar temblores</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- 7) CAPAS DE ANÁLISIS ÓPTICO (FRAME DIFFERENCE & FLOW FIELD) -->
+            <div class="tracking-card">
+              <div class="section-subtitle">
+                <span>🔬 7) CAPAS DE ANÁLISIS ÓPTICO (FRAME DIFFERENCE &amp; FLOW FIELD)</span>
+              </div>
+              <p class="words-help-text">
+                Capas de visión computacional en tiempo real para análisis de movimiento dinámico y vectores ópticos.
+              </p>
+
+              <div class="calibration-grid">
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-frame-diff">
+                    <strong>Capa FRAME DIFFERENCE (Shader con Feedback)</strong>
+                  </label>
+                  <small class="item-desc">Compara cuadros sucesivos en GPU con buffer de feedback para generar estelas de movimiento espectrales</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-framediff-limit">
+                    <strong>Sensibilidad / Umbral (Limit):</strong> <span id="val-track-framediff-limit">0.08</span>
+                  </label>
+                  <input type="range" id="cfg-track-framediff-limit" min="0.01" max="0.35" step="0.01" value="0.08">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-framediff-force">
+                    <strong>Fuerza de Estela (Feedback Force):</strong> <span id="val-track-framediff-force">0.85</span>
+                  </label>
+                  <input type="range" id="cfg-track-framediff-force" min="0.10" max="0.98" step="0.02" value="0.85">
+                </div>
+
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-framediff-orig">
+                    <strong>Pintar con Color Original del Video (origcolor)</strong>
+                  </label>
+                  <small class="item-desc">Si está desactivado, proyecta la diferencia cromática pura de los vectores</small>
+                </div>
+
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-flow-field">
+                    <strong>Capa FLOW FIELD (Campo de Flujo Vectorial)</strong>
+                  </label>
+                  <small class="item-desc">Matriz de vectores direccionales que se orientan e impulsan con tu movimiento</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4) CALIBRACIÓN DE CONTROL Y TELEMETRÍA EN VIVO -->
+            <div class="tracking-card">
+              <div class="section-subtitle">
+                <span>⚙️ 4) CALIBRACIÓN DEL SENSOR &amp; TELEMETRÍA EN TIEMPO REAL</span>
+              </div>
+              
+              <div class="calibration-grid">
+                <div class="calib-item">
+                  <label for="cfg-track-anchor"><strong>Punto de Control para el Cursor:</strong></label>
+                  <select id="cfg-track-anchor" class="cyber-select-sm">
+                    <option value="nose" selected>Nariz (Centro Facial - Predeterminado)</option>
+                    <option value="right_wrist">Mano Derecha (Muñeca / Puntero Manual)</option>
+                    <option value="left_wrist">Mano Izquierda (Muñeca / Puntero Manual)</option>
+                    <option value="chest">Pecho / Centroide Torácico</option>
+                  </select>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-smoothing">
+                    <strong>Suavizado de Cursor (Lerp):</strong> <span id="val-track-smoothing">0.55</span>
+                  </label>
+                  <input type="range" id="cfg-track-smoothing" min="0.1" max="0.9" step="0.05" value="0.55">
+                </div>
+              </div>
+
+              <!-- Telemetría en Vivo -->
+              <div class="calib-telemetry-box">
+                <div class="telemetry-stat">
+                  <span class="stat-lbl">SENSOR CAM:</span>
+                  <span class="stat-val" id="calib-cam-status">STANDBY</span>
+                </div>
+                <div class="telemetry-stat">
+                  <span class="stat-lbl">NODOS DETECTADOS:</span>
+                  <span class="stat-val" id="calib-points-count">0 / 33</span>
+                </div>
+                <div class="telemetry-stat">
+                  <span class="stat-lbl">INFERENCIA POSE:</span>
+                  <span class="stat-val" id="calib-fps">0 FPS</span>
+                </div>
+                <div class="telemetry-stat">
+                  <span class="stat-lbl">MÁSCARA DEPTH:</span>
+                  <span class="stat-val" id="calib-depth-status">STANDBY</span>
+                </div>
+              </div>
+
+              <div class="calib-actions-row">
+                <button type="button" class="btn-calib-action" id="btn-center-calibration">
+                  🎯 Centrar Posición de Reposo
+                </button>
+                <button type="button" class="btn-calib-action" id="btn-reset-calibration">
+                  ↺ Restaurar Calibración Predeterminada
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- SYSTEM PROMPT -->
-          <div class="form-group">
-            <label for="cfg-system-prompt">
-              <span>SYSTEM PROMPT (Instrucción al LLM):</span>
-              <small>(Obliga al modelo a responder el JSON con nuevas_palabras y frase_generada)</small>
-            </label>
-            <textarea id="cfg-system-prompt" rows="6" placeholder="Prompt del sistema..."></textarea>
+          <!-- TAB 5: RENDER & CAPAS (SWITCHES Y CONTROL DE OPACIDAD) -->
+          <div class="modal-tab-pane" id="tab-render">
+            <div class="render-layers-card">
+              <div class="section-subtitle">
+                <span>🎛️ MATRIZ DE COMPOSICIÓN &amp; CONTROL DE OPACIDAD DE CAPAS</span>
+              </div>
+              <p class="words-help-text">
+                Enciende, apaga y gradúa individualmente la opacidad de cada capa de renderizado. Los interruptores se sincronizan continuamente en tiempo real con las pestañas de Tracking y Shader.
+              </p>
+
+              <div class="render-layers-grid">
+                <!-- Capa 1: Cámara de Fondo -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Video Webcam de Fondo">
+                      <input type="checkbox" id="cfg-render-camera-toggle" checked>
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">1. Cámara de Video (Fondo CCTV)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-camera-opacity">Opacidad: <span id="val-render-camera-opacity">100</span>%</label>
+                    <input type="range" id="cfg-render-camera-opacity" min="0" max="100" step="1" value="100">
+                  </div>
+                </div>
+
+                <!-- Capa 2: Shader ASCII -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Shader ASCII">
+                      <input type="checkbox" id="cfg-render-ascii-toggle" checked>
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">2. Shader ASCII (WebGL)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-ascii-opacity">Opacidad: <span id="val-render-ascii-opacity">92</span>%</label>
+                    <input type="range" id="cfg-render-ascii-opacity" min="0" max="100" step="1" value="92">
+                  </div>
+                </div>
+
+                <!-- Capa 3: Shader Frame Difference -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Frame Difference Shader">
+                      <input type="checkbox" id="cfg-render-framediff-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">3. Shader Frame Difference (Feedback)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-framediff-opacity">Opacidad: <span id="val-render-framediff-opacity">88</span>%</label>
+                    <input type="range" id="cfg-render-framediff-opacity" min="0" max="100" step="1" value="88">
+                  </div>
+                </div>
+
+                <!-- Capa 4: OpenPose Kinematic Overlay -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Superposición OpenPose">
+                      <input type="checkbox" id="cfg-render-openpose-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">4. Esqueleto OpenPose (Huesos &amp; Nodos)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-openpose-opacity">Opacidad: <span id="val-render-openpose-opacity">100</span>%</label>
+                    <input type="range" id="cfg-render-openpose-opacity" min="0" max="100" step="1" value="100">
+                  </div>
+                </div>
+
+                <!-- Capa 5: Punteros de Interacción Unificados -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Mostrar/Ocultar Punteros Unificados de Selección">
+                      <input type="checkbox" id="cfg-render-pointers-toggle" checked>
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">5. Punteros de Selección (Retículas HUD)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-pointers-opacity">Opacidad: <span id="val-render-pointers-opacity">100</span>%</label>
+                    <input type="range" id="cfg-render-pointers-opacity" min="0" max="100" step="1" value="100">
+                  </div>
+                </div>
+
+                <!-- Capa 6: Monitor Depth Map PiP -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Monitor PiP Depth Map">
+                      <input type="checkbox" id="cfg-render-depth-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">6. Monitor PiP Depth Map</span>
+                  </div>
+                  <small class="item-desc">Visor táctico de segmentación en esquina inferior</small>
+                </div>
+
+                <!-- Capa 7: Monitor Cámara Facial PiP -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Monitor PiP Rostro">
+                      <input type="checkbox" id="cfg-render-face-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">7. Monitor PiP Cámara Rostro</span>
+                  </div>
+                  <small class="item-desc">Visor biométrico en esquina superior derecha</small>
+                </div>
+
+                <!-- Capa 8: Scanlines & Viñeta CCTV -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Filtros CCTV">
+                      <input type="checkbox" id="cfg-render-scanlines-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">8. Filtro Analógico CCTV (Scanlines &amp; Viñeta)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-scanlines-opacity">Opacidad: <span id="val-render-scanlines-opacity">85</span>%</label>
+                    <input type="range" id="cfg-render-scanlines-opacity" min="0" max="100" step="1" value="85">
+                  </div>
+                </div>
+
+                <!-- Capa 9: Ruido Estático Procedural -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Ruido Estático">
+                      <input type="checkbox" id="cfg-render-noise-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">9. Ruido Estático &amp; Grano Analógico</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-noise-opacity">Opacidad: <span id="val-render-noise-opacity">40</span>%</label>
+                    <input type="range" id="cfg-render-noise-opacity" min="0" max="100" step="1" value="40">
+                  </div>
+                  <div class="layer-slider-group" style="margin-top: 6px;">
+                    <label for="cfg-render-noise-scale">Escala / Grano: <span id="val-render-noise-scale">2.0</span>x</label>
+                    <input type="range" id="cfg-render-noise-scale" min="0.5" max="6" step="0.5" value="2.0">
+                  </div>
+                </div>
+
+                <!-- Capa 10: Partículas Corporativas en Pantalla Final -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Lluvia de Partículas Corporativas">
+                      <input type="checkbox" id="cfg-render-corpparticles-toggle" checked>
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">10. Partículas Corporativas (👔 😊 💪 💵)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-corpparticles-opacity">Opacidad: <span id="val-render-corpparticles-opacity">80</span>%</label>
+                    <input type="range" id="cfg-render-corpparticles-opacity" min="0" max="100" step="1" value="80">
+                  </div>
+                  <small class="item-desc">Lluvia de íconos que cae durante el discurso final inspiracional</small>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="config-status-msg" id="config-status-msg"></div>
@@ -306,6 +891,6 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js"></script>
+  <script src="script.js?v=2.8"></script>
 </body>
 </html>

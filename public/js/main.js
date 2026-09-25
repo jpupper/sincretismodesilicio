@@ -129,6 +129,13 @@ async function initApp() {
     // 7. Initial Search for 2D Graph
     exploreWord(currentWord);
 
+    // 8. Handle Deep Linking / URL Query Param for direct tab opening (e.g. ?tab=cosmos-clusters)
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetTab = urlParams.get('tab') || window.location.hash.replace('#', '');
+    if (targetTab && ['hub', 'explorer', 'distance', 'cluster-lib', 'cosmos-clusters', 'cosmos', 'game'].includes(targetTab)) {
+      switchTab(targetTab);
+    }
+
   } catch (err) {
     console.error('Initialization failed:', err);
     if (loaderStatus) {

@@ -2661,6 +2661,30 @@ html, body {
   border-radius: 50%;
 }
 
+.btn-fullscreen-cosmos {
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+}
+
+.btn-fullscreen-cosmos:hover {
+  background: rgba(0, 240, 255, 0.25);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.45);
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
 /* ==========================================================================
    Cyberpunk Custom Scrollbar
    ========================================================================== */

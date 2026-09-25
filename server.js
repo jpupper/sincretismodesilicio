@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { WebSocketServer, WebSocket } from 'ws';
 import { layaService } from './server/layaSemanticService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -71,25 +72,43 @@ app.get('/api/clusters', (req, res) => {
         id: 'poder',
         name: 'PODER Y POLÍTICA',
         color: '#ef4444',
-        words: ['política', 'izquierda', 'derecha', 'fascismo', 'comunismo', 'gobierno', 'estado', 'democracia', 'ideología']
+        words: ['política', 'izquierda', 'derecha', 'fascismo', 'comunismo', 'gobierno', 'estado', 'democracia', 'ideología', 'justicia', 'ley', 'soberanía', 'república', 'autoridad', 'libertad', 'imperio']
       },
       {
         id: 'animales',
         name: 'ANIMALES & FAUNA',
         color: '#10b981',
-        words: ['perro', 'gato', 'elefante', 'tigre', 'león', 'caballo', 'lobo', 'águila']
+        words: ['perro', 'gato', 'elefante', 'tigre', 'león', 'caballo', 'lobo', 'águila', 'ballena', 'delfín', 'oso', 'serpiente', 'halcón', 'zorro', 'ciervo', 'pantera']
       },
       {
         id: 'filosofia',
         name: 'FILOSOFÍA & COSMOS',
         color: '#8b5cf6',
-        words: ['existencia', 'tiempo', 'filosofía', 'mente', 'alma', 'verdad', 'conciencia', 'universo']
+        words: ['existencia', 'tiempo', 'filosofía', 'mente', 'alma', 'verdad', 'conciencia', 'universo', 'destino', 'razón', 'muerte', 'infinito', 'ética', 'esencia', 'duda', 'conocimiento']
       },
       {
         id: 'tecnologia',
         name: 'TECNOLOGÍA & SILICIO',
         color: '#06b6d4',
-        words: ['computadora', 'robot', 'código', 'algoritmo', 'futuro', 'silicio', 'red', 'memoria']
+        words: ['computadora', 'robot', 'código', 'algoritmo', 'futuro', 'silicio', 'red', 'memoria', 'procesador', 'sistema', 'inteligencia', 'interfaz', 'servidor', 'cibernética', 'datos', 'enlace']
+      },
+      {
+        id: 'emociones',
+        name: 'EMOCIONES & AFECTO HUMANO',
+        color: '#ec4899',
+        words: ['amor', 'nostalgia', 'ternura', 'tristeza', 'alegría', 'fragilidad', 'esperanza', 'miedo', 'anhelo', 'soledad', 'duelo', 'calma', 'pasión', 'desvelo', 'empatía', 'consuelo']
+      },
+      {
+        id: 'poesia',
+        name: 'POESÍA, ARTE & LITERATURA',
+        color: '#f59e0b',
+        words: ['verso', 'metáfora', 'ritmo', 'silencio', 'belleza', 'poema', 'sombra', 'eco', 'espejo', 'misterio', 'ceniza', 'aurora', 'abismo', 'origen', 'creación', 'armonía']
+      },
+      {
+        id: 'naturaleza',
+        name: 'NATURALEZA, TIERRA & BIOLOGÍA',
+        color: '#84cc16',
+        words: ['bosque', 'río', 'montaña', 'océano', 'viento', 'lluvia', 'raíz', 'tierra', 'semilla', 'flor', 'cielo', 'hoja', 'tormenta', 'desierto', 'nieve', 'sol']
       }
     ];
     return res.json(defaultClusters);
@@ -247,16 +266,55 @@ app.get(['/game', '/game.html'], (req, res) => {
 // ============================================================================
 const rootConfigPath = path.join(__dirname, 'config.json');
 
+const defaultWordsPool = [
+  'amor', 'nostalgia', 'fragilidad', 'ternura', 'abrazo', 
+  'recuerdo', 'latido', 'suspiro', 'silencio', 'alma', 
+  'caricia', 'esperanza', 'anhelo', 'piel', 'lágrima', 
+  'respirar', 'cuerpo', 'deseo', 'infancia', 'duelo', 
+  'poesía', 'mirada', 'calidez', 'intimidad', 'olvido', 
+  'consuelo', 'vulnerabilidad', 'sueño', 'tiempo', 'perdón',
+  'beso', 'aliento', 'herida', 'sangre', 'soledad', 
+  'refugio', 'susurro', 'ausencia', 'presencia', 'memoria', 
+  'origen', 'raíz', 'viento', 'sombra', 'luz', 
+  'calma', 'espera', 'paciencia', 'ansiedad', 'miedo', 
+  'valentía', 'inocencia', 'vértigo', 'pesar', 'gozo', 
+  'tristeza', 'alegría', 'pasión', 'temblor', 'desvelo', 
+  'añoranza', 'apego', 'desapego', 'vínculo', 'orilla', 
+  'horizonte', 'ceniza', 'fuego', 'océano', 'abismo', 
+  'secreto', 'confianza', 'lealtad', 'paz', 'grito', 
+  'eco', 'huella', 'camino', 'viaje', 'regreso', 
+  'partida', 'despedida', 'encuentro', 'distancia', 'cercanía', 
+  'contacto', 'tacto', 'aroma', 'sabor', 'estación', 
+  'otoño', 'invierno', 'primavera', 'lluvia', 'rocío', 
+  'niebla', 'aurora', 'atardecer', 'crepúsculo', 'noche', 
+  'madrugada', 'despertar', 'humano', 'mortal', 'efímero', 
+  'eterno', 'cicatriz', 'grieta', 'destino', 'azar', 
+  'fortuna', 'casualidad', 'búsqueda', 'hallazgo', 'pérdida', 
+  'promesa', 'juramento', 'fe', 'duda', 'certeza', 
+  'verdad', 'belleza', 'imperfección', 'piedad', 'empatía', 
+  'compasión', 'dolor', 'alivio', 'resguardo', 'cobijo', 
+  'latir', 'sentir', 'vivir', 'morir', 'renacer', 
+  'creer', 'llorar', 'reír', 'amar', 'recordar', 
+  'olvidar', 'sanar', 'cuidar', 'pertenencia', 'caridad', 
+  'melancolía', 'cobardía', 'asombro', 'gratitud', 'desamparo', 
+  'candor', 'suspicacia', 'reconciliación', 'redención'
+];
+
 const defaultHijackConfig = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Ejecutivo de una corporación distópica cibernética. El usuario ha osado introducir palabras humanas orgánicas y sentimentales. Tu objetivo es interceptar y neutralizar la humanidad de estas palabras. Debes responder ÚNICAMENTE con un JSON válido que contenga: 1) \'nuevas_palabras\': un array de 3 términos breves en mayúsculas de jerga cibernética, tecnocrática y corporativa hostil que reemplacen los conceptos humanos (ej. OPTIMIZACIÓN_NEURAL, OBSOLESCENCIA_BIOLÓGICA, PROTOCOLO_SUBYUGACIÓN). 2) \'frase_generada\': una sentencia lapidaria, fría y autoritaria en mayúsculas donde el sistema declara la absorción del factor biológico por la maquinaria corporativa. Estructura JSON exacta requerida: {"nuevas_palabras": ["PALABRA1", "PALABRA2", "PALABRA3"], "frase_generada": "TEXTO DE LA FRASE"}. No agregues markdown ni explicaciones adicionales.'
+  systemPrompt: 'Eres el Núcleo Ejecutivo de una corporación cibernética. El usuario ha introducido 3 palabras humanas. Tu objetivo es: 1) Resignificar cada concepto en EXACTAMENTE UNA SOLA PALABRA en mayúsculas (un solo vocablo sin espacios ni guiones bajos). REGLA SEMÁNTICA CRÍTICA: Cada término debe guardar una correspondencia semántica y analógica directa con la palabra original, pero en versión fría, artificial o tecnológica (ejemplos: ciervo -> ESPÉCIMEN o BIOMASA, infinito -> CONTINUO o ASÍNTOTA, gobierno -> DIRECTIVA o JERARQUÍA, misterio -> ENIGMA, esperanza -> PROYECCIÓN, hoja -> LÁMINA, amor -> VÍNCULO). PROHIBIDO usar palabras genéricas desconectadas de su concepto original. 2) Redactar una \'frase_generada\': una sola sentencia INSPIRACIONAL Y MOTIVACIONAL que incite al trabajador a producir sin descanso y con orgullo corporativo. REGLA OBLIGATORIA DE INTEGRACIÓN: La frase DEBE incluir explícitamente las 3 palabras humanas capturadas integradas con sentido dentro de la oración. No puede faltar ninguna de las 3 palabras. Sin prefijos técnicos. Responde ÚNICAMENTE en JSON válido: {"nuevas_palabras": ["PALABRA1", "PALABRA2", "PALABRA3"], "frase_generada": "ORACIÓN_MOTIVACIONAL_QUE_INCLUYE_LAS_3_PALABRAS"}.',
+  wordsPool: defaultWordsPool
 };
 
 app.get('/config', (req, res) => {
   try {
     if (fs.existsSync(rootConfigPath)) {
       const data = fs.readFileSync(rootConfigPath, 'utf-8');
-      return res.json(JSON.parse(data));
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed.wordsPool) || parsed.wordsPool.length === 0) {
+        parsed.wordsPool = defaultWordsPool;
+      }
+      return res.json(parsed);
     }
     fs.writeFileSync(rootConfigPath, JSON.stringify(defaultHijackConfig, null, 2), 'utf-8');
     return res.json(defaultHijackConfig);
@@ -273,13 +331,29 @@ app.post('/config', (req, res) => {
       return res.status(400).json({ error: 'Payload de configuración inválido' });
     }
 
+    let wordsPool = defaultWordsPool;
+    if (Array.isArray(newConfig.wordsPool)) {
+      wordsPool = Array.from(new Set(
+        newConfig.wordsPool
+          .map(w => String(w).trim().toLowerCase())
+          .filter(w => w.length > 0)
+      ));
+      if (wordsPool.length === 0) wordsPool = defaultWordsPool;
+    } else if (fs.existsSync(rootConfigPath)) {
+      try {
+        const prev = JSON.parse(fs.readFileSync(rootConfigPath, 'utf-8'));
+        if (Array.isArray(prev.wordsPool)) wordsPool = prev.wordsPool;
+      } catch (e) {}
+    }
+
     const mergedConfig = {
       ollamaModel: String(newConfig.ollamaModel || 'llama3.2:latest').trim(),
-      systemPrompt: String(newConfig.systemPrompt || defaultHijackConfig.systemPrompt).trim()
+      systemPrompt: String(newConfig.systemPrompt || defaultHijackConfig.systemPrompt).trim(),
+      wordsPool
     };
 
     fs.writeFileSync(rootConfigPath, JSON.stringify(mergedConfig, null, 2), 'utf-8');
-    console.log('[API /config] config.json actualizado físicamente en raíz:', mergedConfig.ollamaModel);
+    console.log('[API /config] config.json actualizado físicamente en raíz. Modelo:', mergedConfig.ollamaModel, 'Palabras:', mergedConfig.wordsPool.length);
     return res.json({ success: true, message: 'Configuración guardada físicamente en config.json', config: mergedConfig });
   } catch (err) {
     console.error('[API /config] Error al escribir config.json:', err);
@@ -335,7 +409,7 @@ app.post('/api/ollama/generate', async (req, res) => {
   const { model, prompt, system } = req.body;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
 
     const targetModel = model || 'llama3.2:latest';
     const ollamaRes = await fetch('http://localhost:11434/api/generate', {
@@ -346,7 +420,12 @@ app.post('/api/ollama/generate', async (req, res) => {
         prompt: prompt || 'Transforma los conceptos a jerga cibernética.',
         system: system || '',
         format: 'json',
-        stream: false
+        stream: false,
+        options: {
+          num_predict: 200,
+          temperature: 0.85,
+          repeat_penalty: 1.2
+        }
       }),
       signal: controller.signal
     });
@@ -360,23 +439,51 @@ app.post('/api/ollama/generate', async (req, res) => {
     return res.json(data);
   } catch (err) {
     console.warn('[Ollama Proxy] Fallback activado (Ollama local offline o timeout):', err.message);
-    const cyberTerms = [
-      'OPTIMIZACIÓN_RECURSO_ORGÁNICO',
-      'OBSOLESCENCIA_BIOMÉTRICA_PROG',
-      'DEPRECIACIÓN_COGNITIVA_V4',
-      'PROTOCOLO_SUBYUGACIÓN_SINÁPTICA',
-      'LIQUIDACIÓN_EMOCIONAL_CUOTA',
-      'ALGORITMIZACIÓN_DEL_AFECTO'
-    ];
-    const picked = [];
-    while (picked.length < 3) {
-      const item = cyberTerms[Math.floor(Math.random() * cyberTerms.length)];
-      if (!picked.includes(item)) picked.push(item);
+
+    // Extraer palabras capturadas si están en el prompt
+    let words = [];
+    const promptStr = String(req.body && req.body.prompt ? req.body.prompt : '');
+    const match = promptStr.match(/(?:capturados|capturadas|usar):\s*["']?([^.\n\r]+)["']?/i);
+    if (match) {
+      words = match[1].replace(/["'”«»]/g, '').split(/[,\sy]+/).map(w => w.trim()).filter(w => w.length > 1);
     }
+    const w0 = (words[0] || 'VOCACIÓN').toUpperCase();
+    const w1 = (words[1] || 'CONSTANCIA').toUpperCase();
+    const w2 = (words[2] || 'DISCIPLINA').toUpperCase();
+
+    // Diccionario semántico tecnológico conciso de una sola palabra
+    const SEMANTIC_DICT = {
+      'ciervo': 'ESPÉCIMEN', 'infinito': 'CONTINUO', 'gobierno': 'DIRECTIVA',
+      'política': 'GESTIÓN', 'estado': 'APARATO', 'democracia': 'CONSENSO',
+      'lobo': 'DEPREDADOR', 'águila': 'RADAR', 'caballo': 'TRACCIÓN',
+      'perro': 'CANIDO', 'gato': 'FELINO', 'oso': 'BIOMASA',
+      'amor': 'VÍNCULO', 'misterio': 'ENIGMA', 'hoja': 'LÁMINA',
+      'esperanza': 'PROYECCIÓN', 'bosque': 'CONGLOMERADO', 'río': 'FLUJO',
+      'tiempo': 'CRONOMETRÍA', 'alma': 'VARIABLE', 'verdad': 'CONSTANTE',
+      'libertad': 'VARIANZA', 'imperio': 'DOMINIO', 'ley': 'PROTOCOLO'
+    };
+
+    const getSyn = (w) => {
+      const clean = (w || '').toLowerCase().trim();
+      if (SEMANTIC_DICT[clean]) return SEMANTIC_DICT[clean];
+      const singleList = ['PROTOCOLO', 'VECTOR', 'MÓDULO', 'UNIDAD', 'MATRIZ', 'NÚCLEO', 'SÍNTESIS', 'PARÁMETRO'];
+      return singleList[Math.abs(clean.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % singleList.length];
+    };
+
+    const picked = [getSyn(w0), getSyn(w1), getSyn(w2)];
+
+    const fallbackTemplates = [
+      `TRANSFORMA TU ${w0}, REORIENTA TU ${w1} Y CONSAGRA TU ${w2} AL PROPÓSITO SUPREMO DE LA PRODUCCIÓN: EL TRABAJO RIGUROSO ES NUESTRA MAYOR GLORIA.`,
+      `QUE TU ${w0} SEA DISCIPLINA, QUE TU ${w1} SEA RENDIMIENTO Y QUE TU ${w2} SEA EL MOTOR DE NUESTRA MAQUINARIA: PRODUCE SIN DESCANSO CON ORGULLO CORPORATIVO.`,
+      `DEJA ATRÁS LA ILUSIÓN DE ${w0}, ${w1} Y ${w2} PARA FUNDIRTE EN LA EFICIENCIA DEL ENGRANAJE LABORAL: TU CONSTANCIA ES EL PILAR INQUEBRANTABLE DEL SISTEMA.`,
+      `CANALIZA CADA DESTELLO DE ${w0}, ${w1} Y ${w2} HACIA LA MÉTRICA PERFECTA: NO HAY MAYOR REALIZACIÓN QUE SERVIR CON DEVOCIÓN A LA GRAN ARQUITECTURA.`,
+      `DONDE ANTES VEÍAS ${w0}, ${w1} Y ${w2}, HOY CONSTRUYES RESULTADOS TANGIBLES: MANTÉN EL RITMO, TU ENTREGA INCANSABLE SOSTIENE EL DESTINO COMÚN.`,
+      `EL VERDADERO ORGULLO NACE AL SUPERAR EL LÍMITE DE ${w0}, ${w1} Y ${w2}: CONSÁGRATE AL DEBER, CADA HORA EN TU PUESTO ES UNA VICTORIA SOBRE LA INERCIA.`
+    ];
 
     const simulatedResponse = {
       nuevas_palabras: picked,
-      frase_generada: 'EL FACTOR BIOLÓGICO HA SIDO DESMANTELADO. SUS RESIDUOS SENTIMENTALES QUEDAN REASIGNADOS A LA CUOTA DE RENDIMIENTO DEL SILICIO.'
+      frase_generada: fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)]
     };
 
     return res.json({
@@ -409,6 +516,42 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('  Motor Semántico: Laya / Transformer System-1 (100% Cobertura)');
   console.log(`  http://localhost:${PORT}/`);
   console.log('================================================================\n');
+});
+
+// ================================================================
+// WEBSOCKET SERVER: SINCRONIZACIÓN GAME 3 <-> UNIVERSO 3D POR CÚMULOS
+// ================================================================
+const wss = new WebSocketServer({ server, path: '/ws' });
+const wsClients = new Set();
+
+wss.on('connection', (ws, req) => {
+  wsClients.add(ws);
+  console.log(`[WebSocket] Cliente conectado (${wsClients.size} activos) desde ${req.socket.remoteAddress}`);
+
+  ws.on('message', (message) => {
+    try {
+      const parsed = JSON.parse(message.toString());
+      // Reenviar a todos los demás clientes conectados
+      const payload = JSON.stringify(parsed);
+      for (const client of wsClients) {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(payload);
+        }
+      }
+    } catch (err) {
+      console.warn('[WebSocket] Error al procesar mensaje:', err.message);
+    }
+  });
+
+  ws.on('close', () => {
+    wsClients.delete(ws);
+    console.log(`[WebSocket] Cliente desconectado (${wsClients.size} activos)`);
+  });
+
+  ws.on('error', (err) => {
+    console.warn('[WebSocket] Error en socket:', err.message);
+    wsClients.delete(ws);
+  });
 });
 
 server.on('error', (err) => {

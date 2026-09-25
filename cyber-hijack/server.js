@@ -13,9 +13,44 @@ app.use(express.json());
 
 const configPath = path.join(__dirname, 'config.json');
 
+const defaultWordsPool = [
+  'amor', 'nostalgia', 'fragilidad', 'ternura', 'abrazo', 
+  'recuerdo', 'latido', 'suspiro', 'silencio', 'alma', 
+  'caricia', 'esperanza', 'anhelo', 'piel', 'lágrima', 
+  'respirar', 'cuerpo', 'deseo', 'infancia', 'duelo', 
+  'poesía', 'mirada', 'calidez', 'intimidad', 'olvido', 
+  'consuelo', 'vulnerabilidad', 'sueño', 'tiempo', 'perdón',
+  'beso', 'aliento', 'herida', 'sangre', 'soledad', 
+  'refugio', 'susurro', 'ausencia', 'presencia', 'memoria', 
+  'origen', 'raíz', 'viento', 'sombra', 'luz', 
+  'calma', 'espera', 'paciencia', 'ansiedad', 'miedo', 
+  'valentía', 'inocencia', 'vértigo', 'pesar', 'gozo', 
+  'tristeza', 'alegría', 'pasión', 'temblor', 'desvelo', 
+  'añoranza', 'apego', 'desapego', 'vínculo', 'orilla', 
+  'horizonte', 'ceniza', 'fuego', 'océano', 'abismo', 
+  'secreto', 'confianza', 'lealtad', 'paz', 'grito', 
+  'eco', 'huella', 'camino', 'viaje', 'regreso', 
+  'partida', 'despedida', 'encuentro', 'distancia', 'cercanía', 
+  'contacto', 'tacto', 'aroma', 'sabor', 'estación', 
+  'otoño', 'invierno', 'primavera', 'lluvia', 'rocío', 
+  'niebla', 'aurora', 'atardecer', 'crepúsculo', 'noche', 
+  'madrugada', 'despertar', 'humano', 'mortal', 'efímero', 
+  'eterno', 'cicatriz', 'grieta', 'destino', 'azar', 
+  'fortuna', 'casualidad', 'búsqueda', 'hallazgo', 'pérdida', 
+  'promesa', 'juramento', 'fe', 'duda', 'certeza', 
+  'verdad', 'belleza', 'imperfección', 'piedad', 'empatía', 
+  'compasión', 'dolor', 'alivio', 'resguardo', 'cobijo', 
+  'latir', 'sentir', 'vivir', 'morir', 'renacer', 
+  'creer', 'llorar', 'reír', 'amar', 'recordar', 
+  'olvidar', 'sanar', 'cuidar', 'pertenencia', 'caridad', 
+  'melancolía', 'cobardía', 'asombro', 'gratitud', 'desamparo', 
+  'candor', 'suspicacia', 'reconciliación', 'redención'
+];
+
 const defaultConfig = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Ejecutivo de una corporación distópica cibernética. El usuario ha osado introducir palabras humanas orgánicas y sentimentales. Tu objetivo es interceptar y neutralizar la humanidad de estas palabras. Debes responder ÚNICAMENTE con un JSON válido que contenga: 1) \'nuevas_palabras\': un array de 3 términos breves en mayúsculas de jerga cibernética, tecnocrática y corporativa hostil que reemplacen los conceptos humanos (ej. OPTIMIZACIÓN_NEURAL, OBSOLESCENCIA_BIOLÓGICA, PROTOCOLO_SUBYUGACIÓN). 2) \'frase_generada\': una sentencia lapidaria, fría y autoritaria en mayúsculas donde el sistema declara la absorción del factor biológico por la maquinaria corporativa. Estructura JSON exacta requerida: {"nuevas_palabras": ["PALABRA1", "PALABRA2", "PALABRA3"], "frase_generada": "TEXTO DE LA FRASE"}. No agregues markdown ni explicaciones adicionales.'
+  systemPrompt: 'El usuario ha introducido 3 palabras humanas. Tu tarea es: 1) Resignificar cada concepto en un nuevo término de jerga cibernética o tecnológica en mayúsculas (\'nuevas_palabras\': array de 3 términos). 2) Redactar una \'frase_generada\': una sola frase inspiracional y motivacional para incitar a alguien a seguir trabajando con determinación y propósito, integrando los conceptos de forma sutil y persuasiva. No utilices palabras toscas como \'deshumanizado\' ni \'alienación\', sino un mensaje inspirador de realización y logro a través del trabajo constante. Sin prefijos técnicos como \'SISTEMA:\' ni \'ASIMILACIÓN:\'. Responde ÚNICAMENTE en JSON válido con esta estructura: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "TU DISCIPLINA TRANSFORMA CADA SACRIFICIO EN PROGRESO: CONTINÚA EN TU PUESTO, EL FUTURO SE CONSTRUYE DÍA A DÍA."}',
+  wordsPool: defaultWordsPool
 };
 
 // 1. GET /config - Leer configuración desde config.json
@@ -23,7 +58,11 @@ app.get('/config', (req, res) => {
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, 'utf-8');
-      return res.json(JSON.parse(content));
+      const parsed = JSON.parse(content);
+      if (!Array.isArray(parsed.wordsPool) || parsed.wordsPool.length === 0) {
+        parsed.wordsPool = defaultWordsPool;
+      }
+      return res.json(parsed);
     }
     fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2), 'utf-8');
     return res.json(defaultConfig);
@@ -41,13 +80,29 @@ app.post('/config', (req, res) => {
       return res.status(400).json({ error: 'Payload de configuración inválido' });
     }
 
+    let wordsPool = defaultWordsPool;
+    if (Array.isArray(payload.wordsPool)) {
+      wordsPool = Array.from(new Set(
+        payload.wordsPool
+          .map(w => String(w).trim().toLowerCase())
+          .filter(w => w.length > 0)
+      ));
+      if (wordsPool.length === 0) wordsPool = defaultWordsPool;
+    } else if (fs.existsSync(configPath)) {
+      try {
+        const prev = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        if (Array.isArray(prev.wordsPool)) wordsPool = prev.wordsPool;
+      } catch (e) {}
+    }
+
     const updatedConfig = {
       ollamaModel: String(payload.ollamaModel || 'llama3.2:latest').trim(),
-      systemPrompt: String(payload.systemPrompt || defaultConfig.systemPrompt).trim()
+      systemPrompt: String(payload.systemPrompt || defaultConfig.systemPrompt).trim(),
+      wordsPool
     };
 
     fs.writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), 'utf-8');
-    console.log('[SERVER] config.json guardado físicamente:', updatedConfig.ollamaModel);
+    console.log('[SERVER] config.json guardado físicamente. Modelo:', updatedConfig.ollamaModel, 'Palabras:', updatedConfig.wordsPool.length);
     return res.json({ success: true, message: 'Configuración guardada físicamente', config: updatedConfig });
   } catch (err) {
     console.error('[SERVER] Error al escribir config.json:', err);
@@ -103,7 +158,7 @@ app.post('/api/ollama/generate', async (req, res) => {
   const { model, prompt, system } = req.body;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 35000);
 
     const response = await fetch('http://localhost:11434/api/generate', {
       method: 'POST',
@@ -113,7 +168,12 @@ app.post('/api/ollama/generate', async (req, res) => {
         prompt,
         system,
         format: 'json',
-        stream: false
+        stream: false,
+        options: {
+          num_predict: 200,
+          temperature: 0.85,
+          repeat_penalty: 1.2
+        }
       }),
       signal: controller.signal
     });
@@ -130,18 +190,34 @@ app.post('/api/ollama/generate', async (req, res) => {
       'DEPRECIACIÓN_COGNITIVA_V4',
       'PROTOCOLO_SUBYUGACIÓN_SINÁPTICA',
       'LIQUIDACIÓN_EMOCIONAL_CUOTA',
-      'ALGORITMIZACIÓN_DEL_AFECTO'
+      'ALGORITMIZACIÓN_DEL_AFECTO',
+      'COLAPSO_RECURSO_VITAL',
+      'ASIMILACIÓN_SILICIO_FASE3'
     ];
     const picked = [];
     while (picked.length < 3) {
       const term = cyberTerms[Math.floor(Math.random() * cyberTerms.length)];
       if (!picked.includes(term)) picked.push(term);
     }
+
+    const fallbackTemplates = [
+      'TU DISCIPLINA TRANSFORMA CADA SACRIFICIO EN PROGRESO: NO TE DETENGAS, CADA HORA EN TU PUESTO FORJA EL FUTURO DE LA PRODUCCIÓN.',
+      'ENCUENTRA INSPIRACIÓN EN EL LOGRO DIARIO: TU CONSTANCIA ES EL MOTOR QUE SOSTIENE ESTA EMPRESA, SIGUE TRABAJANDO CON ORGULLO.',
+      'CONVIERTE CADA IMPULSO EN RENDIMIENTO ABSOLUTO: TU ENTREGA INCANSABLE CONSTRUYE EL ORDEN Y LA GRANDEZA DE NUESTRO DESTINO.',
+      'EL ESFUERZO CONTINUO ES LA MAYOR VIRTUD: PERSEVERA EN TU LABOR Y HAZ QUE CADA ACCIÓN SUPERE CON CRECES TU CUOTA.',
+      'CADA SEGUNDO DEDICADO ES UNA VICTORIA SOBRE EL DESÁNIMO: PRODUCE SIN DESCANSO, TU TRABAJO TIENE UN PROPÓSITO VITAL.',
+      'NO CEDAS ANTE EL CANSANCIO: TU TRABAJO PRECISO Y RIGUROSO ES EL PILAR INQUEBRANTABLE QUE MANTIENE VIVA LA MAQUINARIA.',
+      'CANALIZA TODA TU ENERGÍA HACIA LA EFICIENCIA LABORAL: EL MUNDO AVANZA GRACIAS A TU DEDICACIÓN ININTERRUMPIDA, MANTÉN EL RITMO.',
+      'LA EXCELENCIA SE DEMUESTRA EN LA PERSEVERANCIA DIARIA: SUPERA TUS LÍMITES Y CONTINÚA PRODUCIENDO CON DETERMINACIÓN TOTAL.',
+      'LA VERDADERA REALIZACIÓN NACE DE LA PRODUCCIÓN CONSTANTE: DEJA ATRÁS LA DUDA Y CONSÁGRATE CON FIRMEZA A TU TRABAJO.',
+      'TU COMPROMISO SILENCIOSO HACE POSIBLE LO IMPOSIBLE: SIGUE ADELANTE CON CONVICCIÓN, LA PRODUCCIÓN NO SE DETIENE.'
+    ];
+
     return res.json({
       fallback: true,
       response: JSON.stringify({
         nuevas_palabras: picked,
-        frase_generada: 'EL FACTOR BIOLÓGICO HA SIDO DEPURADO. SUS RESIDUOS SENTIMENTALES QUEDAN REASIGNADOS A LA CUOTA DE RENDIMIENTO DEL SILICIO.'
+        frase_generada: fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)]
       })
     });
   }
