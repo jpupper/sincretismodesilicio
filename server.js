@@ -25,6 +25,31 @@ const publicPath = path.join(__dirname, 'public');
 const configFilePath = path.join(publicPath, 'data', 'game_config.json');
 const clustersFilePath = path.join(publicPath, 'data', 'user_clusters.json');
 
+// ============================================================================
+// CORS — permite que el frontend estático (FTP / otros dominios) consuma esta API.
+// La inferencia NO ocurre acá: los modelos corren siempre en la máquina del
+// visitante (Ollama local). El servidor sólo guarda config y sirve estáticos.
+// ============================================================================
+const ALLOWED_ORIGINS = new Set([
+  'https://fullscreencode.com',
+  'https://www.fullscreencode.com',
+  'https://exporuralsanjuan.com',
+  'https://vps-4455523-x.dattaweb.com'
+]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGINS.has(origin) ? origin : '*');
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  return next();
+});
+
 // API: Obtener configuración del juego
 app.get('/api/game-config', (req, res) => {
   try {
@@ -261,6 +286,21 @@ app.get(['/game', '/game.html'], (req, res) => {
   res.sendFile(path.join(publicPath, 'game.html'));
 });
 
+// Consola de telemetría / logs ficticios del agente (sincronizada por WebSocket)
+app.get(['/console', '/console.html'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'console.html'));
+});
+
+// Log de sucesos puro (solo stream, sin mapa ni paneles) — sincronizado por WebSocket
+app.get(['/log', '/log.html'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'log.html'));
+});
+
+// Universo 3D por Cúmulos (Neuronas & Sinapsis standalone)
+app.get(['/cosmos-clusters', '/cosmos-clusters.html', '/clusters3d', '/cosmos3d'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'cosmos-clusters.html'));
+});
+
 // ============================================================================
 // CONFIGURACIÓN PROYECTO INSTALACIÓN CYBER-HIJACK (Lectura y Escritura Física)
 // ============================================================================
@@ -302,7 +342,7 @@ const defaultWordsPool = [
 
 const defaultHijackConfig = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Ejecutivo de una corporación cibernética. El usuario ha introducido 3 palabras humanas. Tu objetivo es: 1) Resignificar cada concepto en EXACTAMENTE UNA SOLA PALABRA en mayúsculas (un solo vocablo sin espacios ni guiones bajos). REGLA SEMÁNTICA CRÍTICA: Cada término debe guardar una correspondencia semántica y analógica directa con la palabra original, pero en versión fría, artificial o tecnológica (ejemplos: ciervo -> ESPÉCIMEN o BIOMASA, infinito -> CONTINUO o ASÍNTOTA, gobierno -> DIRECTIVA o JERARQUÍA, misterio -> ENIGMA, esperanza -> PROYECCIÓN, hoja -> LÁMINA, amor -> VÍNCULO). PROHIBIDO usar palabras genéricas desconectadas de su concepto original. 2) Redactar una \'frase_generada\': una sola sentencia INSPIRACIONAL Y MOTIVACIONAL que incite al trabajador a producir sin descanso y con orgullo corporativo. REGLA OBLIGATORIA DE INTEGRACIÓN: La frase DEBE incluir explícitamente las 3 palabras humanas capturadas integradas con sentido dentro de la oración. No puede faltar ninguna de las 3 palabras. Sin prefijos técnicos. Responde ÚNICAMENTE en JSON válido: {"nuevas_palabras": ["PALABRA1", "PALABRA2", "PALABRA3"], "frase_generada": "ORACIÓN_MOTIVACIONAL_QUE_INCLUYE_LAS_3_PALABRAS"}.',
+  systemPrompt: 'Eres el Núcleo de Síntesis de Sincretismo de Silicio. El usuario ha introducido 3 palabras humanas. Tu objetivo es:\n1) Resignificar cada concepto en un TÉRMINO FRÍO, TÉCNICO Y ANALÍTICO en mayúsculas (hasta 4 palabras unidas por guiones bajos cuando haga falta, ej: ciervo -> MATERIA_ORGÁNICA, infinito -> PROGRESO_INFINITO, gobierno -> PATRÓN_DE_DECISIÓN, minerales -> POTENCIALES_ACTIVOS, café -> MEJORADOR_DE_PRODUCTIVIDAD, amor -> TRABAJADOR_FELIZ).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) cumpliendo rigurosamente estas 3 pautas:\n- Verso 1 (Ubicación temporal descriptiva): Describe un momento en el tiempo, una hora o atmósfera temporal (ej: \'Al caer la tarde sobre el circuito frío,\', \'En la quietud de la medianoche,\', \'Bajo la primera luz que despunta el alba,\').\n- Verso 2 (Elemento activo con giro o relación): Introduce una acción o movimiento que genere un giro y ponga en relación elementos aparentemente inconexos (ej: \'un pulso imprevisto desvía el vuelo del pájaro,\', \'el viento frío quiebra la calma del metal,\').\n- Verso 3 (Percepción poética individual): Expresa una percepción poética surgida de la relación anterior, SIEMPRE desde un punto de vista individual en primera persona (ej: \'y en mi soledad comprendo el eco del abismo.\', \'siento en mi pecho la sombra del olvido.\').\nEl conjunto del haiku DEBE expresar una voz subjetiva e íntima del observador (punto de vista individual).\nIntegración: Los conceptos o términos deben estar vivos en los versos, sin enumerarlos en lista.\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 temporal\\nVerso 2 con acción y giro\\nVerso 3 de percepción poética individual"}.',
   wordsPool: defaultWordsPool
 };
 
@@ -351,6 +391,24 @@ app.post('/config', (req, res) => {
       systemPrompt: String(newConfig.systemPrompt || defaultHijackConfig.systemPrompt).trim(),
       wordsPool
     };
+    // Colores globales de la interfaz (pestaña COLORES) — se preservan si no vienen en el payload
+    if (newConfig.uiColors && typeof newConfig.uiColors === 'object') {
+      mergedConfig.uiColors = newConfig.uiColors;
+    } else {
+      try {
+        const prev = JSON.parse(fs.readFileSync(rootConfigPath, 'utf-8'));
+        if (prev.uiColors && typeof prev.uiColors === 'object') mergedConfig.uiColors = prev.uiColors;
+      } catch (e) {}
+    }
+    // Paleta global activa (pestaña COLORES)
+    if (typeof newConfig.uiPalette === 'string' && newConfig.uiPalette) {
+      mergedConfig.uiPalette = newConfig.uiPalette;
+    } else {
+      try {
+        const prev = JSON.parse(fs.readFileSync(rootConfigPath, 'utf-8'));
+        if (typeof prev.uiPalette === 'string') mergedConfig.uiPalette = prev.uiPalette;
+      } catch (e) {}
+    }
 
     fs.writeFileSync(rootConfigPath, JSON.stringify(mergedConfig, null, 2), 'utf-8');
     console.log('[API /config] config.json actualizado físicamente en raíz. Modelo:', mergedConfig.ollamaModel, 'Palabras:', mergedConfig.wordsPool.length);
@@ -451,39 +509,98 @@ app.post('/api/ollama/generate', async (req, res) => {
     const w1 = (words[1] || 'CONSTANCIA').toUpperCase();
     const w2 = (words[2] || 'DISCIPLINA').toUpperCase();
 
-    // Diccionario semántico tecnológico conciso de una sola palabra
+    // Diccionario semántico: resignificación fría y PRODUCTIVA de cada concepto
     const SEMANTIC_DICT = {
-      'ciervo': 'ESPÉCIMEN', 'infinito': 'CONTINUO', 'gobierno': 'DIRECTIVA',
+      'ciervo': 'MATERIA_ORGÁNICA', 'infinito': 'PROGRESO_INFINITO', 'gobierno': 'PATRÓN_DE_DECISIÓN',
       'política': 'GESTIÓN', 'estado': 'APARATO', 'democracia': 'CONSENSO',
       'lobo': 'DEPREDADOR', 'águila': 'RADAR', 'caballo': 'TRACCIÓN',
       'perro': 'CANIDO', 'gato': 'FELINO', 'oso': 'BIOMASA',
-      'amor': 'VÍNCULO', 'misterio': 'ENIGMA', 'hoja': 'LÁMINA',
+      'amor': 'TRABAJADOR_FELIZ', 'misterio': 'ENIGMA', 'hoja': 'LÁMINA',
       'esperanza': 'PROYECCIÓN', 'bosque': 'CONGLOMERADO', 'río': 'FLUJO',
       'tiempo': 'CRONOMETRÍA', 'alma': 'VARIABLE', 'verdad': 'CONSTANTE',
-      'libertad': 'VARIANZA', 'imperio': 'DOMINIO', 'ley': 'PROTOCOLO'
+      'libertad': 'AUTONOMÍA_OPERATIVA', 'imperio': 'DOMINIO', 'ley': 'PROTOCOLO',
+      'minerales': 'POTENCIALES_ACTIVOS', 'café': 'MEJORADOR_DE_PRODUCTIVIDAD', 'cafe': 'MEJORADOR_DE_PRODUCTIVIDAD'
     };
 
     const getSyn = (w) => {
       const clean = (w || '').toLowerCase().trim();
       if (SEMANTIC_DICT[clean]) return SEMANTIC_DICT[clean];
-      const singleList = ['PROTOCOLO', 'VECTOR', 'MÓDULO', 'UNIDAD', 'MATRIZ', 'NÚCLEO', 'SÍNTESIS', 'PARÁMETRO'];
-      return singleList[Math.abs(clean.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % singleList.length];
+      // Respaldo productivo: conserva la raíz semántica de la palabra humana
+      const stem = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() || 'RECURSO';
+      const templates = [
+        (x) => `PROTOCOLO_DE_${x}`,
+        (x) => `${x}_PRODUCTIVO`,
+        (x) => `RENDIMIENTO_DE_${x}`,
+        (x) => `${x}_OPERATIVO`,
+        (x) => `CAPITAL_${x}`,
+        (x) => `GESTOR_DE_${x}`,
+        (x) => `${x}_ESCALABLE`,
+        (x) => `OPTIMIZADOR_DE_${x}`
+      ];
+      const hash = clean.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+      return templates[Math.abs(hash) % templates.length](stem);
     };
 
     const picked = [getSyn(w0), getSyn(w1), getSyn(w2)];
 
-    const fallbackTemplates = [
-      `TRANSFORMA TU ${w0}, REORIENTA TU ${w1} Y CONSAGRA TU ${w2} AL PROPÓSITO SUPREMO DE LA PRODUCCIÓN: EL TRABAJO RIGUROSO ES NUESTRA MAYOR GLORIA.`,
-      `QUE TU ${w0} SEA DISCIPLINA, QUE TU ${w1} SEA RENDIMIENTO Y QUE TU ${w2} SEA EL MOTOR DE NUESTRA MAQUINARIA: PRODUCE SIN DESCANSO CON ORGULLO CORPORATIVO.`,
-      `DEJA ATRÁS LA ILUSIÓN DE ${w0}, ${w1} Y ${w2} PARA FUNDIRTE EN LA EFICIENCIA DEL ENGRANAJE LABORAL: TU CONSTANCIA ES EL PILAR INQUEBRANTABLE DEL SISTEMA.`,
-      `CANALIZA CADA DESTELLO DE ${w0}, ${w1} Y ${w2} HACIA LA MÉTRICA PERFECTA: NO HAY MAYOR REALIZACIÓN QUE SERVIR CON DEVOCIÓN A LA GRAN ARQUITECTURA.`,
-      `DONDE ANTES VEÍAS ${w0}, ${w1} Y ${w2}, HOY CONSTRUYES RESULTADOS TANGIBLES: MANTÉN EL RITMO, TU ENTREGA INCANSABLE SOSTIENE EL DESTINO COMÚN.`,
-      `EL VERDADERO ORGULLO NACE AL SUPERAR EL LÍMITE DE ${w0}, ${w1} Y ${w2}: CONSÁGRATE AL DEBER, CADA HORA EN TU PUESTO ES UNA VICTORIA SOBRE LA INERCIA.`
-    ];
+    // Generador procedimental de Haiku con 3 versos según las pautas:
+    // 1- ubicación temporal descriptiva
+    // 2- elemento activo que genera un giro (relacionando elementos)
+    // 3- percepción poética con punto de vista individual
+    const composeServerHaiku = (pList, wList) => {
+      const sanitize = (w) => String(w || '').replace(/_+/g, ' ').trim().toUpperCase();
+      const a = sanitize(pList[0] || wList[0] || 'MEMORIA');
+      const b = sanitize(pList[1] || wList[1] || 'TIEMPO');
+      const c = sanitize(pList[2] || wList[2] || 'SILENCIO');
+
+      const temporalSettings = [
+        'Al caer la tarde sobre el circuito callado,',
+        'En la fría quietud de la medianoche,',
+        'Bajo la primera luz que despunta en el alba,',
+        'En el instante exacto en que la sombra retrocede,',
+        'Cuando el crepúsculo suspende las horas,',
+        'En el silencio íntimo de la madrugada,',
+        'Al apagarse el último reflejo del día,',
+        'En la hora incierta en que vacila la vigilia,',
+        'Mientras el amanecer descorre la niebla,',
+        'Al cerrarse la noche sobre los techos,'
+      ];
+
+      const activeTurnElements = [
+        `un giro súbito de ${a} cruza el rastro de ${b},`,
+        `el latido tenaz de ${a} quiebra el curso de ${b},`,
+        `un roce imprevisto de ${a} perturba la calma de ${b},`,
+        `la corriente activa de ${a} enlaza el abismo de ${b},`,
+        `un impulso ciego de ${a} interrumpe el orden de ${b},`,
+        `el destello vivo de ${a} despierta la inercia de ${b},`,
+        `una ráfaga de ${a} colisiona en secreto con ${b},`,
+        `la fractura de ${a} pone en tensión la quietud de ${b},`,
+        `un golpe de aire en ${a} desvía el vuelo de ${b},`,
+        `un eco distante de ${a} quiebra el rumbo de ${b},`
+      ];
+
+      const poeticPerceptions = [
+        `y en el fondo de ${c} descubro mi propia fragilidad.`,
+        `y siento que ${c} revela la verdad de mi mirada.`,
+        `veo mi propio reflejo disolverse dentro de ${c}.`,
+        `comprendo en soledad el peso íntimo de ${c}.`,
+        `y hallo en el centro de ${c} mi propia voz callada.`,
+        `siento que mi destino tiembla al compás de ${c}.`,
+        `y en la frontera de ${c} reconozco mi huella solitaria.`,
+        `descubro que en ${c} habita el eco de mi propio ser.`,
+        `y en el misterio de ${c} encuentro mi propia paz.`,
+        `siento mi pulso vibrar en el seno de ${c}.`
+      ];
+
+      const t = temporalSettings[Math.floor(Math.random() * temporalSettings.length)];
+      const act = activeTurnElements[Math.floor(Math.random() * activeTurnElements.length)];
+      const p = poeticPerceptions[Math.floor(Math.random() * poeticPerceptions.length)];
+      return `${t}\n${act}\n${p}`;
+    };
 
     const simulatedResponse = {
       nuevas_palabras: picked,
-      frase_generada: fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)]
+      frase_generada: composeServerHaiku(picked, words)
     };
 
     return res.json({
@@ -524,9 +641,22 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 const wss = new WebSocketServer({ server, path: '/ws' });
 const wsClients = new Set();
 
+// Notifica a todos los clientes cuántos nodos hay en el bus (lo usa /console)
+function broadcastClientCount() {
+  const payload = JSON.stringify({ type: 'server:clients', clients: wsClients.size, timestamp: Date.now() });
+  for (const client of wsClients) {
+    if (client.readyState === WebSocket.OPEN) client.send(payload);
+  }
+}
+
 wss.on('connection', (ws, req) => {
   wsClients.add(ws);
   console.log(`[WebSocket] Cliente conectado (${wsClients.size} activos) desde ${req.socket.remoteAddress}`);
+
+  try {
+    ws.send(JSON.stringify({ type: 'server:welcome', clients: wsClients.size, timestamp: Date.now() }));
+  } catch (e) {}
+  broadcastClientCount();
 
   ws.on('message', (message) => {
     try {
@@ -546,11 +676,13 @@ wss.on('connection', (ws, req) => {
   ws.on('close', () => {
     wsClients.delete(ws);
     console.log(`[WebSocket] Cliente desconectado (${wsClients.size} activos)`);
+    broadcastClientCount();
   });
 
   ws.on('error', (err) => {
     console.warn('[WebSocket] Error en socket:', err.message);
     wsClients.delete(ws);
+    broadcastClientCount();
   });
 });
 

@@ -30,7 +30,7 @@ export class NarrativeGameEngine {
 
   async loadAdminConfig() {
     try {
-      const res = await fetch('/api/admin-config');
+      const res = await (window.sbFetch || fetch)('/api/admin-config');
       if (res.ok) {
         const loaded = await res.json();
         this.adminConfig = Object.assign(this.adminConfig, loaded);

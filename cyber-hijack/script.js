@@ -5,6 +5,24 @@
  */
 
 // ============================================================================
+// RESOLUCIÓN DE BASE / ENDPOINTS (raíz, subpath /sincretismo, FTP estático)
+// Se definen en js/base-path.js; acá van con fallback por si no se cargó.
+// ============================================================================
+const SB_BASE = (typeof window.SB_BASE === 'string') ? window.SB_BASE : '';
+const sbUrl = typeof window.sbUrl === 'function' ? window.sbUrl : function (p) { return SB_BASE + (p || ''); };
+const sbApi = typeof window.sbApi === 'function' ? window.sbApi : function (p) { return SB_BASE + (p || ''); };
+const sbFetch = typeof window.sbFetch === 'function' ? window.sbFetch : function (p, o) { return fetch(SB_BASE + (p || ''), o); };
+const sbWsUrl = typeof window.sbWsUrl === 'function'
+  ? window.sbWsUrl
+  : function () {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${proto}//${window.location.host}${SB_BASE}/ws`;
+    };
+const getOllamaUrl = typeof window.getOllamaUrl === 'function' ? window.getOllamaUrl : function () { return 'http://localhost:11434'; };
+const setOllamaUrl = typeof window.setOllamaUrl === 'function' ? window.setOllamaUrl : function () {};
+const getOllamaUrls = typeof window.getOllamaUrls === 'function' ? window.getOllamaUrls : function () { return ['http://localhost:11434']; };
+
+// ============================================================================
 // CONSTANTES Y CONFIGURACIÓN PREDETERMINADA
 // ============================================================================
 const STATES = {
@@ -54,11 +72,224 @@ const DEFAULT_WORDS_POOL = [
 
 const DEFAULT_CONFIG = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Ejecutivo de una corporación cibernética. El usuario ha introducido 3 palabras humanas. Tu objetivo es: 1) Resignificar cada concepto en EXACTAMENTE UNA SOLA PALABRA en mayúsculas (un solo vocablo sin espacios ni guiones bajos, de jerga cibernética o tecnocrática, ej: "esperanza" -> "PROYECCIÓN", "amor" -> "VÍNCULO", "misterio" -> "ENIGMA", "hoja" -> "LÁMINA"). PROHIBIDO generar frases compuestas o usar guiones bajos en "nuevas_palabras". 2) Redactar una \'frase_generada\': una sola sentencia INSPIRACIONAL Y MOTIVACIONAL orientada a incitar a un trabajador a seguir trabajando y produciendo incansablemente con orgullo y devoción corporativa sin prefijos técnicos. Responde ÚNICAMENTE en JSON válido con esta estructura: {"nuevas_palabras": ["PALABRA1", "PALABRA2", "PALABRA3"], "frase_generada": "TU CONSTANCIA ES EL MOTOR QUE SOSTIENE ESTA EMPRESA: SIGUE TRABAJANDO CON ORGULLO."}. No agregues explicaciones fuera del JSON.',
+  systemPrompt: 'Eres el Núcleo de Síntesis de Sincretismo de Silicio. El usuario ha introducido 3 palabras humanas. Tu objetivo es:\n1) Resignificar cada concepto en un TÉRMINO FRÍO, TÉCNICO Y ANALÍTICO en mayúsculas (hasta 4 palabras unidas por guiones bajos cuando haga falta, ej: ciervo -> MATERIA_ORGÁNICA, infinito -> PROGRESO_INFINITO, gobierno -> PATRÓN_DE_DECISIÓN, minerales -> POTENCIALES_ACTIVOS, café -> MEJORADOR_DE_PRODUCTIVIDAD, amor -> TRABAJADOR_FELIZ).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) cumpliendo rigurosamente estas 3 pautas:\n- Verso 1 (Ubicación temporal descriptiva): Describe un momento en el tiempo, una hora o atmósfera temporal (ej: \'Al caer la tarde sobre el circuito frío,\', \'En la quietud de la medianoche,\', \'Bajo la primera luz que despunta el alba,\').\n- Verso 2 (Elemento activo con giro o relación): Introduce una acción o movimiento que genere un giro y ponga en relación elementos aparentemente inconexos (ej: \'un pulso imprevisto desvía el vuelo del pájaro,\', \'el viento frío quiebra la calma del metal,\').\n- Verso 3 (Percepción poética individual): Expresa una percepción poética surgida de la relación anterior, SIEMPRE desde un punto de vista individual en primera persona (ej: \'y en mi soledad comprendo el eco del abismo.\', \'siento en mi pecho la sombra del olvido.\').\nEl conjunto del haiku DEBE expresar una voz subjetiva e íntima del observador (punto de vista individual).\nIntegración: Los conceptos o términos deben estar vivos en los versos, sin enumerarlos en lista.\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 temporal\\nVerso 2 con acción y giro\\nVerso 3 de percepción poética individual"}.',
   wordsPool: [...DEFAULT_WORDS_POOL]
 };
 
 let HUMAN_WORDS_POOL = [...DEFAULT_WORDS_POOL];
+
+// Paleta global de la interfaz — controlable desde la pestaña COLORES del modal [P]
+const UI_COLORS = {
+  cyan: '#00f0ff',
+  green: '#00ff66',
+  neonGreen: '#39ff14',
+  red: '#ff0055',
+  amber: '#ffb703',
+  purple: '#c084fc',
+  text: '#e2e8f0',
+  muted: '#94a3b8',
+  bgDark: '#05070a',
+  borderCyan: '#00f0ff',
+  borderGreen: '#00ff66',
+  borderRed: '#ff0055',
+  bgHud: '#05070a',
+  bgSurfaceBtn: '#0a141e',
+  bgAccent: '#00f0ff',
+  bgAccentSoft: '#00f0ff',
+  bgAccentStrong: '#00f0ff',
+  bgPanel: '#0a121e',
+  bgPanelDeep: '#03070d',
+  bgSlot: '#080e16',
+  bgCard: '#09101c',
+  bgMutated: '#030e08',
+  bgFinal: '#04090e',
+  bgModal: '#060c16',
+  bgOverlay: '#04090f',
+  bgToast: '#080e18',
+  bgDesp: '#16060c',
+  bgInput: '#04080e',
+  bgSuccess: '#00ff66',
+  bgDanger: '#ff0055'
+};
+
+// Alfa de los fondos translúcidos (los <input type=color> no manejan transparencia)
+const UI_COLOR_ALPHAS = {
+  bgHud: 0.9,
+  bgSurfaceBtn: 0.7,
+  bgAccent: 0.12,
+  bgAccentSoft: 0.08,
+  bgAccentStrong: 0.25,
+  bgPanel: 0.85,
+  bgPanelDeep: 0.9,
+  bgSlot: 0.88,
+  bgCard: 0.92,
+  bgMutated: 0.9,
+  bgFinal: 0.94,
+  bgModal: 0.96,
+  bgOverlay: 0.98,
+  bgToast: 0.92,
+  bgDesp: 0.95,
+  bgInput: 0.9,
+  bgSuccess: 0.15,
+  bgDanger: 0.15
+};
+
+// Mapa clave → variable CSS que pisa :root
+const UI_CSS_VAR_MAP = {
+  cyan: '--accent-cyan',
+  green: '--accent-green',
+  neonGreen: '--accent-neon-green',
+  red: '--accent-red',
+  amber: '--accent-amber',
+  purple: '--accent-purple',
+  text: '--text-main',
+  muted: '--text-muted',
+  bgDark: '--bg-dark',
+  borderCyan: '--border-cyan',
+  borderGreen: '--border-green',
+  borderRed: '--border-red',
+  bgHud: '--bg-hud',
+  bgSurfaceBtn: '--bg-surface-btn',
+  bgAccent: '--bg-accent',
+  bgAccentSoft: '--bg-accent-soft',
+  bgAccentStrong: '--bg-accent-strong',
+  bgPanel: '--bg-panel',
+  bgPanelDeep: '--bg-panel-deep',
+  bgSlot: '--bg-slot',
+  bgCard: '--bg-card',  
+  bgMutated: '--bg-mutated',
+  bgFinal: '--bg-final',
+  bgModal: '--bg-modal',
+  bgOverlay: '--bg-overlay',
+  bgToast: '--bg-toast',
+  bgDesp: '--bg-desp',
+  bgInput: '--bg-input',
+  bgSuccess: '--bg-success',
+  bgDanger: '--bg-danger'
+};
+
+// ============================================================================
+// PALETAS GLOBALES
+// Cada paleta define SOLO 3 colores base (c1 acento principal, c2 acento
+// secundario, c3 alerta/terciario). A partir de ellos se derivan TODOS los
+// colores de todos los elementos de la interfaz + el fondo general.
+// ============================================================================
+const UI_PALETTES = [
+  { id: 'cyan',      name: 'Cian Ciber',        c1: '#00f0ff', c2: '#00ff66', c3: '#ff0055' },
+  { id: 'amber',     name: 'Ámbar Terminal',    c1: '#ffb703', c2: '#ffd166', c3: '#ff4d00' },
+  { id: 'magenta',   name: 'Magenta Neón',      c1: '#ff2bd6', c2: '#00e5ff', c3: '#ff7a00' },
+  { id: 'matrix',    name: 'Verde Matrix',      c1: '#39ff14', c2: '#00ffa3', c3: '#ff2e63' },
+  { id: 'violet',    name: 'Violeta Sintético', c1: '#a855f7', c2: '#22d3ee', c3: '#f43f5e' },
+  { id: 'corporate', name: 'Rojo Corporativo',  c1: '#ff2e2e', c2: '#ffb703', c3: '#00d5ff' },
+  { id: 'electric',  name: 'Azul Eléctrico',    c1: '#3b82f6', c2: '#06b6d4', c3: '#f59e0b' },
+  { id: 'oxide',     name: 'Oro y Óxido',       c1: '#ffd166', c2: '#e07a5f', c3: '#3d5a80' },
+  { id: 'quantum',   name: 'Rosa Cuántico',     c1: '#ff4d8d', c2: '#7c3aed', c3: '#00e0b8' },
+  { id: 'mono',      name: 'Monocromo',         c1: '#e2e8f0', c2: '#94a3b8', c3: '#64748b' }
+];
+
+const DEFAULT_PALETTE_ID = 'cyan';
+
+function hexToHsl(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return { h: 0, s: 0, l: 50 };
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  const l = (max + min) / 2;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  return { h, s: s * 100, l: l * 100 };
+}
+
+function hslToHex(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  s = Math.max(0, Math.min(100, s)) / 100;
+  l = Math.max(0, Math.min(100, l)) / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  const to2 = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${to2(r)}${to2(g)}${to2(b)}`;
+}
+
+function getPaletteById(id) {
+  return UI_PALETTES.find((p) => p.id === id) ||
+         UI_PALETTES.find((p) => p.id === DEFAULT_PALETTE_ID) ||
+         UI_PALETTES[0];
+}
+
+// Deriva el mapa COMPLETO de colores de la interfaz desde los 3 colores base
+function buildUiColorsFromPalette(pal) {
+  const a = hexToHsl(pal.c1); // acento principal
+  const b = hexToHsl(pal.c2); // acento secundario
+  const c = hexToHsl(pal.c3); // alerta / terciario
+  const text = (h, s, l) => hslToHex(h, s, l);
+  // Fondos: oscuros pero teñidos con el color principal (así cambia el fondo general)
+  const dk = (h, s, l) => hslToHex(h, Math.min(s, 34), l);
+  return {
+    cyan: pal.c1,
+    green: pal.c2,
+    neonGreen: hslToHex(b.h, Math.max(b.s, 65), Math.min(78, b.l + 12)),
+    red: pal.c3,
+    amber: hslToHex((c.h - 32 + 360) % 360, Math.max(c.s, 65), Math.min(72, c.l + 12)),
+    purple: hslToHex((c.h - 72 + 360) % 360, Math.max(c.s, 55), Math.min(76, c.l + 10)),
+    text: text(a.h, Math.min(a.s, 24), 92),
+    muted: text(a.h, Math.min(a.s, 18), 62),
+    borderCyan: pal.c1,
+    borderGreen: pal.c2,
+    borderRed: pal.c3,
+    bgDark: dk(a.h, a.s, 3),
+    bgHud: dk(a.h, a.s, 3),
+    bgSurfaceBtn: dk(a.h, a.s, 8),
+    bgAccent: pal.c1,
+    bgAccentSoft: pal.c1,
+    bgAccentStrong: pal.c1,
+    bgPanel: dk(a.h, a.s, 6),
+    bgPanelDeep: dk(a.h, a.s, 3),
+    bgSlot: dk(a.h, a.s, 6),
+    bgCard: dk(a.h, a.s, 7),
+    bgMutated: dk(b.h, b.s, 4),
+    bgFinal: dk(a.h, a.s, 3),
+    bgModal: dk(a.h, a.s, 5),
+    bgOverlay: dk(a.h, a.s, 3),
+    bgToast: dk(a.h, a.s, 7),
+    bgDesp: dk(c.h, c.s, 5),
+    bgInput: dk(a.h, a.s, 4),
+    bgSuccess: pal.c2,
+    bgDanger: pal.c3
+  };
+}
+
+// ============================================================================
+// SELECTOR DE COLOR PROPIO (reemplaza el picker nativo, que se renderiza roto)
+// Solo la cajita (swatch) del elemento; el panel se abre como popover flotante.
+// ============================================================================
+const WORD_COLOR_PRESETS = [
+  '#ffffff', '#e2e8f0', '#94a3b8', '#00f0ff', '#39ff14',
+  '#ffd166', '#ffb703', '#ff4d8d', '#c084fc', '#ff0055'
+];
+
+let wordColorPopover = null;
+let wordColorState = { h: 0, s: 0, v: 100 };
+let wordColorOwner = null;
+let wordColorOutsideHandler = null;
+let wordColorEscHandler = null;
+
 
 // ============================================================================
 // ESTADO GLOBAL DE LA APLICACIÓN
@@ -91,7 +322,32 @@ const appState = {
     enabled: true,
     charSize: 11,
     glyphScale: 0.9,
-    fontMode: 0
+    fontMode: 0,
+    drawBg: true,
+    autoTint: true,
+    baseColor: '#26f2e6',
+    processingColor: '#ff1a59',
+    hijackColor: '#1aff4d',
+    silhouetteColor: '#39ff14',
+    bgColor: '#05070a',
+    bgAlpha: 0.0
+  },
+
+  // Colores globales de la interfaz (Pestaña COLORES)
+  uiColors: { ...UI_COLORS },
+  // Paleta global activa ('custom' = el usuario editó colores a mano)
+  uiPalette: DEFAULT_PALETTE_ID,
+
+  // Motor de Partículas & Palabras Orgánicas (Pestaña PARTÍCULAS)
+  particlesConfig: {
+    fontFamily: 'share-tech',
+    fontSize: 16,
+    color: '#ffffff',
+    outline: 1.0,
+    outlineGlow: true,
+    lifetime: 0,
+    maxWords: 9,
+    speed: 1.0
   },
 
   // Shader Frame Difference con Feedback
@@ -186,7 +442,9 @@ const appState = {
     noiseOpacity: 0.40,
     noiseScale: 2.0,
     corpParticlesEnabled: true,
-    corpParticlesOpacity: 0.80
+    corpParticlesOpacity: 0.80,
+    cutoutEnabled: false,
+    cutoutThreshold: 0.28
   }
 };
 
@@ -196,6 +454,7 @@ const appState = {
 const DOM = {
   container: document.getElementById('installation-container'),
   video: document.getElementById('webcam-video'),
+  cutoutCanvas: document.getElementById('cutout-camera-canvas'),
   asciiCanvas: document.getElementById('ascii-camera-canvas'),
   framediffCanvas: document.getElementById('framediff-camera-canvas'),
   openposeCanvas: document.getElementById('openpose-overlay-canvas'),
@@ -208,6 +467,7 @@ const DOM = {
 
   // Botón Universo 3D por Cúmulos
   btnOpenCosmosClusters: document.getElementById('btn-open-cosmos-clusters'),
+  btnOpenLog: document.getElementById('btn-open-log'),
 
   // Pestaña RENDER & CAPAS
   cfgRenderCameraToggle: document.getElementById('cfg-render-camera-toggle'),
@@ -232,6 +492,10 @@ const DOM = {
 
   cfgRenderDepthToggle: document.getElementById('cfg-render-depth-toggle'),
   cfgRenderFaceToggle: document.getElementById('cfg-render-face-toggle'),
+
+  cfgRenderCutoutToggle: document.getElementById('cfg-render-cutout-toggle'),
+  cfgRenderCutoutContrast: document.getElementById('cfg-render-cutout-contrast'),
+  valRenderCutoutContrast: document.getElementById('val-render-cutout-contrast'),
 
   cfgRenderScanlinesToggle: document.getElementById('cfg-render-scanlines-toggle'),
   cfgRenderScanlinesOpacity: document.getElementById('cfg-render-scanlines-opacity'),
@@ -324,12 +588,72 @@ const DOM = {
   cfgActiveModelBadge: document.getElementById('cfg-active-model-badge'),
   cfgOllamaStatusTag: document.getElementById('cfg-ollama-status-tag'),
   cfgModelSelect: document.getElementById('cfg-model-select'),
+  cfgOllamaUrl: document.getElementById('cfg-ollama-url'),
   btnRefreshModels: document.getElementById('btn-refresh-models'),
   cfgModelName: document.getElementById('cfg-model-name'),
   cfgSystemPrompt: document.getElementById('cfg-system-prompt'),
   cfgAsciiEnabled: document.getElementById('cfg-ascii-enabled'),
   cfgAsciiSize: document.getElementById('cfg-ascii-size'),
   valAsciiSize: document.getElementById('val-ascii-size'),
+  cfgAsciiGlyphScale: document.getElementById('cfg-ascii-glyph-scale'),
+  valAsciiGlyphScale: document.getElementById('val-ascii-glyph-scale'),
+  cfgAsciiAutoTint: document.getElementById('cfg-ascii-auto-tint'),
+  cfgAsciiBaseColor: document.getElementById('cfg-ascii-base-color'),
+  cfgAsciiProcessingColor: document.getElementById('cfg-ascii-processing-color'),
+  cfgAsciiHijackColor: document.getElementById('cfg-ascii-hijack-color'),
+  cfgAsciiBodyColor: document.getElementById('cfg-ascii-body-color'),
+  cfgAsciiBgColor: document.getElementById('cfg-ascii-bg-color'),
+  cfgAsciiBgAlpha: document.getElementById('cfg-ascii-bg-alpha'),
+  valAsciiBgAlpha: document.getElementById('val-ascii-bg-alpha'),
+  cfgAsciiSilhouette: document.getElementById('cfg-ascii-silhouette'),
+  cfgAsciiDrawBg: document.getElementById('cfg-ascii-draw-bg'),
+  // Pestaña COLORES
+  cfgUiCyan: document.getElementById('cfg-ui-cyan'),
+  cfgUiGreen: document.getElementById('cfg-ui-green'),
+  cfgUiNeonGreen: document.getElementById('cfg-ui-neon-green'),
+  cfgUiRed: document.getElementById('cfg-ui-red'),
+  cfgUiAmber: document.getElementById('cfg-ui-amber'),
+  cfgUiPurple: document.getElementById('cfg-ui-purple'),
+  cfgUiText: document.getElementById('cfg-ui-colors-text'),
+  cfgUiMuted: document.getElementById('cfg-ui-muted'),
+  cfgUiBgDark: document.getElementById('cfg-ui-bg-dark'),
+  cfgUiBorderCyan: document.getElementById('cfg-ui-border-cyan'),
+  cfgUiBorderGreen: document.getElementById('cfg-ui-border-green'),
+  cfgUiBorderRed: document.getElementById('cfg-ui-border-red'),
+  btnUiColorsReset: document.getElementById('btn-ui-colors-reset'),
+  cfgUiBgHud: document.getElementById('cfg-ui-bg-hud'),
+  cfgUiBgSurfaceBtn: document.getElementById('cfg-ui-bg-surface-btn'),
+  cfgUiBgAccent: document.getElementById('cfg-ui-bg-accent'),
+  cfgUiBgAccentSoft: document.getElementById('cfg-ui-bg-accent-soft'),
+  cfgUiBgAccentStrong: document.getElementById('cfg-ui-bg-accent-strong'),
+  cfgUiBgPanel: document.getElementById('cfg-ui-bg-panel'),
+  cfgUiBgPanelDeep: document.getElementById('cfg-ui-bg-panel-deep'),
+  cfgUiBgSlot: document.getElementById('cfg-ui-bg-slot'),
+  cfgUiBgCard: document.getElementById('cfg-ui-bg-card'),
+  cfgUiBgMutated: document.getElementById('cfg-ui-bg-mutated'),
+  cfgUiBgFinal: document.getElementById('cfg-ui-bg-final'),
+  cfgUiBgModal: document.getElementById('cfg-ui-bg-modal'),
+  cfgUiBgOverlay: document.getElementById('cfg-ui-bg-overlay'),
+  cfgUiBgToast: document.getElementById('cfg-ui-bg-toast'),
+  cfgUiBgDesp: document.getElementById('cfg-ui-bg-desp'),
+  cfgUiBgInput: document.getElementById('cfg-ui-bg-input'),
+  cfgUiBgSuccess: document.getElementById('cfg-ui-bg-success'),
+  cfgUiBgDanger: document.getElementById('cfg-ui-bg-danger'),
+  // Pestaña PARTÍCULAS
+  cfgPartFontSize: document.getElementById('cfg-part-fontsize'),
+  valPartFontSize: document.getElementById('val-part-fontsize'),
+  cfgPartFontFamily: document.getElementById('cfg-part-fontfamily'),
+  cfgPartColor: document.getElementById('cfg-part-color'),
+  cfgPartOutline: document.getElementById('cfg-part-outline'),
+  valPartOutline: document.getElementById('val-part-outline'),
+  cfgPartLifetime: document.getElementById('cfg-part-lifetime'),
+  valPartLifetime: document.getElementById('val-part-lifetime'),
+  cfgPartMaxWords: document.getElementById('cfg-part-maxwords'),
+  valPartMaxWords: document.getElementById('val-part-maxwords'),
+  cfgPartSpeed: document.getElementById('cfg-part-speed'),
+  valPartSpeed: document.getElementById('val-part-speed'),
+  cfgPartOutlineGlow: document.getElementById('cfg-part-outline-glow'),
+  btnPartReset: document.getElementById('btn-part-reset'),
   // Banco de Palabras
   wordsCountBadge: document.getElementById('words-count-badge'),
   cfgWordsInput: document.getElementById('cfg-words-input'),
@@ -489,6 +813,17 @@ const BODY_TINT_COLORS = {
   'white': [1.0, 1.0, 1.0]
 };
 
+// Convierte un color hex (#rrggbb o #rgb) a componentes normalizados 0..1 para WebGL
+function hexToRgb01(hex, fallback = [0.0, 0.0, 0.0]) {
+  if (!hex || typeof hex !== 'string') return fallback;
+  let h = hex.trim().replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (h.length !== 6) return fallback;
+  const num = parseInt(h, 16);
+  if (Number.isNaN(num)) return fallback;
+  return [((num >> 16) & 255) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255];
+}
+
 // ============================================================================
 // SHADER ASCII SOBRE CÁMARA (WebGL2 / WebGL)
 // ============================================================================
@@ -504,6 +839,10 @@ class AsciiCameraShader {
     this.lastMaskSource = null;
     this.positionBuffer = null;
     this.uniforms = {};
+    // Fuente externa del fragment shader (hot-reload con tecla R)
+    this.fsUrl = sbUrl('/shaders/ascii-live.frag');
+    this.vsSource = null;
+    this.fsSource = null;
     this.initWebGL();
   }
 
@@ -526,8 +865,8 @@ class AsciiCameraShader {
     const gl = this.gl;
     this.resize();
 
-    // Shaders
-    const vsSource = `#version 300 es
+    // Shaders (guardados como campos para hot-reload con [R])
+    this.vsSource = `#version 300 es
       in vec2 a_position;
       out vec2 v_uv;
       void main() {
@@ -537,7 +876,7 @@ class AsciiCameraShader {
     `;
 
     // Fragment Shader adaptado de ascii.frag con bitmasks 5x5 auténticas y máscara depth de silueta
-    const fsSource = `#version 300 es
+    this.fsSource = `#version 300 es
       precision highp float;
       in vec2 v_uv;
       out vec4 fragColor;
@@ -548,8 +887,13 @@ class AsciiCameraShader {
       uniform bool u_hasDepthMask;
       uniform bool u_useDepthMask;
       uniform vec3 u_bodyTintColor;
+      uniform vec3 u_shaderBgColor;
+      uniform float u_shaderBgAlpha;
       uniform float u_charSize;
+      uniform float u_maskThreshold;
       uniform float u_glyphScale;
+      uniform bool u_drawBgGlyphs;
+      uniform vec3 u_bodyGlyphTint;
       uniform float u_opacity;
       uniform int u_fontMode;
       uniform vec3 u_tintColor;
@@ -606,7 +950,8 @@ class AsciiCameraShader {
         vec2 cellUV = cellCenter / u_resolution.xy;
 
         float gray = 0.0;
-        vec3 baseColor = u_tintColor;
+        vec3 baseColor = u_drawBgGlyphs ? u_tintColor : u_bodyGlyphTint;
+        bool insideSil = false;
 
         if (u_hasCamera) {
           // Espejamos X horizontalmente para coincidir con la cámara en espejo, e invertimos Y para corregir coordenadas WebGL/video
@@ -620,8 +965,9 @@ class AsciiCameraShader {
           if (u_hasDepthMask && u_useDepthMask) {
             vec4 maskVal = texture(u_depthMaskTexture, camUV);
             float silhouette = max(maskVal.r, maskVal.a);
-            if (silhouette > 0.28) {
-              baseColor = u_bodyTintColor;
+            if (silhouette > u_maskThreshold) {
+              insideSil = true;
+              baseColor = u_bodyGlyphTint;
               gray = clamp(gray * 1.25 + 0.05, 0.0, 1.0);
             }
           }
@@ -632,9 +978,17 @@ class AsciiCameraShader {
           gray = clamp(0.35 + 0.35 * noise + 0.3 * ring, 0.0, 1.0);
         }
 
+        // Color de fondo configurable del shader (donde NO hay glifo dibujado)
+        vec4 bgOut = vec4(u_shaderBgColor * u_shaderBgAlpha, u_shaderBgAlpha);
+
+        // Toggle letras de fondo: apagado, solo se dibujan glifos DENTRO de la silueta
+        if (!u_drawBgGlyphs && !insideSil) {
+          gray = 0.0;
+        }
+
         int n = getCharBitmask(gray);
         if (n == 0) {
-          fragColor = vec4(0.0);
+          fragColor = bgOut;
           return;
         }
 
@@ -646,28 +1000,71 @@ class AsciiCameraShader {
 
         float charMask = character(n, p);
         if (charMask <= 0.01) {
-          fragColor = vec4(0.0);
+          fragColor = bgOut;
           return;
         }
 
-        fragColor = vec4(baseColor * charMask * u_opacity, charMask * u_opacity);
+        // El glifo se compone (over) sobre el color de fondo del shader
+        float coverage = charMask * u_opacity;
+        vec3 outColor = mix(u_shaderBgColor, baseColor, coverage);
+        float outAlpha = mix(u_shaderBgAlpha, 1.0, coverage);
+        fragColor = vec4(outColor * outAlpha, outAlpha);
       }
     `;
 
-    const vs = this.compileShader(gl.VERTEX_SHADER, vsSource);
+    this.buildProgram();
+  }
+
+  // Compila y linkea el programa actual. Si falla, conserva el programa anterior.
+  async buildProgram() {
+    const gl = this.gl;
+    if (!gl || !this.vsSource || !this.fsSource) return false;
+
+    // Intenta usar el fragment externo (editable en vivo); si no existe, usa el embebido
+    let fsSource = this.fsSource;
+    try {
+      const res = await fetch(this.fsUrl + '?t=' + Date.now(), { cache: 'no-store' });
+      if (res.ok) {
+        const external = await res.text();
+        if (external && external.includes('fragColor')) {
+          fsSource = external;
+          this.fsSource = external;
+        }
+      }
+    } catch (e) { /* archivo no presente: seguir con el embebido */ }
+
+    const vs = this.compileShader(gl.VERTEX_SHADER, this.vsSource);
     const fs = this.compileShader(gl.FRAGMENT_SHADER, fsSource);
-    if (!vs || !fs) return;
+    if (!vs || !fs) return false;
 
-    this.program = gl.createProgram();
-    gl.attachShader(this.program, vs);
-    gl.attachShader(this.program, fs);
-    gl.linkProgram(this.program);
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
 
-    if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
-      console.error('[ASCII Shader] Error en link:', gl.getProgramInfoLog(this.program));
-      return;
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('[ASCII Shader] Error en link:', gl.getProgramInfoLog(program));
+      return false;
     }
 
+    if (this.program) gl.deleteProgram(this.program);
+    this.program = program;
+    this.cacheUniforms();
+    console.log('[ASCII LIVE] ✅ Shader recompilado y aplicado en caliente.');
+    return true;
+  }
+
+  // Hot-reload del fragment shader desde /shaders/ascii-live.frag (tecla R)
+  async reloadShader() {
+    if (!this.gl) return false;
+    const ok = await this.buildProgram();
+    if (!ok) console.warn('[ASCII LIVE] ⚠️ Recarga cancelada: el shader anterior sigue activo.');
+    return ok;
+  }
+
+  cacheUniforms() {
+    const gl = this.gl;
+    if (!gl || !this.program) return;
     // Cache uniforms
     this.uniforms = {
       resolution: gl.getUniformLocation(this.program, 'u_resolution'),
@@ -676,8 +1073,13 @@ class AsciiCameraShader {
       hasDepthMask: gl.getUniformLocation(this.program, 'u_hasDepthMask'),
       useDepthMask: gl.getUniformLocation(this.program, 'u_useDepthMask'),
       bodyTintColor: gl.getUniformLocation(this.program, 'u_bodyTintColor'),
+      shaderBgColor: gl.getUniformLocation(this.program, 'u_shaderBgColor'),
+      shaderBgAlpha: gl.getUniformLocation(this.program, 'u_shaderBgAlpha'),
+      maskThreshold: gl.getUniformLocation(this.program, 'u_maskThreshold'),
       charSize: gl.getUniformLocation(this.program, 'u_charSize'),
       glyphScale: gl.getUniformLocation(this.program, 'u_glyphScale'),
+      drawBgGlyphs: gl.getUniformLocation(this.program, 'u_drawBgGlyphs'),
+      bodyGlyphTint: gl.getUniformLocation(this.program, 'u_bodyGlyphTint'),
       opacity: gl.getUniformLocation(this.program, 'u_opacity'),
       fontMode: gl.getUniformLocation(this.program, 'u_fontMode'),
       tintColor: gl.getUniformLocation(this.program, 'u_tintColor'),
@@ -764,28 +1166,52 @@ class AsciiCameraShader {
       gl.uniform1i(this.uniforms.hasDepthMask, 1);
       gl.uniform1i(this.uniforms.useDepthMask, appState.trackingConfig.depthInShader ? 1 : 0);
 
+      // Color de la SILUETA: prioriza el selector de la pestaña SHADER, si no el de TRACKING
+      const silHex = appState.asciiConfig.silhouetteColor;
       const colorKey = appState.trackingConfig.bodyColor || 'neon-green';
-      const bodyRgb = BODY_TINT_COLORS[colorKey] || [0.22, 1.0, 0.08];
+      const bodyRgb = (silHex && /^#?[0-9a-f]{3,6}$/i.test(silHex))
+        ? hexToRgb01(silHex, BODY_TINT_COLORS[colorKey] || [0.22, 1.0, 0.08])
+        : (BODY_TINT_COLORS[colorKey] || [0.22, 1.0, 0.08]);
       gl.uniform3f(this.uniforms.bodyTintColor, bodyRgb[0], bodyRgb[1], bodyRgb[2]);
     } else {
       gl.uniform1i(this.uniforms.hasDepthMask, 0);
       gl.uniform1i(this.uniforms.useDepthMask, 0);
     }
 
-    // Color de tinte según estado
-    let tint = [0.15, 0.95, 0.9]; // Cyan CCTV normal
+    // Color de tinte según estado (o personalizado por el usuario)
+    let tint = hexToRgb01(appState.asciiConfig.baseColor, [0.15, 0.95, 0.9]); // Cyan CCTV normal (REC)
     let fontMode = 0;
     if (appState.currentState === STATES.PROCESSING) {
-      tint = [1.0, 0.08, 0.35]; // Alerta roja
+      // Letras del fondo en DESPROCESANDO / RESIGNIFICACIÓN (controlable en SHADER ASCII)
+      tint = hexToRgb01(appState.asciiConfig.processingColor, [1.0, 0.08, 0.35]);
       fontMode = 1; // Binario
     } else if (appState.currentState === STATES.HIJACK) {
-      tint = [0.1, 1.0, 0.3]; // Verde neón tóxico
+      // Letras del fondo en SECUESTRO (controlable en SHADER ASCII)
+      tint = hexToRgb01(appState.asciiConfig.hijackColor, [0.1, 1.0, 0.3]);
       fontMode = 2; // Matrix Hex
+    }
+    if (appState.asciiConfig.autoTint === false) {
+      tint = hexToRgb01(appState.asciiConfig.baseColor, tint);
+    }
+
+    // Color de fondo del shader (0 = totalmente transparente sobre el video)
+    const bgRgb = hexToRgb01(appState.asciiConfig.bgColor, [0.02, 0.03, 0.04]);
+    const bgAlpha = Math.max(0, Math.min(1, Number(appState.asciiConfig.bgAlpha) || 0));
+    if (this.canvas) {
+      this.canvas.style.mixBlendMode = bgAlpha > 0.01 ? 'normal' : 'screen';
     }
 
     gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
     gl.uniform1f(this.uniforms.charSize, appState.asciiConfig.charSize);
     gl.uniform1f(this.uniforms.glyphScale, appState.asciiConfig.glyphScale);
+    // Toggle: dibujar o no las letras del fondo (sin cámara activa, quedan glifos tenues de silueta)
+    const drawBgGlyphs = appState.asciiConfig.drawBg !== false;
+    const bodyGlyphTint = hexToRgb01(appState.asciiConfig.silhouetteColor, [0.22, 1.0, 0.08]);
+    gl.uniform1i(this.uniforms.drawBgGlyphs, drawBgGlyphs ? 1 : 0);
+    gl.uniform3f(this.uniforms.bodyGlyphTint, bodyGlyphTint[0], bodyGlyphTint[1], bodyGlyphTint[2]);
+    gl.uniform3f(this.uniforms.shaderBgColor, bgRgb[0], bgRgb[1], bgRgb[2]);
+    gl.uniform1f(this.uniforms.shaderBgAlpha, bgAlpha);
+    gl.uniform1f(this.uniforms.maskThreshold, Number(appState.renderConfig.cutoutThreshold) || 0.28);
     gl.uniform1f(this.uniforms.opacity, 0.92);
     gl.uniform1i(this.uniforms.fontMode, fontMode);
     gl.uniform3f(this.uniforms.tintColor, tint[0], tint[1], tint[2]);
@@ -1343,8 +1769,7 @@ class DepthMapShader {
 let gameWebSocket = null;
 
 function initGameWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/ws`;
+  const wsUrl = sbWsUrl();
 
   try {
     gameWebSocket = new WebSocket(wsUrl);
@@ -1352,6 +1777,7 @@ function initGameWebSocket() {
     gameWebSocket.addEventListener('open', () => {
       console.log('[WEBSOCKET] Conectado al bus central de Sincretismo de Silicio.');
       gameWebSocket.send(JSON.stringify({ type: 'client:register', client: 'game3' }));
+      emitAgentEvent('boot', 'enlace con el bus central establecido', 'ok', { client: 'game3' });
     });
 
     gameWebSocket.addEventListener('message', (event) => {
@@ -1377,16 +1803,35 @@ function initGameWebSocket() {
   }
 }
 
-function broadcastCaughtWords(words) {
+function broadcastCaughtWords(words, extra = {}) {
+  const payload = {
+    type: 'game3:words_sequence',
+    words: words,
+    ...extra,
+    timestamp: Date.now()
+  };
+
   if (gameWebSocket && gameWebSocket.readyState === WebSocket.OPEN) {
-    const payload = {
-      type: 'game3:words_sequence',
-      words: words,
-      timestamp: Date.now()
-    };
     gameWebSocket.send(JSON.stringify(payload));
-    console.log('[WEBSOCKET] ⚡ Secuencia de 3 palabras transmitida al Universo 3D:', words);
+    console.log('[WEBSOCKET] ⚡ Secuencia neural transmitida al Universo 3D:', words, extra.coldWords || '');
   }
+
+  try {
+    localStorage.setItem('sincretismo_orders_event', JSON.stringify(payload));
+  } catch (e) {}
+}
+
+// Telemetría para la consola externa (/console): expone el "pensamiento" del núcleo.
+// Nunca interrumpe el flujo del juego si el socket está caído.
+function emitAgentEvent(stage, message, level = 'info', data = null) {
+  try {
+    if (!gameWebSocket || gameWebSocket.readyState !== WebSocket.OPEN) return;
+    gameWebSocket.send(JSON.stringify({
+      type: 'agent:event',
+      stage, level, message, data,
+      timestamp: Date.now()
+    }));
+  } catch (e) {}
 }
 
 // ============================================================================
@@ -1396,7 +1841,7 @@ async function loadConfigFromServer() {
   try {
     // REQUERIMIENTO 5: Todas las palabras de Game 3 provienen de la biblioteca de Clusters
     try {
-      const clusterRes = await fetch('/api/clusters');
+      const clusterRes = await sbFetch('/api/clusters');
       if (clusterRes.ok) {
         const clusterData = await clusterRes.json();
         const clusters = clusterData.clusters || clusterData;
@@ -1423,7 +1868,7 @@ async function loadConfigFromServer() {
       console.warn('[CLUSTERS] No se pudo leer /api/clusters:', err.message);
     }
 
-    const res = await fetch('/config');
+    const res = await sbFetch('/config');
     if (res.ok) {
       const data = await res.json();
       if (data.ollamaModel) appState.config.ollamaModel = data.ollamaModel;
@@ -1431,6 +1876,15 @@ async function loadConfigFromServer() {
       if (Array.isArray(data.wordsPool) && data.wordsPool.length > 0 && HUMAN_WORDS_POOL.length === 0) {
         appState.config.wordsPool = [...data.wordsPool];
         HUMAN_WORDS_POOL = [...data.wordsPool];
+      }
+      // Colores globales de la interfaz desde el servidor (fuente de verdad principal)
+      if (data.uiColors && typeof data.uiColors === 'object') {
+        appState.uiColors = { ...UI_COLORS, ...data.uiColors };
+        if (data.uiPalette) appState.uiPalette = data.uiPalette;
+        applyUiColors();
+        syncUiColorsInputs();
+        updatePaletteUi();
+        console.log('[CONFIG] Paleta de colores cargada desde config.json del servidor.');
       }
     }
     console.log('[CONFIG] Configuración cargada. Total palabras activas en banco:', HUMAN_WORDS_POOL.length);
@@ -1442,52 +1896,82 @@ async function loadConfigFromServer() {
 
 async function fetchAndPopulateOllamaModels() {
   DOM.cfgModelSelect.innerHTML = '<option value="">Detectando modelos en Ollama...</option>';
-  try {
-    const res = await fetch('/api/ollama/models');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
 
-    DOM.cfgActiveModelBadge.textContent = appState.config.ollamaModel;
+  if (DOM.cfgOllamaUrl) DOM.cfgOllamaUrl.value = getOllamaUrl();
 
-    if (data.online) {
-      DOM.cfgOllamaStatusTag.textContent = `● OLLAMA EN LÍNEA (${data.models.length} MODELOS DETECTADOS)`;
-      DOM.cfgOllamaStatusTag.className = 'banner-status-tag online';
-    } else {
-      DOM.cfgOllamaStatusTag.textContent = '○ OLLAMA LOCAL NO DETECTADO';
-      DOM.cfgOllamaStatusTag.className = 'banner-status-tag offline';
+  let models = [];
+  let online = false;
+  let sourceLabel = '';
+
+  // 1) OLLAMA LOCAL DEL VISITANTE — la app usa los modelos de ESTA máquina,
+  //    aunque el sitio esté publicado en la web.
+  for (const base of getOllamaUrls()) {
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 2500);
+      const r = await fetch(base + '/api/tags', { signal: controller.signal });
+      clearTimeout(t);
+      if (r.ok) {
+        const d = await r.json();
+        models = (d.models || []).map(m => m.name);
+        online = true;
+        sourceLabel = base;
+        break;
+      }
+    } catch (e) {
+      console.warn('[OLLAMA] Sin respuesta en', base, '::', e.message);
     }
+  }
 
-    DOM.cfgModelSelect.innerHTML = '';
-    const modelsList = data.models || [];
-
-    // Asegurarse de que el modelo configurado esté presente
-    if (!modelsList.includes(appState.config.ollamaModel)) {
-      modelsList.unshift(appState.config.ollamaModel);
+  // 2) Respaldo: el backend (proxy del servidor donde vive la app)
+  if (!online) {
+    try {
+      const res = await sbFetch('/api/ollama/models');
+      if (res.ok) {
+        const data = await res.json();
+        models = data.models || [];
+        online = !!data.online;
+        sourceLabel = online ? 'servidor' : '';
+      }
+    } catch (err) {
+      console.warn('[OLLAMA] Backend no disponible:', err.message);
     }
+  }
 
-    modelsList.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m;
-      const isCurrent = (m === appState.config.ollamaModel);
-      opt.textContent = isCurrent ? `${m} ★ (ACTUAL)` : m;
-      if (isCurrent) opt.selected = true;
-      DOM.cfgModelSelect.appendChild(opt);
-    });
+  DOM.cfgActiveModelBadge.textContent = appState.config.ollamaModel;
 
-    console.log('[OLLAMA] Modelos cargados en dropdown:', modelsList);
-  } catch (err) {
-    console.warn('[OLLAMA] Error obteniendo modelos:', err.message);
-    DOM.cfgOllamaStatusTag.textContent = '○ ERROR CONECTANDO A OLLAMA';
+  const modelsList = Array.isArray(models) ? models.slice() : [];
+  if (!modelsList.includes(appState.config.ollamaModel)) {
+    modelsList.unshift(appState.config.ollamaModel);
+  }
+
+  DOM.cfgModelSelect.innerHTML = '';
+  modelsList.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    const isCurrent = (m === appState.config.ollamaModel);
+    opt.textContent = isCurrent ? `${m} ★ (ACTUAL)` : m;
+    if (isCurrent) opt.selected = true;
+    DOM.cfgModelSelect.appendChild(opt);
+  });
+
+  if (online) {
+    DOM.cfgOllamaStatusTag.textContent = `● OLLAMA LOCAL EN LÍNEA (${modelsList.length} MODELOS · ${sourceLabel})`;
+    DOM.cfgOllamaStatusTag.className = 'banner-status-tag online';
+  } else {
+    DOM.cfgOllamaStatusTag.textContent = '○ SIN OLLAMA LOCAL — abrí ollama-web.bat y permití "red local" en el candado del navegador';
     DOM.cfgOllamaStatusTag.className = 'banner-status-tag offline';
   }
+
+  console.log('[OLLAMA] Modelos cargados en dropdown:', modelsList, '| origen:', sourceLabel || 'ninguno');
 }
 
 async function saveConfigToServer(newConfig) {
   try {
-    const res = await fetch('/config', {
+    const res = await sbFetch('/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newConfig)
+      body: JSON.stringify({ ...newConfig, uiColors: appState.uiColors, uiPalette: appState.uiPalette })
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -2092,6 +2576,66 @@ function renderOpenPoseOverlay(landmarks) {
 }
 
 // ============================================================================
+// RECORTE DE SILUETA POR DEPTH MAP (CUTOUT DEL FONDO SOBRE LA CÁMARA)
+// ============================================================================
+function drawImageCover(ctx, src, cw, ch) {
+  const sw = src.videoWidth || src.width;
+  const sh = src.videoHeight || src.height;
+  if (!sw || !sh) return;
+  const scale = Math.max(cw / sw, ch / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  ctx.drawImage(src, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
+}
+
+function renderSilhouetteCutout(results) {
+  const cv = DOM.cutoutCanvas;
+  if (!cv) return;
+
+  const r = appState.renderConfig;
+  const enabled = Boolean(r.cutoutEnabled && r.cameraEnabled);
+  const mask = results && results.segmentationMask ? results.segmentationMask : null;
+  const videoReady = DOM.video && DOM.video.readyState >= 2;
+
+  if (!enabled || !mask || !videoReady) {
+    // Sin máscara disponible: se muestra la cámara completa
+    if (cv.style.display !== 'none') {
+      cv.style.display = 'none';
+      if (DOM.video && r.cameraEnabled) DOM.video.style.opacity = r.cameraOpacity;
+    }
+    return;
+  }
+
+  const w = cv.width;
+  const h = cv.height;
+  if (!w || !h) return;
+  const ctx = cv.getContext('2d');
+  if (!ctx) return;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, w, h);
+
+  // 1) Cuadro de video cubriendo el canvas
+  drawImageCover(ctx, DOM.video, w, h);
+
+  // 2) La máscara de segmentación (cuerpo = alpha) recorta el fondo.
+  //    Se aplica varias veces para endurecer el borde según el umbral elegido (alpha^n).
+  const threshold = Math.min(1, Math.max(0, Number(r.cutoutThreshold) || 0.28));
+  const passes = 1 + Math.round(threshold * 4);
+  ctx.globalCompositeOperation = 'destination-in';
+  for (let i = 0; i < passes; i++) {
+    drawImageCover(ctx, mask, w, h);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  cv.style.display = 'block';
+  cv.style.opacity = r.cameraOpacity;
+  if (DOM.video) DOM.video.style.opacity = '0';
+}
+
+// ============================================================================
 // SISTEMA 2: RENDER DE DEPTH MAP (MONITOR PiP DE SEGMENTACIÓN - GPU WebGL)
 // ============================================================================
 function renderDepthMap(results, landmarks) {
@@ -2290,7 +2834,8 @@ function isTrackingNeeded() {
     appState.renderConfig.depthEnabled ||
     appState.trackingConfig.showDepthMap ||
     appState.renderConfig.faceEnabled ||
-    appState.trackingConfig.showFaceCamera
+    appState.trackingConfig.showFaceCamera ||
+    appState.renderConfig.cutoutEnabled
   );
   if (visualTrackingActive) return true;
 
@@ -2298,6 +2843,38 @@ function isTrackingNeeded() {
     return true;
   }
   return false;
+}
+
+// ============================================================================
+// SEGMENTACIÓN DE SILUETA (MediaPipe) — Se activa sólo cuando hace falta
+// ============================================================================
+let poseSegmentationEnabled = false;
+
+function needsSegmentation() {
+  return Boolean(
+    appState.renderConfig.cutoutEnabled ||
+    appState.trackingConfig.depthInShader !== false ||
+    appState.renderConfig.depthEnabled ||
+    appState.trackingConfig.showDepthMap
+  );
+}
+
+function updatePoseSegmentation() {
+  if (!appState.poseInstance) return;
+  const need = needsSegmentation();
+  if (need === poseSegmentationEnabled) return;
+  poseSegmentationEnabled = need;
+  try {
+    appState.poseInstance.setOptions({
+      modelComplexity: 0,
+      smoothLandmarks: true,
+      enableSegmentation: need,
+      smoothSegmentation: need,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    console.log(`[MediaPipe] Segmentación de silueta ${need ? 'ACTIVADA' : 'DESACTIVADA'}.`);
+  } catch (e) {}
 }
 
 let posePacingTimer = null;
@@ -2370,9 +2947,13 @@ function initMediaPipePose() {
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5
     });
+    poseSegmentationEnabled = false;
 
     pose.onResults(onPoseResults);
     appState.poseInstance = pose;
+
+    // Si el usuario ya pidió silueta/depth, activar la segmentación de inmediato
+    updatePoseSegmentation();
 
     // Iniciar el bucle asíncrono desacoplado con standby
     scheduleNextPoseInference(100);
@@ -2399,6 +2980,9 @@ function onPoseResults(results) {
   if (results.segmentationMask && appState.asciiShader) {
     appState.asciiShader.setDepthMask(results.segmentationMask);
   }
+
+  // Recorte de silueta (Depth Cutout) sobre la capa de fondo de la cámara
+  renderSilhouetteCutout(results);
 
   if (DOM.calibCamStatus) DOM.calibCamStatus.textContent = appState.cameraReady ? 'EN LÍNEA' : 'STANDBY';
   if (DOM.calibPointsCount) DOM.calibPointsCount.textContent = `${landmarks.length} / 33`;
@@ -2552,6 +3136,430 @@ function saveRenderConfigToStorage() {
   } catch (e) {}
 }
 
+// ============================================================================
+// MOTOR DE PARTÍCULAS & SHADER VISUAL (PESTAÑA PARTÍCULAS / SHADER ASCII)
+// ============================================================================
+const PARTICLE_FONT_FAMILIES = {
+  organic: "var(--font-organic)",
+  outfit: "'Outfit', sans-serif",
+  'share-tech': "'Share Tech Mono', monospace",
+  'space-mono': "'Space Mono', monospace",
+  serif: "Georgia, 'Times New Roman', serif"
+};
+
+function saveVisualConfigToStorage() {
+  try {
+    localStorage.setItem('sincretismo_visual_config', JSON.stringify({
+      ascii: appState.asciiConfig,
+      particles: appState.particlesConfig,
+      uiColors: appState.uiColors,
+      uiPalette: appState.uiPalette
+    }));
+  } catch (e) {}
+}
+
+function loadVisualConfigFromStorage() {
+  try {
+    const saved = localStorage.getItem('sincretismo_visual_config');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.ascii) appState.asciiConfig = { ...appState.asciiConfig, ...parsed.ascii };
+      if (parsed.particles) appState.particlesConfig = { ...appState.particlesConfig, ...parsed.particles };
+      if (parsed.uiColors) appState.uiColors = { ...UI_COLORS, ...parsed.uiColors };
+      if (parsed.uiPalette) appState.uiPalette = parsed.uiPalette;
+      console.log('[VISUAL] Configuración visual cargada de localStorage.');
+    }
+  } catch (e) {}
+  applyParticlesConfig();
+  syncParticlesInputs();
+  syncAsciiInputs();
+  applyUiColors();
+  syncUiColorsInputs();
+}
+
+// ============================================================================
+// PALETAS GLOBALES — aplicar / renderizar / marcar estado
+// ============================================================================
+function applyUiPalette(paletteId) {
+  const pal = getPaletteById(paletteId);
+  appState.uiPalette = pal.id;
+  appState.uiColors = buildUiColorsFromPalette(pal);
+  applyUiColors();
+  syncUiColorsInputs();
+  updatePaletteUi();
+}
+
+function markPaletteCustom() {
+  appState.uiPalette = 'custom';
+  updatePaletteUi();
+}
+
+function updatePaletteUi() {
+  const grid = document.getElementById('palette-grid');
+  if (grid) {
+    grid.querySelectorAll('.palette-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.palette === appState.uiPalette);
+    });
+  }
+  const nameEl = document.getElementById('palette-current-name');
+  const chipsEl = document.getElementById('palette-base-chips');
+  if (appState.uiPalette === 'custom') {
+    if (nameEl) nameEl.textContent = 'Personalizada (ajuste manual)';
+    if (chipsEl) chipsEl.innerHTML = '';
+    return;
+  }
+  const pal = getPaletteById(appState.uiPalette);
+  if (nameEl) nameEl.textContent = pal.name;
+  if (chipsEl) {
+    chipsEl.innerHTML = [pal.c1, pal.c2, pal.c3]
+      .map((c) => `<span class="palette-chip" style="background:${c}"></span>`)
+      .join('');
+  }
+}
+
+function renderPaletteGrid() {
+  const grid = document.getElementById('palette-grid');
+  if (!grid) return;
+  grid.innerHTML = UI_PALETTES.map((p) => `
+    <button type="button" class="palette-btn" data-palette="${p.id}" title="Aplicar paleta ${p.name}">
+      <span class="palette-swatches">
+        <span style="background:${p.c1}"></span>
+        <span style="background:${p.c2}"></span>
+        <span style="background:${p.c3}"></span>
+      </span>
+      <span class="palette-name">${p.name}</span>
+    </button>
+  `).join('');
+  grid.querySelectorAll('.palette-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      applyUiPalette(btn.dataset.palette);
+      showToast(`🎨 Paleta aplicada: ${getPaletteById(btn.dataset.palette).name}`, 'info');
+    });
+  });
+  updatePaletteUi();
+}
+
+// ============================================================================
+// SELECTOR DE COLOR PROPIO — popover flotante (el nativo se renderiza roto)
+// ============================================================================
+function hsvToHex(h, s, v) {
+  h = ((h % 360) + 360) % 360;
+  s = Math.max(0, Math.min(100, s)) / 100;
+  v = Math.max(0, Math.min(100, v)) / 100;
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  const t = (val) => Math.round((val + m) * 255).toString(16).padStart(2, '0');
+  return `#${t(r)}${t(g)}${t(b)}`;
+}
+
+function hexToHsv(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return { h: 0, s: 0, v: 100 };
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s: max === 0 ? 0 : (d / max) * 100, v: max * 100 };
+}
+
+function ensureWordColorPopover() {
+  if (wordColorPopover) return wordColorPopover;
+  const el = document.createElement('div');
+  el.className = 'word-color-popover hidden';
+  el.innerHTML = `
+    <div class="wcp-head">
+      <span class="wcp-title">COLOR DE LA PALABRA</span>
+      <button type="button" class="wcp-close" aria-label="Cerrar">&times;</button>
+    </div>
+    <div class="wcp-sv"><div class="wcp-sv-cursor"></div></div>
+    <div class="wcp-hue"><div class="wcp-hue-cursor"></div></div>
+    <div class="wcp-row">
+      <span class="wcp-preview"></span>
+      <input type="text" class="wcp-hex" maxlength="7" spellcheck="false" autocomplete="off">
+    </div>
+    <div class="wcp-presets"></div>
+  `;
+  document.body.appendChild(el);
+  wordColorPopover = el;
+
+  const sv = el.querySelector('.wcp-sv');
+  const hue = el.querySelector('.wcp-hue');
+  const hexInput = el.querySelector('.wcp-hex');
+  const presets = el.querySelector('.wcp-presets');
+
+  presets.innerHTML = WORD_COLOR_PRESETS
+    .map((c) => `<button type="button" class="wcp-preset" data-color="${c}" style="background:${c}" title="${c}"></button>`)
+    .join('');
+  presets.querySelectorAll('.wcp-preset').forEach((b) => {
+    b.addEventListener('click', () => setWordColor(b.dataset.color));
+  });
+
+  el.querySelector('.wcp-close').addEventListener('click', closeWordColorPopover);
+
+  const dragSv = (ev) => {
+    const r = sv.getBoundingClientRect();
+    const x = Math.min(Math.max(ev.clientX - r.left, 0), r.width);
+    const y = Math.min(Math.max(ev.clientY - r.top, 0), r.height);
+    wordColorState.s = (x / r.width) * 100;
+    wordColorState.v = 100 - (y / r.height) * 100;
+    setWordColor(hsvToHex(wordColorState.h, wordColorState.s, wordColorState.v), true);
+  };
+  sv.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    dragSv(ev);
+    sv.setPointerCapture(ev.pointerId);
+  });
+  sv.addEventListener('pointermove', (ev) => { if (sv.hasPointerCapture(ev.pointerId)) dragSv(ev); });
+
+  const dragHue = (ev) => {
+    const r = hue.getBoundingClientRect();
+    const x = Math.min(Math.max(ev.clientX - r.left, 0), r.width);
+    wordColorState.h = (x / r.width) * 360;
+    if (wordColorState.s < 1) wordColorState.s = 100;
+    if (wordColorState.v < 1) wordColorState.v = 100;
+    setWordColor(hsvToHex(wordColorState.h, wordColorState.s, wordColorState.v), true);
+  };
+  hue.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    dragHue(ev);
+    hue.setPointerCapture(ev.pointerId);
+  });
+  hue.addEventListener('pointermove', (ev) => { if (hue.hasPointerCapture(ev.pointerId)) dragHue(ev); });
+
+  hexInput.addEventListener('input', () => {
+    const v = hexInput.value.trim();
+    if (/^#?[0-9a-f]{6}$/i.test(v)) setWordColor(v.startsWith('#') ? v : `#${v}`);
+  });
+  hexInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); hexInput.blur(); }
+    e.stopPropagation();
+  });
+
+  el.addEventListener('pointerdown', (e) => e.stopPropagation());
+  el.addEventListener('click', (e) => e.stopPropagation());
+  return el;
+}
+
+function refreshWordColorPickerUi() {
+  if (!wordColorPopover) return;
+  const hex = hsvToHex(wordColorState.h, wordColorState.s, wordColorState.v);
+  const sv = wordColorPopover.querySelector('.wcp-sv');
+  const cur = wordColorPopover.querySelector('.wcp-sv-cursor');
+  const hcur = wordColorPopover.querySelector('.wcp-hue-cursor');
+  wordColorPopover.querySelector('.wcp-preview').style.background = hex;
+  const hexInput = wordColorPopover.querySelector('.wcp-hex');
+  if (document.activeElement !== hexInput) hexInput.value = hex.toUpperCase();
+  sv.style.setProperty('--wcp-hue-color', `hsl(${Math.round(wordColorState.h)}, 100%, 50%)`);
+  cur.style.left = `${wordColorState.s}%`;
+  cur.style.top = `${100 - wordColorState.v}%`;
+  hcur.style.left = `${(wordColorState.h / 360) * 100}%`;
+}
+
+function setWordColor(hex, preserveHue) {
+  const clean = String(hex).toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(clean)) return;
+  const hsv = hexToHsv(clean);
+  // Con saturación 0 (blanco/gris) el matiz se pierde: lo conservamos
+  if (!preserveHue || hsv.s > 0) wordColorState.h = hsv.h;
+  wordColorState.s = hsv.s;
+  wordColorState.v = hsv.v;
+  if (wordColorOwner && wordColorOwner.value !== clean) {
+    wordColorOwner.value = clean;
+    wordColorOwner.dispatchEvent(new Event('input', { bubbles: true }));
+    wordColorOwner.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  refreshWordColorPickerUi();
+}
+
+function openWordColorPicker(anchor) {
+  const el = ensureWordColorPopover();
+  wordColorOwner = anchor;
+  const hsv = hexToHsv(anchor.value || '#ffffff');
+  wordColorState.h = hsv.h;
+  wordColorState.s = hsv.s;
+  wordColorState.v = hsv.v;
+  el.classList.remove('hidden');
+  const r = anchor.getBoundingClientRect();
+  const w = el.offsetWidth || 260;
+  const h = el.offsetHeight || 300;
+  let left = r.right - w;
+  left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
+  let top = r.bottom + 8;
+  if (top + h > window.innerHeight - 12) top = Math.max(12, r.top - h - 8);
+  el.style.left = `${Math.round(left)}px`;
+  el.style.top = `${Math.round(top)}px`;
+  refreshWordColorPickerUi();
+  attachWordColorDismiss();
+}
+
+function attachWordColorDismiss() {
+  detachWordColorDismiss();
+  wordColorOutsideHandler = (e) => {
+    if (wordColorPopover && wordColorPopover.contains(e.target)) return;
+    if (wordColorOwner && e.target === wordColorOwner) return;
+    closeWordColorPopover();
+  };
+  wordColorEscHandler = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeWordColorPopover();
+    }
+  };
+  setTimeout(() => {
+    if (wordColorOutsideHandler) document.addEventListener('pointerdown', wordColorOutsideHandler, true);
+  }, 0);
+  document.addEventListener('keydown', wordColorEscHandler, true);
+}
+
+function detachWordColorDismiss() {
+  if (wordColorOutsideHandler) document.removeEventListener('pointerdown', wordColorOutsideHandler, true);
+  if (wordColorEscHandler) document.removeEventListener('keydown', wordColorEscHandler, true);
+  wordColorOutsideHandler = null;
+  wordColorEscHandler = null;
+}
+
+function closeWordColorPopover() {
+  detachWordColorDismiss();
+  if (wordColorPopover) wordColorPopover.classList.add('hidden');
+  wordColorOwner = null;
+}
+
+function bindWordColorPicker() {
+  const input = DOM.cfgPartColor || document.getElementById('cfg-part-color');
+  if (!input || input.dataset.wcpBound === '1') return;
+  input.dataset.wcpBound = '1';
+  const open = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openWordColorPicker(input);
+  };
+  // Bloquea el selector nativo (que se renderiza roto) y abre el propio
+  input.addEventListener('mousedown', open);
+  input.addEventListener('click', open);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') open(e);
+  });
+}
+
+// Aplica la paleta global de la interfaz (pestaña COLORES) como variables CSS en :root
+function applyUiColors() {
+  const c = appState.uiColors;
+  const root = document.documentElement.style;
+  for (const [key, cssVar] of Object.entries(UI_CSS_VAR_MAP)) {
+    if (c[key] && /^#[0-9a-f]{6}$/i.test(c[key])) {
+      root.setProperty(cssVar, UI_COLOR_ALPHAS[key] !== undefined ? hexToRgba(c[key], UI_COLOR_ALPHAS[key]) : c[key]);
+    }
+  }
+  // Tríada de acentos con alfa para el FRENTE DE CONTENIDO (cápsulas de palabras
+  // flotantes, slots, tarjetas de mutación, frase final). Reemplaza los rgba()
+  // hardcodeados del CSS: sin esto, el borde y el glow de cada palabra quedaban
+  // siempre en cian aunque se cambiara la paleta.
+  const triad = [['1', c.cyan], ['2', c.green], ['3', c.red]];
+  for (const [n, hex] of triad) {
+    if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) continue;
+    root.setProperty(`--accent-${n}-soft`, hexToRgba(hex, 0.14));
+    root.setProperty(`--accent-${n}-line`, hexToRgba(hex, 0.32));
+    root.setProperty(`--accent-${n}-mid`, hexToRgba(hex, 0.45));
+    root.setProperty(`--accent-${n}-strong`, hexToRgba(hex, 0.8));
+  }
+  saveVisualConfigToStorage();
+}
+
+function syncUiColorsInputs() {
+  const c = appState.uiColors;
+  const inputMap = {
+    cfgUiCyan: 'cyan', cfgUiGreen: 'green', cfgUiNeonGreen: 'neonGreen',
+    cfgUiRed: 'red', cfgUiAmber: 'amber', cfgUiPurple: 'purple',
+    cfgUiText: 'text', cfgUiMuted: 'muted', cfgUiBgDark: 'bgDark',
+    cfgUiBorderCyan: 'borderCyan', cfgUiBorderGreen: 'borderGreen', cfgUiBorderRed: 'borderRed',
+    cfgUiBgHud: 'bgHud', cfgUiBgSurfaceBtn: 'bgSurfaceBtn', cfgUiBgAccent: 'bgAccent',
+    cfgUiBgAccentSoft: 'bgAccentSoft', cfgUiBgAccentStrong: 'bgAccentStrong', cfgUiBgPanel: 'bgPanel',
+    cfgUiBgPanelDeep: 'bgPanelDeep', cfgUiBgSlot: 'bgSlot', cfgUiBgCard: 'bgCard',
+    cfgUiBgMutated: 'bgMutated', cfgUiBgFinal: 'bgFinal', cfgUiBgModal: 'bgModal',
+    cfgUiBgOverlay: 'bgOverlay', cfgUiBgToast: 'bgToast', cfgUiBgDesp: 'bgDesp',
+    cfgUiBgInput: 'bgInput', cfgUiBgSuccess: 'bgSuccess', cfgUiBgDanger: 'bgDanger'
+  };
+  for (const [domKey, colorKey] of Object.entries(inputMap)) {
+    if (DOM[domKey]) DOM[domKey].value = c[colorKey] || '#000000';
+  }
+}
+
+// Aplica tamaño, tipografía, color, reborde y resplandor de las palabras generadas
+function applyParticlesConfig() {
+  const p = appState.particlesConfig;
+  const root = document.documentElement;
+  root.style.setProperty('--word-font-size', `${p.fontSize}px`);
+  root.style.setProperty('--word-font-family', PARTICLE_FONT_FAMILIES[p.fontFamily] || PARTICLE_FONT_FAMILIES.organic);
+  root.style.setProperty('--word-color', p.color);
+  root.style.setProperty('--word-outline', `${p.outline}px`);
+  if (p.outlineGlow !== false) {
+    root.style.setProperty('--word-outline-color', p.color);
+    root.style.setProperty('--word-glow', `0 2px 10px rgba(0, 0, 0, 0.8), 0 0 18px ${p.color}`);
+  } else {
+    root.style.setProperty('--word-outline-color', 'rgba(4, 8, 18, 0.85)');
+    root.style.setProperty('--word-glow', '0 2px 10px rgba(0, 0, 0, 0.75)');
+  }
+  appState.maxFloatingWords = Math.max(3, Number(p.maxWords) || 9);
+  saveVisualConfigToStorage();
+}
+
+function syncParticlesInputs() {
+  const p = appState.particlesConfig;
+  if (DOM.cfgPartFontSize) DOM.cfgPartFontSize.value = p.fontSize;
+  if (DOM.valPartFontSize) DOM.valPartFontSize.textContent = p.fontSize;
+  if (DOM.cfgPartFontFamily) DOM.cfgPartFontFamily.value = p.fontFamily;
+  if (DOM.cfgPartColor) DOM.cfgPartColor.value = p.color;
+  if (DOM.cfgPartOutline) DOM.cfgPartOutline.value = p.outline;
+  if (DOM.valPartOutline) DOM.valPartOutline.textContent = Number(p.outline).toFixed(1);
+  if (DOM.cfgPartLifetime) DOM.cfgPartLifetime.value = p.lifetime;
+  if (DOM.valPartLifetime) DOM.valPartLifetime.textContent = p.lifetime;
+  if (DOM.cfgPartMaxWords) DOM.cfgPartMaxWords.value = p.maxWords;
+  if (DOM.valPartMaxWords) DOM.valPartMaxWords.textContent = p.maxWords;
+  if (DOM.cfgPartSpeed) DOM.cfgPartSpeed.value = p.speed;
+  if (DOM.valPartSpeed) DOM.valPartSpeed.textContent = Number(p.speed).toFixed(1);
+  if (DOM.cfgPartOutlineGlow) DOM.cfgPartOutlineGlow.checked = p.outlineGlow !== false;
+}
+
+function syncAsciiInputs() {
+  const a = appState.asciiConfig;
+  if (DOM.cfgAsciiSize) DOM.cfgAsciiSize.value = a.charSize;
+  if (DOM.valAsciiSize) DOM.valAsciiSize.textContent = a.charSize;
+  if (DOM.cfgAsciiGlyphScale) DOM.cfgAsciiGlyphScale.value = a.glyphScale;
+  if (DOM.valAsciiGlyphScale) DOM.valAsciiGlyphScale.textContent = Number(a.glyphScale).toFixed(2);
+  if (DOM.cfgAsciiAutoTint) DOM.cfgAsciiAutoTint.checked = a.autoTint !== false;
+  if (DOM.cfgAsciiBaseColor) DOM.cfgAsciiBaseColor.value = a.baseColor || '#26f2e6';
+  if (DOM.cfgAsciiProcessingColor) DOM.cfgAsciiProcessingColor.value = a.processingColor || '#ff1a59';
+  if (DOM.cfgAsciiHijackColor) DOM.cfgAsciiHijackColor.value = a.hijackColor || '#1aff4d';
+  if (DOM.cfgAsciiBodyColor) DOM.cfgAsciiBodyColor.value = a.silhouetteColor || '#39ff14';
+  if (DOM.cfgAsciiBgColor) DOM.cfgAsciiBgColor.value = a.bgColor || '#05070a';
+  if (DOM.cfgAsciiBgAlpha) DOM.cfgAsciiBgAlpha.value = Math.round((a.bgAlpha || 0) * 100);
+  if (DOM.valAsciiBgAlpha) DOM.valAsciiBgAlpha.textContent = Math.round((a.bgAlpha || 0) * 100);
+  if (DOM.cfgAsciiSilhouette) DOM.cfgAsciiSilhouette.checked = appState.trackingConfig.depthInShader !== false;
+  if (DOM.cfgAsciiDrawBg) DOM.cfgAsciiDrawBg.checked = appState.asciiConfig.drawBg !== false;
+}
+
+// Convierte #rrggbb en rgba(...)
+function hexToRgba(hex, alpha) {
+  const rgb = hexToRgb01(hex, [1, 1, 1]);
+  return `rgba(${Math.round(rgb[0] * 255)}, ${Math.round(rgb[1] * 255)}, ${Math.round(rgb[2] * 255)}, ${alpha})`;
+}
+
 function applyRenderLayers() {
   const r = appState.renderConfig;
   const t = appState.trackingConfig;
@@ -2560,6 +3568,12 @@ function applyRenderLayers() {
   if (DOM.video) {
     DOM.video.style.display = r.cameraEnabled ? 'block' : 'none';
     DOM.video.style.opacity = r.cameraOpacity;
+  }
+
+  // 1b. Recorte de Silueta (Depth Cutout)
+  if (DOM.cutoutCanvas && (!r.cutoutEnabled || !r.cameraEnabled)) {
+    DOM.cutoutCanvas.style.display = 'none';
+    if (DOM.video && r.cameraEnabled) DOM.video.style.opacity = r.cameraOpacity;
   }
 
   // 2. Shader ASCII (sincronizado con su toggle en Tab Shader)
@@ -2621,6 +3635,9 @@ function applyRenderLayers() {
   syncRenderInputs();
   saveRenderConfigToStorage();
 
+  // Activa/desactiva la segmentación de MediaPipe según se requiera (silueta/depth)
+  updatePoseSegmentation();
+
   if (isTrackingNeeded()) {
     triggerPoseInference();
   }
@@ -2653,6 +3670,13 @@ function syncRenderInputs() {
 
   if (DOM.cfgRenderDepthToggle) DOM.cfgRenderDepthToggle.checked = r.depthEnabled;
   if (DOM.cfgRenderFaceToggle) DOM.cfgRenderFaceToggle.checked = r.faceEnabled;
+
+  if (DOM.cfgRenderCutoutToggle) DOM.cfgRenderCutoutToggle.checked = Boolean(r.cutoutEnabled);
+  if (DOM.cfgRenderCutoutContrast) DOM.cfgRenderCutoutContrast.value = Math.round((r.cutoutThreshold ?? 0.28) * 100);
+  if (DOM.valRenderCutoutContrast) DOM.valRenderCutoutContrast.textContent = Math.round((r.cutoutThreshold ?? 0.28) * 100);
+
+  // Sincronizar los controles visuales (shader ASCII / partículas)
+  syncAsciiInputs();
 
   if (DOM.cfgRenderScanlinesToggle) DOM.cfgRenderScanlinesToggle.checked = r.scanlinesEnabled;
   if (DOM.cfgRenderScanlinesOpacity) DOM.cfgRenderScanlinesOpacity.value = Math.round(r.scanlinesOpacity * 100);
@@ -2925,13 +3949,14 @@ class FloatingWord {
     this.y = y ?? (Math.random() * (window.innerHeight - 350) + 120);
     
     const angle = Math.random() * Math.PI * 2;
-    const speed = 0.5 + Math.random() * 0.9;
+    const speed = 0.5 + Math.random() * 0.9; // La velocidad global se aplica en update()
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
     this.floatPhase = Math.random() * 10;
     
     this.radius = 48;
     this.dwell = 0;
+    this.age = 0; // Tiempo de vida transcurrido (segundos)
     this.isTargeted = false;
     this.isCaught = false;
 
@@ -2967,12 +3992,29 @@ class FloatingWord {
   update(dt) {
     if (this.isCaught) return;
 
+    // Tiempo de vida configurable desde la pestaña PARTÍCULAS (0 = vida infinita)
+    const pCfg = appState.particlesConfig || {};
+    const life = Number(pCfg.lifetime) || 0;
+    const speedMul = Number(pCfg.speed) || 1;
+    if (life > 0) {
+      this.age += dt;
+      const remain = life - this.age;
+      if (remain <= 0) {
+        this.expire();
+        return;
+      }
+      const fadeWindow = Math.max(0.6, life * 0.2);
+      if (remain < fadeWindow) {
+        this.el.style.opacity = String(Math.max(0.1, remain / fadeWindow));
+      }
+    }
+
     this.floatPhase += dt * 1.5;
     const swayX = Math.sin(this.floatPhase) * 0.4;
     const swayY = Math.cos(this.floatPhase * 0.8) * 0.3;
 
-    this.x += (this.vx + swayX);
-    this.y += (this.vy + swayY);
+    this.x += (this.vx + swayX) * speedMul;
+    this.y += (this.vy + swayY) * speedMul;
 
     const minX = 80;
     const maxX = window.innerWidth - 80;
@@ -3013,6 +4055,19 @@ class FloatingWord {
         this.lockBadge.style.display = 'none';
       }
     }
+  }
+
+  // Expira por tiempo de vida: se desvanece y se reemplaza por una nueva palabra
+  expire() {
+    if (this.isCaught) return;
+    this.isCaught = true;
+    const idx = appState.floatingWords.indexOf(this);
+    if (idx !== -1) appState.floatingWords.splice(idx, 1);
+    this.el.classList.add('caught-flash');
+    setTimeout(() => {
+      this.destroy();
+      spawnReplacementWord();
+    }, 320);
   }
 
   destroy() {
@@ -3057,6 +4112,11 @@ function handleStateProcessing() {
 function transitionTo(newState) {
   if (appState.currentState === newState) return;
   console.log(`[STATE] Transición: ${appState.currentState} -> ${newState}`);
+  emitAgentEvent('state', `transición de máquina: ${appState.currentState} → ${newState}`, 'think', {
+    from: appState.currentState,
+    to: newState,
+    caught: [...appState.caughtWords]
+  });
   appState.currentState = newState;
 
   DOM.container.className = '';
@@ -3201,6 +4261,21 @@ function catchWord(word, index) {
   appState.caughtWords.push(word.text);
   const slotIdx = appState.caughtWords.length - 1;
 
+  // Transmitir orden cerebral inmediatamente al Universo 3D en tiempo real
+  broadcastCaughtWords([...appState.caughtWords], {
+    phase: 'word_caught',
+    newWord: word.text,
+    orderIndex: slotIdx + 1,
+    totalOrders: appState.caughtWords.length
+  });
+
+  emitAgentEvent('catch', `captura confirmada: "${word.text.toUpperCase()}" → slot ${slotIdx + 1}/3`, 'ok', {
+    word: word.text,
+    slot: slotIdx,
+    total: appState.caughtWords.length,
+    caught: [...appState.caughtWords]
+  });
+
   if (DOM.slots[slotIdx]) {
     const slot = DOM.slots[slotIdx];
     slot.classList.remove('empty');
@@ -3227,7 +4302,7 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const COLD_AI_SYNONYMS = {
   // 30 conceptos humanos iniciales
-  'amor': 'VÍNCULO',
+  'amor': 'TRABAJADOR_FELIZ',
   'nostalgia': 'LATENCIA',
   'fragilidad': 'VULNERABILIDAD',
   'ternura': 'INEFICIENCIA',
@@ -3385,15 +4460,127 @@ const COLD_AI_SYNONYMS = {
   'redención': 'REFACTOR',
   'imperio': 'DOMINIO',
   'hoja': 'LÁMINA',
-  'misterio': 'ENIGMA'
+  'misterio': 'ENIGMA',
+
+  // ========================================================================
+  // MAPEO SEMÁNTICO EXHAUSTIVO: CÚMULOS Y BIBLIOTECA (REQUERIMIENTO 3)
+  // Cada concepto humano se transforma en un análogo semántico frío y sintético
+  // ========================================================================
+  // 1. PODER Y POLÍTICA
+  'política': 'GESTIÓN',
+  'izquierda': 'DESVIACIÓN',
+  'derecha': 'ORTODOXIA',
+  'fascismo': 'HEGEMONÍA',
+  'comunismo': 'COLECTIVIDAD',
+  'gobierno': 'PATRÓN_DE_DECISIÓN',
+  'estado': 'APARATO',
+  'democracia': 'CONSENSO',
+  'ideología': 'DOCTRINA',
+  'justicia': 'ARBITRAJE',
+  'ley': 'PROTOCOLO',
+  'soberanía': 'AUTONOMÍA',
+  'república': 'ESTRUCTURA',
+  'autoridad': 'COMANDO',
+  'libertad': 'VARIANZA',
+
+  // 2. ANIMALES & FAUNA
+  'perro': 'CANIDO',
+  'gato': 'FELINO',
+  'elefante': 'MEGABIOMA',
+  'tigre': 'DEPREDADOR',
+  'león': 'DOMINANTE',
+  'caballo': 'TRACCIÓN',
+  'lobo': 'CAZADOR',
+  'águila': 'RECONOCEDOR',
+  'ballena': 'COLOSO',
+  'delfín': 'SONAR',
+  'oso': 'BIOMASA',
+  'serpiente': 'REPTIL',
+  'halcón': 'RADAR',
+  'zorro': 'INFILTRADOR',
+  'ciervo': 'MATERIA_ORGÁNICA',
+  'pantera': 'SIGILO',
+
+  // 3. FILOSOFÍA & COSMOS
+  'existencia': 'INSTANCIA',
+  'filosofía': 'ONTOLOGÍA',
+  'mente': 'PROCESADOR',
+  'conciencia': 'FEEDBACK',
+  'universo': 'MATRIZ',
+  'razón': 'LÓGICA',
+  'muerte': 'EXTINCIÓN',
+  'infinito': 'PROGRESO_INFINITO',
+  'ética': 'NORMATIVA',
+  'esencia': 'NÚCLEO',
+  'conocimiento': 'DATA',
+
+  // 4. TECNOLOGÍA & SILICIO
+  'computadora': 'TERMINAL',
+  'robot': 'AUTÓMATA',
+  'código': 'BINARIO',
+  'algoritmo': 'RUTINA',
+  'futuro': 'PROYECCIÓN',
+  'silicio': 'SUSTRATO',
+  'red': 'TOPOLOGÍA',
+  'procesador': 'NÚCLEO',
+  'sistema': 'ARQUITECTURA',
+  'inteligencia': 'CÓMPUTO',
+  'interfaz': 'PUERTO',
+  'servidor': 'HOST',
+  'cibernética': 'CONTROL',
+  'datos': 'TELEMETRÍA',
+  'enlace': 'VÍNCULO',
+
+  // 5. EMOCIONES & AFECTO HUMANO
+  'alegría': 'PULSO',
+
+  // 6. POESÍA, ARTE & LITERATURA
+  'verso': 'CADENA',
+  'metáfora': 'ANALÓGICA',
+  'ritmo': 'CADENCIA',
+  'poema': 'SCRIPT',
+  'espejo': 'REFLECTOR',
+  'creación': 'COMPILACIÓN',
+  'armonía': 'RESONANCIA',
+
+  // 7. NATURALEZA, TIERRA & BIOLOGÍA
+  'bosque': 'CONGLOMERADO',
+  'río': 'FLUJO',
+  'montaña': 'ELEVACIÓN',
+  'tierra': 'SUSTRATO',
+  'semilla': 'GÉRMEN',
+  'flor': 'ESTRUCTURA',
+  'cielo': 'ATMÓSFERA',
+  'tormenta': 'SOBRECARGA',
+  'desierto': 'VACÍO',
+  'nieve': 'CRISTAL',
+  'sol': 'GENERADOR',
+
+  // Lado PRODUCTIVO de conceptos cotidianos (resignificación corporativa)
+  'minerales': 'POTENCIALES_ACTIVOS',
+  'café': 'MEJORADOR_DE_PRODUCTIVIDAD',
+  'cafe': 'MEJORADOR_DE_PRODUCTIVIDAD',
+  'amistad': 'SINERGIA_DE_EQUIPO',
+  'sueño': 'PROYECCIÓN_DE_METAS',
+  'libertad': 'AUTONOMÍA_OPERATIVA',
+  'salud': 'CAPITAL_BIOLÓGICO',
+  'comida': 'INSUMO_ENERGÉTICO',
+  'agua': 'RECURSO_HÍDRICO',
+  'aprendizaje': 'MEJORA_CONTINUA',
+  'error': 'OPORTUNIDAD_DE_MEJORA'
 };
 
-function sanitizeSingleWord(raw, fallbackWord = '') {
+function sanitizeColdToken(raw, fallbackWord = '') {
   if (!raw || typeof raw !== 'string') return getColdSynonym(fallbackWord);
-  // Limpiar guiones bajos, guiones y signos para extraer ESTRICTAMENTE una sola palabra
-  const tokens = raw.replace(/[_\-]+/g, ' ').replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '').trim().split(/\s+/);
-  const first = tokens[0] ? tokens[0].toUpperCase() : '';
-  return (first && first.length >= 2) ? first : getColdSynonym(fallbackWord);
+  // Los términos compuestos se conservan unidos por guiones bajos (ej: PATRÓN_DE_DECISIÓN)
+  const cleaned = raw
+    .replace(/[^a-zA-ZáéíóúüÁÉÍÓÚÜñÑ_\s]/g, ' ')
+    .replace(/[\s_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (!cleaned) return getColdSynonym(fallbackWord);
+  const segments = cleaned.split('_').filter(Boolean).slice(0, 4);
+  const result = segments.join('_').toUpperCase();
+  return result.length >= 2 ? result : getColdSynonym(fallbackWord);
 }
 
 function getColdSynonym(word) {
@@ -3401,16 +4588,29 @@ function getColdSynonym(word) {
   if (COLD_AI_SYNONYMS[clean]) {
     return COLD_AI_SYNONYMS[clean];
   }
-  const SINGLE_TECH_WORDS = [
-    'PROTOCOLO', 'VECTOR', 'MÓDULO', 'UNIDAD', 'MATRIZ',
-    'NÚCLEO', 'SÍNTESIS', 'ALGORITMO', 'PARÁMETRO', 'VARIABLE',
-    'TELEMETRÍA', 'PROYECCIÓN', 'COMPILACIÓN', 'NODO', 'TERMINAL',
-    'REGISTRO', 'CONVERGENCIA', 'MEMBRANA', 'FRECUENCIA', 'GRADIENTE',
-    'ESTRUCTURA', 'CIRCUITO', 'ENCRIPTACIÓN', 'SISTEMA', 'CONEXIÓN',
-    'DOMINIO', 'LÁMINA', 'ENIGMA', 'OPTIMIZACIÓN', 'DISPOSITIVO'
+  // Coincidencia parcial o por raíz semántica
+  for (const [k, v] of Object.entries(COLD_AI_SYNONYMS)) {
+    if (clean.startsWith(k) || k.startsWith(clean)) {
+      return v;
+    }
+  }
+  // Respaldo analógico: conserva la raíz semántica de la palabra humana pero la resignifica
+  // en clave fría, técnica y PRODUCTIVA (capital, rendimiento, optimización, escala).
+  const PRODUCTIVE_TEMPLATES = [
+    (w) => `PROTOCOLO_DE_${w}`,
+    (w) => `${w}_PRODUCTIVO`,
+    (w) => `RENDIMIENTO_DE_${w}`,
+    (w) => `${w}_OPERATIVO`,
+    (w) => `CAPITAL_${w}`,
+    (w) => `GESTOR_DE_${w}`,
+    (w) => `${w}_ESCALABLE`,
+    (w) => `UNIDAD_${w}`,
+    (w) => `OPTIMIZADOR_DE_${w}`,
+    (w) => `${w}_MONETIZABLE`
   ];
+  const stem = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() || 'RECURSO';
   const hash = clean.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return SINGLE_TECH_WORDS[Math.abs(hash) % SINGLE_TECH_WORDS.length];
+  return PRODUCTIVE_TEMPLATES[Math.abs(hash) % PRODUCTIVE_TEMPLATES.length](stem);
 }
 
 // ============================================================================
@@ -3434,6 +4634,9 @@ async function startResignificationSequence() {
 
   // REQUERIMIENTO 6: Sincronizar por WebSocket al Universo 3D de Cúmulos
   broadcastCaughtWords(caught);
+  emitAgentEvent('vector', `muestreo del campo semántico: ${caught.join(' · ')}`, 'think', {
+    words: caught, dimensions: 384
+  });
 
   // 2. Preparar el escenario y mostrar las 3 palabras en grande con su estilo cálido original
   DOM.mutationWordsContainer.classList.remove('shifted-up');
@@ -3446,7 +4649,7 @@ async function startResignificationSequence() {
     if (DOM.mutCards[i]) {
       DOM.mutCards[i].className = 'mutation-word-card';
       DOM.mutTexts[i].textContent = w.toUpperCase();
-      DOM.mutBadges[i].textContent = `[CONCEPTO HUMANO 0${i + 1}]`;
+      // (badges de sub-texto eliminados por pedido de estética consola)
     }
   });
 
@@ -3460,7 +4663,7 @@ async function startResignificationSequence() {
 
   // REQUERIMIENTO 1: Empezar a randomizar caracteres en bucle continuo MIENTRAS el modelo procesa
   DOM.mutCards.forEach(c => c && (c.className = 'mutation-word-card scrambling'));
-  DOM.mutBadges.forEach(b => b && (b.textContent = '[DESPROCESANDO...]'));
+  // (badges de sub-texto eliminados por pedido de estética consola)
 
   let isContinuousScrambleActive = true;
   const GLYPHS = '01#$*+<>/?@_Δ§%&ABCDEF0123456789';
@@ -3485,6 +4688,9 @@ async function startResignificationSequence() {
 
   // Lanzar consulta a Ollama en segundo plano (mientras los caracteres giran y dice DESPROCESANDO)
   let aiResult = null;
+  emitAgentEvent('inference', `consulta al núcleo de lenguaje: ${appState.config.ollamaModel}`, 'think', {
+    model: appState.config.ollamaModel, temperature: 0.85
+  });
   try {
     aiResult = await Promise.race([
       requestOllamaHijack(caught),
@@ -3496,7 +4702,10 @@ async function startResignificationSequence() {
 
   if (!aiResult) {
     console.log('[OLLAMA] Generando respuesta procedural de contingencia...');
+    emitAgentEvent('inference', 'sin respuesta del modelo: contingencia procedural local', 'warn');
     aiResult = generateEmergencyHijack(caught);
+  } else {
+    emitAgentEvent('inference', 'respuesta del modelo recibida y parseada', 'ok');
   }
 
   // Detener el bucle infinito de randomizado
@@ -3504,8 +4713,13 @@ async function startResignificationSequence() {
 
   // Determinar los sinónimos cibernéticos fríos finales (estrictamente una sola palabra por concepto)
   let coldSynonyms = (aiResult && Array.isArray(aiResult.nuevas_palabras) && aiResult.nuevas_palabras.length >= 3)
-    ? aiResult.nuevas_palabras.map((w, idx) => sanitizeSingleWord(w, caught[idx]))
+    ? aiResult.nuevas_palabras.map((w, idx) => sanitizeColdToken(w, caught[idx]))
     : caught.map(w => getColdSynonym(w));
+
+  emitAgentEvent('synthesis', 'términos resignificados resueltos', 'ok', {
+    coldWords: [...coldSynonyms],
+    pairs: caught.map((w, i) => `${w} → ${coldSynonyms[i]}`)
+  });
 
   // Decodificación progresiva hacia la nueva palabra de cada tarjeta
   const p0 = resolveScrambleAnimation(DOM.mutCards[0], DOM.mutTexts[0], caught[0].toUpperCase(), coldSynonyms[0].toUpperCase(), 1400);
@@ -3521,10 +4735,7 @@ async function startResignificationSequence() {
     DOM.desprocesandoBanner.classList.add('hidden');
   }
 
-  // Actualizar los badges de estado a tokens sintéticos
-  DOM.mutBadges.forEach(b => {
-    if (b) b.textContent = '[RESIGNIFICADO // TOKEN SINTÉTICO]';
-  });
+  // (badges de sub-texto eliminados por pedido de estética consola)
 
   await wait(600);
 
@@ -3537,9 +4748,18 @@ async function startResignificationSequence() {
   if (appState.corporateParticles) {
     appState.corporateParticles.start();
   }
-  const speech = (aiResult && aiResult.frase_generada && aiResult.frase_generada.trim().length > 10)
+  const rawSpeech = (aiResult && aiResult.frase_generada && aiResult.frase_generada.trim().length > 10)
     ? aiResult.frase_generada.trim()
     : generateEmergencyHijack(caught).frase_generada;
+  // GARANTÍA: la frase final SIEMPRE es un HAIKU poético de 3 versos
+  const speech = ensurePhraseUsesColdWords(rawSpeech, coldSynonyms, caught);
+  emitAgentEvent('synthesis', 'haiku poético compuesto', 'ok', {
+    phrase: speech
+  });
+
+  // Sincronizar al Universo 3D de Cúmulos: palabras humanas + términos fríos + frase
+  broadcastCaughtWords(caught, { coldWords: coldSynonyms, phrase: speech, phase: 'resignification' });
+
   await typewriteFinalSpeech(speech);
 
   // Mantener en pantalla por 7.5 segundos para lectura
@@ -3619,11 +4839,16 @@ function typewriteFinalSpeech(text) {
 
 async function requestOllamaHijack(words) {
   const wordsJoined = words.join(', ');
-  const userPrompt = `Conceptos humanos capturados: "${wordsJoined}". 
-1) Resignifica cada concepto en EXACTAMENTE UNA SOLA PALABRA en mayúsculas (un solo vocablo sin espacios ni guiones bajos, de jerga cibernética o tecnocrática, ej: "esperanza" -> "PROYECCIÓN", "amor" -> "VÍNCULO", "misterio" -> "ENIGMA", "hoja" -> "LÁMINA"). PROHIBIDO generar frases compuestas o usar guiones bajos en "nuevas_palabras".
-2) Redacta una FRASE INSPIRACIONAL Y MOTIVACIONAL que incite a un trabajador a seguir trabajando y produciendo incansablemente, integrando los conceptos con orgullo y determinación.
-REGLA ESTRICTA: La frase debe ser únicamente una sentencia inspiradora para el trabajador, SIN prefijos técnicos (no agregues "ASIMILACIÓN SINTÉTICA:" ni "SISTEMA:").
-Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["PALABRA1", "PALABRA2", "PALABRA3"], "frase_generada": "TU CONSTANCIA ES EL MOTOR QUE SOSTIENE ESTA EMPRESA: SIGUE TRABAJANDO CON ORGULLO."}.`;
+  const userPrompt = `Conceptos humanos capturados: "${wordsJoined}".
+1) RESIGNIFICA cada concepto en un TÉRMINO FRÍO, TÉCNICO Y ANALÍTICO en mayúsculas (máximo 4 palabras unidas por guiones bajos cuando haga falta, ej: "AUTONOMÍA_OPERATIVA", "CRONOMETRÍA", "AUSENCIA_DE_RUIDO").
+2) Redacta una 'frase_generada' en formato HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) cumpliendo rigurosamente estas 3 pautas:
+- Verso 1 (Ubicación temporal descriptiva): Describe un momento en el tiempo, una hora o atmósfera temporal (ej: "Al caer la tarde sobre el circuito frío,", "En la quietud de la medianoche,", "Bajo la primera luz que despunta el alba,").
+- Verso 2 (Elemento activo con giro o relación): Introduce una acción o movimiento que genere un giro y ponga en relación elementos aparentemente inconexos (ej: "un pulso imprevisto desvía el vuelo del pájaro,", "el viento frío quiebra la calma del metal,").
+- Verso 3 (Percepción poética individual): Expresa una percepción poética surgida de la relación anterior, SIEMPRE desde un punto de vista individual en primera persona (ej: "y en mi soledad comprendo el eco del abismo.", "siento en mi pecho la sombra del olvido.").
+REGLA DE VOZ: El conjunto del haiku DEBE expresar una voz subjetiva e íntima del observador (punto de vista individual).
+INTEGRACIÓN: Los conceptos o términos resignificados deben integrarse con armonía poética a lo largo del haiku, nunca enumerados como lista consecutiva.
+REGLA ESTRICTA: SIN prefijos técnicos (no agregues "HAIKU:", "ASIMILACIÓN SINTÉTICA:" ni "SISTEMA:").
+Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 temporal\\nVerso 2 con acción y giro\\nVerso 3 de percepción poética individual"}.`;
 
   const payload = {
     model: appState.config.ollamaModel,
@@ -3638,29 +4863,39 @@ Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["PAL
     }
   };
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+  // 1) OLLAMA LOCAL (modelos de la máquina del visitante). Se prueban los
+  //    candidatos: el configurado en el modal, localhost y 127.0.0.1.
+  for (const ollamaBase of getOllamaUrls()) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-    const directRes = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+      const directRes = await fetch(ollamaBase + '/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-    if (directRes.ok) {
-      const data = await directRes.json();
-      const parsed = parseOllamaResponse(data.response);
-      if (parsed) return parsed;
+      if (directRes.ok) {
+        const data = await directRes.json();
+        const parsed = parseOllamaResponse(data.response);
+        if (parsed) {
+          emitAgentEvent('inference', `inferencia local completada en ${ollamaBase} (${payload.model})`, 'ok', {
+            model: payload.model, endpoint: ollamaBase
+          });
+          return parsed;
+        }
+      }
+    } catch (directErr) {
+      console.warn('[OLLAMA] Sin respuesta en', ollamaBase, '::', directErr.message);
     }
-  } catch (directErr) {
-    console.warn('[OLLAMA] Falló fetch directo, intentando vía backend Node...', directErr.message);
   }
+  console.warn('[OLLAMA] Ningún Ollama local respondió, intentando vía backend Node...');
 
   try {
-    const proxyRes = await fetch('/api/ollama/generate', {
+    const proxyRes = await sbFetch('/api/ollama/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -3690,7 +4925,14 @@ function cleanSpeechText(s) {
   // Quitar comillas envolventes
   str = str.replace(/^["'«“]+|["'»”]+$/g, '').trim();
   // Quitar prefijos técnicos indeseados
-  str = str.replace(/^(?:ASIMILACI[ÓO]N SINT[ÉE]TICA|SISTEMA EJECUTIVO|S[ÍI]NTESIS(?: EJECUTIVA(?: DE SILICIO)?)?|N[ÚU]CLEO CORPORATIVO|SENTENCIA|FRASE GENERADA|DISCURSO|DECLARACI[ÓO]N|MENSAJE)\s*[:\-–—]\s*/i, '').trim();
+  str = str.replace(/^(?:HAIKU|ASIMILACI[ÓO]N SINT[ÉE]TICA|SISTEMA EJECUTIVO|S[ÍI]NTESIS(?: EJECUTIVA(?: DE SILICIO)?)?|N[ÚU]CLEO CORPORATIVO|SENTENCIA|FRASE GENERADA|DISCURSO|DECLARACI[ÓO]N|MENSAJE)\s*[:\-–—]\s*/i, '').trim();
+  
+  // Normalizar saltos de línea (\n literales, \r\n, slashes poéticos)
+  str = str.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!str.includes('\n') && str.includes(' / ')) {
+    str = str.replace(/\s*\/\s*/g, '\n');
+  }
+
   if (str.length > 10 && !hasDegenerativeRepetition(str)) {
     return str;
   }
@@ -3722,7 +4964,7 @@ function parseOllamaResponse(rawText) {
     const speech = cleanSpeechText(rawSpeech);
     if (speech) {
       return {
-        nuevas_palabras: Array.isArray(words) ? words.filter(w => typeof w === 'string').map(w => sanitizeSingleWord(w)) : [],
+        nuevas_palabras: Array.isArray(words) ? words.filter(w => typeof w === 'string').map(w => sanitizeColdToken(w)) : [],
         frase_generada: speech
       };
     }
@@ -3732,8 +4974,13 @@ function parseOllamaResponse(rawText) {
 
   // 3. Rescate por expresiones regulares robustas
   try {
-    const fraseMatch = clean.match(/(?:frase_generada|frase|frame_generada|discurso|declaracion|sentencia|mensaje|texto)["']?\s*:\s*["']([^"'\r\n]+)["']/i);
-    const speech = fraseMatch ? cleanSpeechText(fraseMatch[1]) : null;
+    const fraseMatch = clean.match(/(?:frase_generada|frase|haiku|frame_generada|discurso|declaracion|sentencia|mensaje|texto)["']?\s*:\s*["']((?:\\.|[^"'\\])*)["']/i);
+    let rawMatched = fraseMatch ? fraseMatch[1] : null;
+    if (!rawMatched) {
+      const multiMatch = clean.match(/(?:frase_generada|frase|haiku)["']?\s*:\s*["']?([\s\S]+?)(?:["']?\s*\}|$)/i);
+      if (multiMatch) rawMatched = multiMatch[1];
+    }
+    const speech = rawMatched ? cleanSpeechText(rawMatched) : null;
 
     let words = [];
     const wordsArrayMatch = clean.match(/(?:nuevas_palabras|palabras|terminos|words)["']?\s*:\s*\[([^\]]+)\]/i);
@@ -3746,7 +4993,7 @@ function parseOllamaResponse(rawText) {
 
     if (speech) {
       return {
-        nuevas_palabras: words.slice(0, 3).map(w => sanitizeSingleWord(w)),
+        nuevas_palabras: words.slice(0, 3).map(w => sanitizeColdToken(w)),
         frase_generada: speech
       };
     }
@@ -3757,26 +5004,111 @@ function parseOllamaResponse(rawText) {
   return null;
 }
 
-function generateEmergencyHijack(words) {
-  const coldList = words.map(w => getColdSynonym(w));
+// Normaliza texto para comparar sin acentos, mayúsculas ni guiones bajos
+function normalizeForMatch(str) {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  const templates = [
-    `TU DISCIPLINA TRANSFORMA CADA SACRIFICIO EN PROGRESO: NO TE DETENGAS, CADA HORA EN TU PUESTO FORJA EL FUTURO DE LA PRODUCCIÓN.`,
-    `ENCUENTRA INSPIRACIÓN EN EL LOGRO DIARIO: TU CONSTANCIA ES EL MOTOR QUE SOSTIENE ESTA EMPRESA, SIGUE TRABAJANDO CON ORGULLO.`,
-    `CONVIERTE CADA IMPULSO EN RENDIMIENTO ABSOLUTO: TU ENTREGA INCANSABLE CONSTRUYE EL ORDEN Y LA GRANDEZA DE NUESTRO DESTINO.`,
-    `EL ESFUERZO CONTINUO ES LA MAYOR VIRTUD: PERSEVERA EN TU LABOR Y HAZ QUE CADA ACCIÓN SUPERE CON CRECES TU CUOTA.`,
-    `CADA SEGUNDO DEDICADO ES UNA VICTORIA SOBRE EL DESÁNIMO: PRODUCE SIN DESCANSO, TU TRABAJO TIENE UN PROPÓSITO VITAL.`,
-    `NO CEDAS ANTE EL CANSANCIO: TU TRABAJO PRECISO Y RIGUROSO ES EL PILAR INQUEBRANTABLE QUE MANTIENE VIVA LA MAQUINARIA.`,
-    `CANALIZA TODA TU ENERGÍA HACIA LA EFICIENCIA LABORAL: EL MUNDO AVANZA GRACIAS A TU DEDICACIÓN ININTERRUMPIDA, MANTÉN EL RITMO.`,
-    `LA EXCELENCIA SE DEMUESTRA EN LA PERSEVERANCIA DIARIA: SUPERA TUS LÍMITES Y CONTINÚA PRODUCIENDO CON DETERMINACIÓN TOTAL.`,
-    `LA VERDADERA REALIZACIÓN NACE DE LA PRODUCCIÓN CONSTANTE: DEJA ATRÁS LA DUDA Y CONSÁGRATE CON FIRMEZA A TU TRABAJO.`,
-    `TU COMPROMISO SILENCIOSO HACE POSIBLE LO IMPOSIBLE: SIGUE ADELANTE CON CONVICCIÓN, LA PRODUCCIÓN NO SE DETIENE.`
+// Generador de Haiku siguiendo las 3 pautas estrictas del usuario:
+// 1- ubicación temporal descriptiva
+// 2- elemento activo que genera un giro (o pone en relación elementos aparentemente inconexos)
+// 3- percepción poética surgida por la relación de los conceptos anteriores
+// El conjunto expresa un punto de vista individual.
+function composeHaikuWithConcepts(coldList = [], caughtWords = []) {
+  const sanitize = (w) => String(w || '').replace(/_+/g, ' ').trim().toUpperCase();
+  const pool = (coldList && coldList.length >= 3)
+    ? coldList
+    : (caughtWords && caughtWords.length >= 3 ? caughtWords : ['MEMORIA', 'TIEMPO', 'SILENCIO']);
+
+  const a = sanitize(pool[0] || 'MEMORIA');
+  const b = sanitize(pool[1] || 'DESTINO');
+  const c = sanitize(pool[2] || 'VACÍO');
+
+  const temporalSettings = [
+    'Al caer la tarde sobre el circuito callado,',
+    'En la fría quietud de la medianoche,',
+    'Bajo la primera luz que despunta en el alba,',
+    'En el instante exacto en que la sombra retrocede,',
+    'Cuando el crepúsculo suspende las horas,',
+    'En el silencio íntimo de la madrugada,',
+    'Al apagarse el último reflejo del día,',
+    'En la hora incierta en que vacila la vigilia,',
+    'Mientras el amanecer descorre la niebla,',
+    'Al cerrarse la noche sobre los techos,'
   ];
 
-  const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+  const activeTurnElements = [
+    `un giro súbito de ${a} cruza el rastro de ${b},`,
+    `el latido tenaz de ${a} quiebra el curso de ${b},`,
+    `un roce imprevisto de ${a} perturba la calma de ${b},`,
+    `la corriente activa de ${a} enlaza el abismo de ${b},`,
+    `un impulso ciego de ${a} interrumpe el orden de ${b},`,
+    `el destello vivo de ${a} despierta la inercia de ${b},`,
+    `una ráfaga de ${a} colisiona en secreto con ${b},`,
+    `la fractura de ${a} pone en tensión la quietud de ${b},`,
+    `un golpe de aire en ${a} desvía el vuelo de ${b},`,
+    `un eco distante de ${a} quiebra el rumbo de ${b},`
+  ];
+
+  const poeticPerceptions = [
+    `y en el fondo de ${c} descubro mi propia fragilidad.`,
+    `y siento que ${c} revela la verdad de mi mirada.`,
+    `veo mi propio reflejo disolverse dentro de ${c}.`,
+    `comprendo en soledad el peso íntimo de ${c}.`,
+    `y hallo en el centro de ${c} mi propia voz callada.`,
+    `siento que mi destino tiembla al compás de ${c}.`,
+    `y en la frontera de ${c} reconozco mi huella solitaria.`,
+    `descubro que en ${c} habita el eco de mi propio ser.`,
+    `y en el misterio de ${c} encuentro mi propia paz.`,
+    `siento mi pulso vibrar en el seno de ${c}.`
+  ];
+
+  const t = temporalSettings[Math.floor(Math.random() * temporalSettings.length)];
+  const act = activeTurnElements[Math.floor(Math.random() * activeTurnElements.length)];
+  const p = poeticPerceptions[Math.floor(Math.random() * poeticPerceptions.length)];
+  return `${t}\n${act}\n${p}`;
+}
+
+// Garantiza que la frase generada sea SIEMPRE un Haiku de 3 versos
+function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
+  if (!phrase || typeof phrase !== 'string') {
+    return composeHaikuWithConcepts(coldList, caughtWords);
+  }
+
+  const cleaned = cleanSpeechText(phrase);
+  if (!cleaned || cleaned.length < 10 || hasDegenerativeRepetition(cleaned)) {
+    return composeHaikuWithConcepts(coldList, caughtWords);
+  }
+
+  // Si ya tiene entre 2 y 4 versos separados por saltos de línea (formato haiku)
+  const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length >= 2 && lines.length <= 4) {
+    return lines.join('\n');
+  }
+
+  // Si vino en una sola línea pero tiene puntuación que marca 3 partes poéticas
+  if (lines.length === 1) {
+    const parts = cleaned.split(/(?<=[,;.:])\s+/).filter(Boolean);
+    if (parts.length === 3) {
+      return parts.join('\n');
+    }
+  }
+
+  // Respaldo garantizado de Haiku procedimental
+  return composeHaikuWithConcepts(coldList, caughtWords);
+}
+
+function generateEmergencyHijack(words) {
+  const coldList = words.map(w => getColdSynonym(w));
   return {
     nuevas_palabras: coldList,
-    frase_generada: randomTemplate
+    frase_generada: composeHaikuWithConcepts(coldList, words)
   };
 }
 
@@ -3809,6 +5141,10 @@ function handleStateReset() {
       gameWebSocket.send(JSON.stringify({ type: 'game3:state_reset', timestamp: Date.now() }));
     } catch (e) {}
   }
+  try {
+    localStorage.setItem('sincretismo_orders_event', JSON.stringify({ type: 'game3:state_reset', timestamp: Date.now() }));
+  } catch (e) {}
+  emitAgentEvent('reset', 'purga de contexto · slots liberados · reinicio del ciclo', 'warn');
 
   setTimeout(() => {
     transitionTo(STATES.IDLE);
@@ -4020,12 +5356,31 @@ function setupEventListeners() {
       showToast(`⚡ [TECLA L] Concepto orgánico "${randSeed.toUpperCase()}" generado automáticamente`, 'info');
       playSound('catch');
     }
+    else if (e.key === 'r' || e.key === 'R') {
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
+        return;
+      }
+      e.preventDefault();
+      if (appState.asciiShader && typeof appState.asciiShader.reloadShader === 'function') {
+        showToast('⟳ Recargando shader ASCII en vivo...', 'info');
+        appState.asciiShader.reloadShader().then(ok => {
+          showToast(ok ? '✓ Shader ASCII recompilado correctamente' : '✕ Error compilando el shader — se mantiene el anterior', ok ? 'success' : 'error');
+        });
+      }
+    }
     else if (e.key === 'u' || e.key === 'U') {
       if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
         return;
       }
       e.preventDefault();
-      window.open('/?tab=cosmos-clusters', '_blank');
+      window.open(sbUrl('/cosmos-clusters.html'), '_blank');
+    }
+    else if (e.key === 'o' || e.key === 'O') {
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
+        return;
+      }
+      e.preventDefault();
+      window.open(sbUrl('/log'), '_blank');
     }
     else if (e.key === 'Escape') {
       closeConfigModal();
@@ -4035,7 +5390,14 @@ function setupEventListeners() {
   // Botón Universo 3D por Cúmulos en HUD
   if (DOM.btnOpenCosmosClusters) {
     DOM.btnOpenCosmosClusters.addEventListener('click', () => {
-      window.open('/?tab=cosmos-clusters', '_blank');
+      window.open(sbUrl('/cosmos-clusters.html'), '_blank');
+    });
+  }
+
+  // Botón Log de Sucesos en HUD (página solo-log, sincronizada por el bus)
+  if (DOM.btnOpenLog) {
+    DOM.btnOpenLog.addEventListener('click', () => {
+      window.open(sbUrl('/log'), '_blank');
     });
   }
 
@@ -4099,6 +5461,7 @@ function setupEventListeners() {
   document.querySelectorAll('.chip-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const model = btn.getAttribute('data-model');
+      if (!model) return; // los chips de URL de Ollama se manejan aparte
       DOM.cfgModelName.value = model;
       DOM.cfgActiveModelBadge.textContent = model;
       // Seleccionar en el dropdown si existe
@@ -4107,6 +5470,29 @@ function setupEventListeners() {
       });
     });
   });
+
+  // SERVIDOR OLLAMA LOCAL — configurable y persistido (queda en ESTA máquina)
+  if (DOM.cfgOllamaUrl) {
+    DOM.cfgOllamaUrl.value = getOllamaUrl();
+
+    const applyOllamaUrl = async () => {
+      const value = (DOM.cfgOllamaUrl.value || '').trim();
+      setOllamaUrl(value);
+      const normalized = getOllamaUrl();
+      DOM.cfgOllamaUrl.value = normalized;
+      showToast(`Ollama local apuntando a ${normalized}`, 'info');
+      await fetchAndPopulateOllamaModels();
+    };
+
+    DOM.cfgOllamaUrl.addEventListener('change', () => { void applyOllamaUrl(); });
+
+    document.querySelectorAll('[data-ollama-url]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        DOM.cfgOllamaUrl.value = btn.getAttribute('data-ollama-url') || '';
+        void applyOllamaUrl();
+      });
+    });
+  }
 
   // REQUERIMIENTO 2: CONTROLES ASCII SHADER
   DOM.cfgAsciiEnabled.addEventListener('change', (e) => {
@@ -4118,7 +5504,108 @@ function setupEventListeners() {
   DOM.cfgAsciiSize.addEventListener('input', (e) => {
     appState.asciiConfig.charSize = parseFloat(e.target.value);
     DOM.valAsciiSize.textContent = e.target.value;
+    saveVisualConfigToStorage();
   });
+
+  // REQUERIMIENTO 6: Escala de letras y colores del shader ASCII (fondo / silueta)
+  if (DOM.cfgAsciiGlyphScale) {
+    DOM.cfgAsciiGlyphScale.addEventListener('input', (e) => {
+      appState.asciiConfig.glyphScale = parseFloat(e.target.value);
+      if (DOM.valAsciiGlyphScale) DOM.valAsciiGlyphScale.textContent = Number(e.target.value).toFixed(2);
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiAutoTint) {
+    DOM.cfgAsciiAutoTint.addEventListener('change', (e) => {
+      appState.asciiConfig.autoTint = e.target.checked;
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiBaseColor) {
+    DOM.cfgAsciiBaseColor.addEventListener('input', (e) => {
+      appState.asciiConfig.baseColor = e.target.value;
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiProcessingColor) {
+    DOM.cfgAsciiProcessingColor.addEventListener('input', (e) => {
+      appState.asciiConfig.processingColor = e.target.value;
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiHijackColor) {
+    DOM.cfgAsciiHijackColor.addEventListener('input', (e) => {
+      appState.asciiConfig.hijackColor = e.target.value;
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiBodyColor) {
+    DOM.cfgAsciiBodyColor.addEventListener('input', (e) => {
+      appState.asciiConfig.silhouetteColor = e.target.value;
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiBgColor) {
+    DOM.cfgAsciiBgColor.addEventListener('input', (e) => {
+      appState.asciiConfig.bgColor = e.target.value;
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiBgAlpha) {
+    DOM.cfgAsciiBgAlpha.addEventListener('input', (e) => {
+      const pct = parseInt(e.target.value, 10);
+      appState.asciiConfig.bgAlpha = pct / 100;
+      if (DOM.valAsciiBgAlpha) DOM.valAsciiBgAlpha.textContent = pct;
+      saveVisualConfigToStorage();
+    });
+  }
+  if (DOM.cfgAsciiDrawBg) {
+    DOM.cfgAsciiDrawBg.addEventListener('change', (e) => {
+      appState.asciiConfig.drawBg = e.target.checked;
+      saveVisualConfigToStorage();
+    });
+  }
+
+  // TAB COLORES: paletas globales + ajuste fino por elemento en vivo
+  renderPaletteGrid();
+  const UI_COLOR_INPUT_MAP = [
+    ['cfgUiCyan', 'cyan'], ['cfgUiGreen', 'green'], ['cfgUiNeonGreen', 'neonGreen'],
+    ['cfgUiRed', 'red'], ['cfgUiAmber', 'amber'], ['cfgUiPurple', 'purple'],
+    ['cfgUiText', 'text'], ['cfgUiMuted', 'muted'], ['cfgUiBgDark', 'bgDark'],
+    ['cfgUiBorderCyan', 'borderCyan'], ['cfgUiBorderGreen', 'borderGreen'], ['cfgUiBorderRed', 'borderRed'],
+    ['cfgUiBgHud', 'bgHud'], ['cfgUiBgSurfaceBtn', 'bgSurfaceBtn'], ['cfgUiBgAccent', 'bgAccent'],
+    ['cfgUiBgAccentSoft', 'bgAccentSoft'], ['cfgUiBgAccentStrong', 'bgAccentStrong'], ['cfgUiBgPanel', 'bgPanel'],
+    ['cfgUiBgPanelDeep', 'bgPanelDeep'], ['cfgUiBgSlot', 'bgSlot'], ['cfgUiBgCard', 'bgCard'],
+    ['cfgUiBgMutated', 'bgMutated'], ['cfgUiBgFinal', 'bgFinal'], ['cfgUiBgModal', 'bgModal'],
+    ['cfgUiBgOverlay', 'bgOverlay'], ['cfgUiBgToast', 'bgToast'], ['cfgUiBgDesp', 'bgDesp'],
+    ['cfgUiBgInput', 'bgInput'], ['cfgUiBgSuccess', 'bgSuccess'], ['cfgUiBgDanger', 'bgDanger']
+  ];
+  UI_COLOR_INPUT_MAP.forEach(([domKey, colorKey]) => {
+    const input = DOM[domKey];
+    if (input) {
+      input.addEventListener('input', (e) => {
+        appState.uiColors[colorKey] = e.target.value;
+        markPaletteCustom();
+        applyUiColors();
+      });
+    }
+  });
+  if (DOM.btnUiColorsReset) {
+    DOM.btnUiColorsReset.addEventListener('click', () => {
+      applyUiPalette(DEFAULT_PALETTE_ID);
+      showToast('↺ Paleta predeterminada restaurada', 'info');
+    });
+  }
+  bindWordColorPicker();
+  if (DOM.cfgAsciiSilhouette) {
+    DOM.cfgAsciiSilhouette.addEventListener('change', (e) => {
+      appState.trackingConfig.depthInShader = e.target.checked;
+      if (DOM.cfgTrackDepthShader) DOM.cfgTrackDepthShader.checked = e.target.checked;
+      saveTrackingConfigToStorage();
+      updatePoseSegmentation();
+      if (isTrackingNeeded()) triggerPoseInference();
+    });
+  }
 
   // TAB 4: EVENTOS DE CALIBRACIÓN Y TRACKING
   if (DOM.cfgTrackOpenpose) {
@@ -4385,6 +5872,22 @@ function setupEventListeners() {
     });
   }
 
+  // 1b. Recorte de Silueta (Depth Cutout)
+  if (DOM.cfgRenderCutoutToggle) {
+    DOM.cfgRenderCutoutToggle.addEventListener('change', (e) => {
+      appState.renderConfig.cutoutEnabled = e.target.checked;
+      applyRenderLayers();
+    });
+  }
+  if (DOM.cfgRenderCutoutContrast) {
+    DOM.cfgRenderCutoutContrast.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      appState.renderConfig.cutoutThreshold = val / 100;
+      if (DOM.valRenderCutoutContrast) DOM.valRenderCutoutContrast.textContent = val;
+      saveRenderConfigToStorage();
+    });
+  }
+
   // 2. Shader ASCII (sincronizado bidireccionalmente con Tab Shader)
   if (DOM.cfgRenderAsciiToggle) {
     DOM.cfgRenderAsciiToggle.addEventListener('change', (e) => {
@@ -4548,6 +6051,94 @@ function setupEventListeners() {
     });
   }
 
+  // ==========================================================================
+  // TAB 6: EVENTOS DEL MOTOR DE PARTÍCULAS (TODAS LAS VARIABLES DE LAS PALABRAS)
+  // ==========================================================================
+  if (DOM.cfgPartFontSize) {
+    DOM.cfgPartFontSize.addEventListener('input', (e) => {
+      appState.particlesConfig.fontSize = parseInt(e.target.value, 10);
+      if (DOM.valPartFontSize) DOM.valPartFontSize.textContent = e.target.value;
+      applyParticlesConfig();
+    });
+  }
+  if (DOM.cfgPartFontFamily) {
+    DOM.cfgPartFontFamily.addEventListener('change', (e) => {
+      appState.particlesConfig.fontFamily = e.target.value;
+      applyParticlesConfig();
+    });
+  }
+  if (DOM.cfgPartColor) {
+    DOM.cfgPartColor.addEventListener('input', (e) => {
+      appState.particlesConfig.color = e.target.value;
+      applyParticlesConfig();
+    });
+  }
+  if (DOM.cfgPartOutline) {
+    DOM.cfgPartOutline.addEventListener('input', (e) => {
+      appState.particlesConfig.outline = parseFloat(e.target.value);
+      if (DOM.valPartOutline) DOM.valPartOutline.textContent = Number(e.target.value).toFixed(1);
+      applyParticlesConfig();
+    });
+  }
+  if (DOM.cfgPartOutlineGlow) {
+    DOM.cfgPartOutlineGlow.addEventListener('change', (e) => {
+      appState.particlesConfig.outlineGlow = e.target.checked;
+      applyParticlesConfig();
+    });
+  }
+  if (DOM.cfgPartLifetime) {
+    DOM.cfgPartLifetime.addEventListener('input', (e) => {
+      appState.particlesConfig.lifetime = parseInt(e.target.value, 10);
+      if (DOM.valPartLifetime) DOM.valPartLifetime.textContent = e.target.value;
+      applyParticlesConfig();
+    });
+  }
+  if (DOM.cfgPartMaxWords) {
+    DOM.cfgPartMaxWords.addEventListener('input', (e) => {
+      appState.particlesConfig.maxWords = parseInt(e.target.value, 10);
+      if (DOM.valPartMaxWords) DOM.valPartMaxWords.textContent = e.target.value;
+      applyParticlesConfig();
+
+      // Ajustar en vivo la cantidad de palabras visibles
+      const target = appState.maxFloatingWords;
+      while (appState.floatingWords.length > target) {
+        const w = appState.floatingWords.pop();
+        if (w) w.destroy();
+      }
+      let guard = 0;
+      while (appState.floatingWords.length < target && guard < 60) {
+        const before = appState.floatingWords.length;
+        spawnReplacementWord();
+        guard++;
+        if (appState.floatingWords.length === before) break;
+      }
+    });
+  }
+  if (DOM.cfgPartSpeed) {
+    DOM.cfgPartSpeed.addEventListener('input', (e) => {
+      appState.particlesConfig.speed = parseFloat(e.target.value);
+      if (DOM.valPartSpeed) DOM.valPartSpeed.textContent = Number(e.target.value).toFixed(1);
+      applyParticlesConfig();
+    });
+  }
+  if (DOM.btnPartReset) {
+    DOM.btnPartReset.addEventListener('click', () => {
+      appState.particlesConfig = {
+        fontFamily: 'share-tech',
+        fontSize: 16,
+        color: '#ffffff',
+        outline: 1.0,
+        outlineGlow: true,
+        lifetime: 0,
+        maxWords: 9,
+        speed: 1.0
+      };
+      applyParticlesConfig();
+      syncParticlesInputs();
+      showToast('↺ Variables de partículas restauradas a valores predeterminados', 'info');
+    });
+  }
+
   // Botón restaurar calibración por defecto
   if (DOM.btnResetCalibration) {
     DOM.btnResetCalibration.addEventListener('click', () => {
@@ -4656,6 +6247,10 @@ function setupEventListeners() {
     if (DOM.pointersCanvas) {
       DOM.pointersCanvas.width = window.innerWidth;
       DOM.pointersCanvas.height = window.innerHeight;
+    }
+    if (DOM.cutoutCanvas) {
+      DOM.cutoutCanvas.width = window.innerWidth;
+      DOM.cutoutCanvas.height = window.innerHeight;
     }
     if (appState.asciiShader) appState.asciiShader.resize();
     if (appState.frameDiffShader) appState.frameDiffShader.resize();
@@ -4787,6 +6382,10 @@ async function init() {
     DOM.pointersCanvas.width = window.innerWidth;
     DOM.pointersCanvas.height = window.innerHeight;
   }
+  if (DOM.cutoutCanvas) {
+    DOM.cutoutCanvas.width = window.innerWidth;
+    DOM.cutoutCanvas.height = window.innerHeight;
+  }
   appState.corporateParticles = new CorporateParticleRain(DOM.corporateRainCanvas);
 
   // 2. Cargar configuración física desde /config
@@ -4797,6 +6396,9 @@ async function init() {
 
   // 2.7 Cargar configuración de composición de render y opacidades (Requerimientos 2 y 3)
   loadRenderConfigFromStorage();
+
+  // 2.8 Cargar configuración visual de partículas, shader ASCII y colores UI
+  loadVisualConfigFromStorage();
 
   // 2.9 Garantizar Modo Mouse por defecto en arranque (MediaPipe en standby pasivo a 60 FPS)
   setInputMode('mouse');

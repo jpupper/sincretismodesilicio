@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S·S // LOG DE SUCESOS</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script src="js/base-path.js?v=3.8"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #000;
+    color: #8fe8d2;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Share Tech Mono", monospace;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---------- barra de estado ---------- */
+  #status {
+    flex: 0 0 auto;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 0 12px;
+    border-bottom: 1px solid #0f2521;
+    background: #020604;
+    color: #47827a;
+    font-size: 11px;
+    letter-spacing: .04em;
+    white-space: nowrap;
+    overflow-x: auto;
+  }
+  #status b { color: #8fe8d2; font-weight: 400; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #6b1f2b; margin-right: 5px; vertical-align: 1px; }
+  .dot.on { background: #39ff14; box-shadow: 0 0 6px #39ff14; }
+  .dot.pulse { background: #ffb703; }
+  .sep { color: #17322d; }
+  .sp { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  button.k {
+    background: #041210;
+    color: #47827a;
+    border: 1px solid #17322d;
+    padding: 2px 8px;
+    font: inherit;
+    font-size: 10.5px;
+    letter-spacing: .06em;
+    cursor: pointer;
+  }
+  button.k:hover { color: #8fe8d2; border-color: #2f8f6f; }
+  button.k.on { color: #ffb703; border-color: #6b4b12; }
+
+  /* ---------- stream ---------- */
+  #stream {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px 14px 40px;
+    scrollbar-width: thin;
+    scrollbar-color: #1d4a44 #000;
+  }
+  #stream::-webkit-scrollbar { width: 7px; }
+  #stream::-webkit-scrollbar-thumb { background: #1d4a44; }
+
+  .ln { display: flex; gap: 10px; white-space: pre-wrap; word-break: break-word; }
+  .ln .t { color: #27564f; flex: 0 0 auto; }
+  .ln .g { flex: 0 0 92px; color: #47827a; }
+  .ln .m { flex: 1 1 auto; color: #8fe8d2; }
+  .g-BUS      { color: #47827a; }
+  .g-NUCLEO    { color: #8fe8d2; }
+  .g-VECTOR   { color: #6ad1ff; }
+  .g-OLLAMA   { color: #ffb703; }
+  .g-SINTESIS { color: #39ff14; }
+  .g-UNIV     { color: #b58cff; }
+  .g-ALERTA   { color: #ff4d6d; }
+  .m-warn { color: #ffb703; }
+  .m-err  { color: #ff4d6d; }
+  .m-dim  { color: #47827a; }
+  .m-ok   { color: #39ff14; }
+  .m-hot  { color: #ff4d6d; font-weight: 700; }
+
+  /* línea de detalle (datos reales del payload) */
+  .dt { display: flex; gap: 10px; color: #2f5f58; white-space: pre-wrap; word-break: break-word; }
+  .dt .t { flex: 0 0 auto; color: #14332e; }
+  .dt .g { flex: 0 0 92px; color: #14332e; }
+  .dt .m { flex: 1 1 auto; }
+  /* payload crudo (modo RAW) */
+  .rw { display: flex; gap: 10px; color: #1d4a44; white-space: pre-wrap; word-break: break-all; }
+  .rw .t { flex: 0 0 auto; }
+  .rw .g { flex: 0 0 92px; }
+
+  /* separador de ciclo */
+  .hr { color: #17322d; margin: 6px 0 2px; }
+
+  /* ---------- indicador de líneas nuevas ---------- */
+  #newlines {
+    position: fixed;
+    right: 18px;
+    bottom: 16px;
+    display: none;
+    background: #041210;
+    border: 1px solid #2f8f6f;
+    color: #39ff14;
+    padding: 5px 12px;
+    font-size: 11px;
+    letter-spacing: .08em;
+    cursor: pointer;
+  }
+  #newlines.show { display: block; }
+  #hint { position: fixed; left: 14px; bottom: 14px; color: #17322d; font-size: 10.5px; }
+</style>
+</head>
+<body>
+
+<div id="status">
+  <span>LOG DE SUCESOS · SECUESTRO CIBERNÉTICO</span>
+  <span class="sep">|</span>
+  <span><span class="dot" id="ws-dot"></span>BUS <b id="ws-txt">DESCONECTADO</b></span>
+  <span class="sep">|</span>
+  <span>NODOS <b id="f-clients">1</b></span>
+  <span class="sep">|</span>
+  <span>EVENTOS <b id="f-events">0</b></span>
+  <span class="sep">|</span>
+  <span>ESTADO <b id="f-state">—</b></span>
+  <span class="sep">|</span>
+  <span>ETAPA <b id="f-stage">—</b></span>
+  <span class="sep">|</span>
+  <span>LINEAS <b id="f-lines">0</b></span>
+  <span class="sp">
+    <button class="k" id="btn-raw" title="Mostrar el payload JSON completo (tecla R)">RAW</button>
+    <button class="k" id="btn-pause" title="Pausar la captura (tecla P)">PAUSA</button>
+    <button class="k" id="btn-copy" title="Copiar todo el log al portapapeles">COPIAR</button>
+    <button class="k" id="btn-clear" title="Limpiar el buffer (tecla C)">LIMPIAR</button>
+  </span>
+</div>
+
+<div id="stream"></div>
+<div id="newlines">▼ LÍNEAS NUEVAS</div>
+<div id="hint">[P] pausa · [C] limpiar · [R] raw · [S] seguir · scroll arriba = pausa automática</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (s) { return document.querySelector(s); };
+  var stream = $('#stream');
+  var MAX_LINES = 4000;
+
+  var state = {
+    connected: false,
+    retry: 0,
+    paused: false,
+    raw: false,
+    follow: true,
+    events: 0,
+    lines: 0,
+    clients: 1,
+    appState: '—',
+    stage: '—'
+  };
+
+  /* ======================================================================
+     1. ESCRITURA EN EL LOG
+     ====================================================================== */
+  function pad(n, w) { n = String(n); while (n.length < w) n = '0' + n; return n; }
+
+  function stamp() {
+    var d = new Date();
+    return pad(d.getHours(), 2) + ':' + pad(d.getMinutes(), 2) + ':' + pad(d.getSeconds(), 2) + '.' + pad(d.getMilliseconds(), 3);
+  }
+
+  function trim() {
+    while (stream.childElementCount > MAX_LINES) stream.removeChild(stream.firstElementChild);
+    state.lines = stream.childElementCount;
+    $('#f-lines').textContent = state.lines;
+  }
+
+  function atBottom() {
+    return (stream.scrollHeight - stream.scrollTop - stream.clientHeight) < 40;
+  }
+
+  // Línea de log: HH:MM:SS.mmm [TAG] mensaje
+  function write(tag, msg, cls) {
+    if (state.paused) return;
+    var stick = state.follow && atBottom();
+
+    var ln = document.createElement('div');
+    ln.className = 'ln';
+    var t = document.createElement('span'); t.className = 't'; t.textContent = stamp();
+    var g = document.createElement('span'); g.className = 'g g-' + tag; g.textContent = '[' + tag + ']';
+    var m = document.createElement('span'); m.className = 'm' + (cls ? ' ' + cls : ''); m.textContent = msg;
+    ln.appendChild(t); ln.appendChild(g); ln.appendChild(m);
+    stream.appendChild(ln);
+
+    trim();
+    if (stick) stream.scrollTop = stream.scrollHeight;
+    else if (!state.follow) $('#newlines').classList.add('show');
+  }
+
+  // Línea de detalle: datos REALES del payload (no texto decorativo)
+  function detail(text) {
+    if (state.paused) return;
+    var stick = state.follow && atBottom();
+    var ln = document.createElement('div');
+    ln.className = 'dt';
+    var t = document.createElement('span'); t.className = 't'; t.textContent = '        ';
+    var g = document.createElement('span'); g.className = 'g'; g.textContent = '';
+    var m = document.createElement('span'); m.className = 'm'; m.textContent = '· ' + text;
+    ln.appendChild(t); ln.appendChild(g); ln.appendChild(m);
+    stream.appendChild(ln);
+    trim();
+    if (stick) stream.scrollTop = stream.scrollHeight;
+  }
+
+  function rawLine(obj) {
+    if (!state.raw || state.paused) return;
+    var stick = state.follow && atBottom();
+    var ln = document.createElement('div');
+    ln.className = 'rw';
+    var t = document.createElement('span'); t.className = 't'; t.textContent = '        ';
+    var g = document.createElement('span'); g.className = 'g'; g.textContent = '';
+    var m = document.createElement('span'); m.className = 'm'; m.textContent = JSON.stringify(obj);
+    ln.appendChild(t); ln.appendChild(g); ln.appendChild(m);
+    stream.appendChild(ln);
+    trim();
+    if (stick) stream.scrollTop = stream.scrollHeight;
+  }
+
+  function hr() {
+    var d = document.createElement('div');
+    d.className = 'ln hr';
+    d.textContent = '──── ciclo ────';
+    stream.appendChild(d);
+    trim();
+  }
+
+  /* ======================================================================
+     2. BUS WEBSOCKET
+     ====================================================================== */
+  var ws = null;
+
+  function connect() {
+    var url = (typeof window.sbWsUrl === 'function')
+      ? window.sbWsUrl()
+      : ((location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws');
+    try { ws = new WebSocket(url); } catch (e) { setTimeout(connect, 3000); return; }
+
+    ws.addEventListener('open', function () {
+      state.connected = true;
+      state.retry = 0;
+      $('#ws-dot').className = 'dot on';
+      $('#ws-txt').textContent = 'CONECTADO';
+      write('BUS', 'enlace con el bus central establecido → ' + url, 'm-ok');
+      ws.send(JSON.stringify({ type: 'client:register', client: 'log', timestamp: Date.now() }));
+      ws.send(JSON.stringify({ type: 'log:hello', timestamp: Date.now() }));
+    });
+
+    ws.addEventListener('message', function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      handle(msg);
+    });
+
+    ws.addEventListener('close', function () {
+      state.connected = false;
+      $('#ws-dot').className = 'dot';
+      $('#ws-txt').textContent = 'RECONECTANDO';
+      write('ALERTA', 'bus perdido · reintento ' + (++state.retry), 'm-err');
+      setTimeout(connect, Math.min(6000, 800 + state.retry * 600));
+    });
+
+    ws.addEventListener('error', function () { /* transitorio */ });
+  }
+
+  function flash() {
+    var d = $('#ws-dot');
+    d.className = 'dot pulse';
+    setTimeout(function () { d.className = state.connected ? 'dot on' : 'dot'; }, 180);
+  }
+
+  /* ======================================================================
+     3. MANEJO DE EVENTOS
+     ====================================================================== */
+  function tagForStage(stage) {
+    switch (stage) {
+      case 'boot': return 'BUS';
+      case 'state': return 'NUCLEO';
+      case 'catch': return 'NUCLEO';
+      case 'vector': return 'VECTOR';
+      case 'inference': return 'OLLAMA';
+      case 'synthesis': return 'SINTESIS';
+      case 'reset': return 'ALERTA';
+      default: return 'UNIV';
+    }
+  }
+
+  function handle(msg) {
+    state.events++;
+    $('#f-events').textContent = state.events;
+    flash();
+    rawLine(msg);
+
+    var type = msg.type;
+
+    if (type === 'server:welcome') {
+      state.clients = msg.clients || 1;
+      $('#f-clients').textContent = state.clients;
+      return;
+    }
+
+    if (type === 'server:clients') {
+      state.clients = msg.clients || 1;
+      $('#f-clients').textContent = state.clients;
+      write('BUS', 'nodos en el bus: ' + state.clients, 'm-dim');
+      return;
+    }
+
+    /* ---- eventos reales del agente (game3) ---- */
+    if (type === 'agent:event') {
+      var tag = tagForStage(msg.stage);
+      var cls = msg.level === 'warn' ? 'm-warn' : (msg.level === 'ok' ? 'm-ok' : null);
+      state.stage = msg.stage || '—';
+      $('#f-stage').textContent = state.stage;
+      write(tag, String(msg.message || ''), cls);
+      renderData(msg.stage, msg.data || {});
+      return;
+    }
+
+    /* ---- secuencia de palabras (captura parcial y completa) ---- */
+    if (type === 'game3:words_sequence') {
+      var words = Array.isArray(msg.words) ? msg.words : [];
+      if (msg.coldWords && msg.coldWords.length) {
+        write('UNIV', 'SECUENCIA COMPLETA · ' + words.length + ' humanos → ' + msg.coldWords.length + ' términos fríos', 'm-hot');
+        detail('humanos: ' + words.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
+        detail('fríos:   ' + msg.coldWords.join(' · '));
+        if (msg.phrase) {
+          write('SINTESIS', 'discurso corporativo: ' + msg.phrase, 'm-ok');
+        }
+        state.appState = 'HIJACK';
+      } else {
+        write('UNIV', 'secuencia parcial ' + words.length + '/3 · ' + words.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
+        state.appState = 'CAPTURA';
+      }
+      $('#f-state').textContent = state.appState;
+      return;
+    }
+
+    if (type === 'game3:state_reset') {
+      state.appState = 'IDLE';
+      $('#f-state').textContent = state.appState;
+      write('ALERTA', 'reset de estado recibido · slots liberados', 'm-warn');
+      hr();
+      return;
+    }
+
+    /* ---- cualquier otro tipo del bus: se registra igual ---- */
+    write('BUS', 'mensaje tipo "' + type + '"', 'm-dim');
+  }
+
+  // Datos REALES de cada etapa (nada inventado)
+  function renderData(stage, data) {
+    if (!data) return;
+    if (stage === 'state') {
+      if (data.from || data.to) detail('transición: ' + (data.from || '?') + ' → ' + (data.to || '?'));
+      if (Array.isArray(data.caught) && data.caught.length) detail('capturadas (' + data.caught.length + '/3): ' + data.caught.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
+      if (data.to) { state.appState = String(data.to).replace('STATE_', ''); $('#f-state').textContent = state.appState; }
+      return;
+    }
+    if (stage === 'catch') {
+      if (data.word) detail('palabra capturada: ' + String(data.word).toUpperCase());
+      if (data.slot != null) detail('slot ' + (Number(data.slot) + 1) + ' ocupado');
+      if (Array.isArray(data.caught) && data.caught.length) detail('en órbita (' + data.caught.length + '/3): ' + data.caught.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
+      return;
+    }
+    if (stage === 'vector') {
+      if (Array.isArray(data.words)) detail('muestreo: ' + data.words.join(' · '));
+      if (data.dimensions) detail('dimensiones del vector: ' + data.dimensions + 'D');
+      return;
+    }
+    if (stage === 'inference') {
+      if (data.model) detail('modelo: ' + data.model + (data.temperature != null ? '  ·  temperatura ' + data.temperature : ''));
+      if (data.endpoint) detail('endpoint local: ' + data.endpoint);
+      return;
+    }
+    if (stage === 'synthesis') {
+      if (Array.isArray(data.coldWords) && data.coldWords.length) detail('términos fríos: ' + data.coldWords.join(' · '));
+      if (Array.isArray(data.pairs) && data.pairs.length) detail('pares: ' + data.pairs.join(' | '));
+      if (data.phrase) detail('frase: ' + data.phrase);
+      if (data.spread === false) detail('aviso: los 3 términos salieron consecutivos, rearmando frase');
+      return;
+    }
+    // genérico: claves planas del payload
+    Object.keys(data).forEach(function (k) {
+      var v = data[k];
+      if (v === null || v === undefined) return;
+      if (Array.isArray(v)) detail(k + ': ' + v.join(' · '));
+      else if (typeof v === 'object') detail(k + ': ' + JSON.stringify(v));
+      else detail(k + ': ' + v);
+    });
+  }
+
+  /* ======================================================================
+     4. CONTROLES
+     ====================================================================== */
+  function setPaused(p) {
+    state.paused = p;
+    $('#btn-pause').classList.toggle('on', p);
+    $('#btn-pause').textContent = p ? 'SEGUIR' : 'PAUSA';
+    write('BUS', p ? 'captura en pausa (los eventos siguen contándose)' : 'captura reanudada', 'm-warn');
+  }
+
+  $('#btn-pause').addEventListener('click', function () { setPaused(!state.paused); });
+
+  $('#btn-clear').addEventListener('click', function () {
+    stream.innerHTML = '';
+    state.lines = 0;
+    $('#f-lines').textContent = '0';
+    write('BUS', 'buffer limpiado', 'm-dim');
+  });
+
+  $('#btn-raw').addEventListener('click', function () {
+    state.raw = !state.raw;
+    $('#btn-raw').classList.toggle('on', state.raw);
+    write('BUS', state.raw ? 'modo RAW activado (payload JSON completo)' : 'modo RAW desactivado', 'm-dim');
+  });
+
+  $('#btn-copy').addEventListener('click', function () {
+    var txt = Array.prototype.map.call(stream.children, function (el) { return el.textContent; }).join('\n');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () {
+        write('BUS', 'log copiado al portapapeles (' + txt.split('\n').length + ' líneas)', 'm-ok');
+      }, function () { write('ALERTA', 'no se pudo copiar (permiso del navegador)', 'm-warn'); });
+    } else {
+      write('ALERTA', 'portapapeles no disponible en este navegador', 'm-warn');
+    }
+  });
+
+  stream.addEventListener('scroll', function () {
+    var bottom = atBottom();
+    if (bottom) {
+      state.follow = true;
+      $('#newlines').classList.remove('show');
+    } else if (state.follow) {
+      state.follow = false;
+    }
+  });
+
+  $('#newlines').addEventListener('click', function () {
+    state.follow = true;
+    stream.scrollTop = stream.scrollHeight;
+    $('#newlines').classList.remove('show');
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+    var k = e.key.toLowerCase();
+    if (k === 'p') { setPaused(!state.paused); e.preventDefault(); }
+    else if (k === 'c') { $('#btn-clear').click(); e.preventDefault(); }
+    else if (k === 'r') { $('#btn-raw').click(); e.preventDefault(); }
+    else if (k === 's') { state.follow = true; stream.scrollTop = stream.scrollHeight; $('#newlines').classList.remove('show'); e.preventDefault(); }
+  });
+
+  /* ======================================================================
+     5. ARRANQUE
+     ====================================================================== */
+  write('BUS', 'SINCRETISMO DE SILICIO · log de sucesos v1', 'm-dim');
+  write('BUS', 'capturando todos los eventos del bus durante la secuencia de selección de palabras', 'm-dim');
+  write('BUS', 'esperando enlace · origen ' + location.origin, 'm-dim');
+  connect();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S·S // CONSOLA DE NÚCLEO</title>
+<script src="js/base-path.js?v=3.6"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #000;
+    color: #8fe8d2;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Share Tech Mono", monospace;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- barras ---------- */
+  #status, #footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    height: 24px;
+    padding: 0 12px;
+    color: #47827a;
+    letter-spacing: .06em;
+    white-space: nowrap;
+    overflow: hidden;
+    border-bottom: 1px solid #0f2521;
+  }
+  #footer { border-bottom: 0; border-top: 1px solid #0f2521; }
+  #status b, #footer b { color: #8fe8d2; font-weight: 400; }
+  .dot { width: 6px; height: 6px; display: inline-block; background: #ff4d6d; }
+  .dot.on { background: #39ff14; }
+  .dot.pulse { background: #ffb703; }
+
+  /* ---------- layout ---------- */
+  main { flex: 1 1 auto; display: flex; min-height: 0; }
+  #stream { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 8px 12px 24px; scrollbar-width: thin; scrollbar-color: #1d4a44 #000; }
+  #stream::-webkit-scrollbar { width: 6px; }
+  #stream::-webkit-scrollbar-thumb { background: #1d4a44; }
+  aside { flex: 0 0 296px; border-left: 1px solid #0f2521; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+  .panel-title { padding: 6px 10px; color: #47827a; border-bottom: 1px solid #0f2521; letter-spacing: .1em; font-size: 10.5px; }
+  #universe { display: block; width: 100%; height: 210px; }
+  #stages { padding: 6px 10px 14px; }
+  .stage { display: flex; align-items: center; gap: 8px; height: 19px; color: #2f5f58; }
+  .stage .nm { flex: 0 0 96px; overflow: hidden; text-overflow: ellipsis; }
+  .stage .bars { flex: 0 0 62px; letter-spacing: -1px; }
+  .stage .st { flex: 1 1 auto; text-align: right; font-size: 10.5px; }
+  .stage.on { color: #8fe8d2; }
+  .stage.on .st { color: #ffb703; }
+  .stage.done .st { color: #2f8f6f; }
+
+  /* ---------- líneas de log ---------- */
+  .ln { display: flex; gap: 10px; white-space: pre-wrap; word-break: break-word; }
+  .ln .t { color: #27564f; flex: 0 0 auto; }
+  .ln .g { flex: 0 0 92px; color: #47827a; }
+  .ln .m { flex: 1 1 auto; color: #8fe8d2; }
+  .g-AGENTE, .g-NUCLEO { color: #8fe8d2; }
+  .g-VECTOR   { color: #6ad1ff; }
+  .g-UNIV     { color: #b58cff; }
+  .g-OLLAMA   { color: #ffb703; }
+  .g-SINTESIS { color: #39ff14; }
+  .g-BUS      { color: #47827a; }
+  .g-ALERTA   { color: #ff4d6d; }
+  .m-warn { color: #ffb703; }
+  .m-err  { color: #ff4d6d; }
+  .m-dim  { color: #47827a; }
+  .m-ok   { color: #39ff14; }
+  .blink { color: #39ff14; animation: bl 1s steps(1) infinite; }
+  @keyframes bl { 50% { opacity: 0; } }
+  #hint { padding: 4px 12px 0; color: #27564f; }
+</style>
+</head>
+<body>
+
+<div id="status">
+  <span><span class="dot" id="ws-dot"></span> BUS <b id="ws-txt">DESCONECTADO</b></span>
+  <span>NODOS <b id="stat-clients">–</b></span>
+  <span>ESTADO <b id="stat-stage">IDLE</b></span>
+  <span id="stat-sub">–</span>
+  <span style="margin-left:auto">T+<b id="stat-clock">00:00:00</b></span>
+</div>
+
+<main>
+  <section id="stream">
+    <div id="log"></div>
+    <div id="hint">▌ <span class="blink">█</span></div>
+  </section>
+  <aside>
+    <div class="panel-title">UNIVERSO 3D · ARQUITECTURA</div>
+    <canvas id="universe"></canvas>
+    <div class="panel-title">PIPELINE DEL NÚCLEO</div>
+    <div id="stages"></div>
+  </aside>
+</main>
+
+<div id="footer">
+  <span>LINEAS <b id="f-lines">0</b></span>
+  <span>EVENTOS <b id="f-events">0</b></span>
+  <span>CAPTURADAS <b id="f-caught">0/3</b></span>
+  <span>NODOS-MAPA <b id="f-nodes">0</b></span>
+  <span style="margin-left:auto">[P] PAUSA · [C] LIMPIAR</span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (s) { return document.querySelector(s); };
+  var logEl = $('#log');
+
+  var state = {
+    connected: false,
+    clients: 1,
+    stage: 'IDLE',
+    sub: 'esperando enlace',
+    caught: [],
+    cold: [],
+    phrase: '',
+    events: 0,
+    lines: 0,
+    nodes: [],
+    paused: false,
+    retry: 0,
+    started: Date.now()
+  };
+
+  /* ======================================================================
+     1. SALIDA DE LOG
+     ====================================================================== */
+  var MAX_LINES = 600;
+
+  function now() {
+    var d = new Date();
+    return ('0' + d.getHours()).slice(-2) + ':' +
+           ('0' + d.getMinutes()).slice(-2) + ':' +
+           ('0' + d.getSeconds()).slice(-2) + '.' +
+           ('00' + d.getMilliseconds()).slice(-3);
+  }
+
+  function write(tag, msg, cls) {
+    var ln = document.createElement('div');
+    ln.className = 'ln';
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = now();
+    var g = document.createElement('span');
+    g.className = 'g g-' + tag;
+    g.textContent = '[' + tag + ']';
+    var m = document.createElement('span');
+    m.className = 'm' + (cls ? ' ' + cls : '');
+    m.textContent = msg;
+    ln.appendChild(t); ln.appendChild(g); ln.appendChild(m);
+    logEl.appendChild(ln);
+
+    while (logEl.childNodes.length > MAX_LINES) logEl.removeChild(logEl.firstChild);
+    state.lines++;
+    $('#f-lines').textContent = state.lines;
+    $('#stream').scrollTop = $('#stream').scrollHeight;
+  }
+
+  // Cola: emite líneas con ritmo irregular para que parezca salida real
+  var queue = [];
+  var pumpTimer = null;
+  function enqueue(tag, msg, cls, lag) {
+    queue.push({ tag: tag, msg: msg, cls: cls, due: Date.now() + (lag || 0) });
+    if (!pumpTimer) pumpTimer = setInterval(pump, 35);
+  }
+  function pump() {
+    if (queue.length && queue[0].due <= Date.now() && !state.paused) {
+      var l = queue.shift();
+      write(l.tag, l.msg, l.cls);
+    }
+    if (!queue.length) { clearInterval(pumpTimer); pumpTimer = null; }
+  }
+
+  function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  /* ======================================================================
+     2. PENSAMIENTO FICTICIO DEL AGENTE (pools por estado)
+     ====================================================================== */
+  var AMBIENT = {
+    IDLE: [
+      ['VECTOR', 'barrido del campo semántico · 384 dims · índice LAYA en memoria'],
+      ['NUCLEO', 'vecindad coseno recalculada sobre ' + rnd(9000, 10000) + ' nodos'],
+      ['VECTOR', 'proyección estable · deriva UMAP ' + (Math.random() * 0.01).toFixed(4)],
+      ['BUS', 'caché de embeddings tibia · hit ' + rnd(80, 96) + '%'],
+      ['NUCLEO', 'sin candidatos dentro del radio de captura'],
+      ['UNIV', 'reindexando aristas del cúmulo · ' + rnd(320, 1400) + ' enlaces'],
+      ['VECTOR', 'normalizando norma L2 de los vectores en órbita'],
+      ['NUCLEO', 'esperando intrusión de lenguaje natural'],
+      ['BUS', 'latido del núcleo · ' + rnd(11, 19) + ' ms'],
+      ['UNIV', 'temperatura del grafo dentro de rango operativo']
+    ],
+    INTERACT: [
+      ['NUCLEO', 'objetivo en radio · midiendo afinidad'],
+      ['VECTOR', 'distancia coseno ' + (Math.random() * 0.3 + 0.6).toFixed(3) + ' · umbral 0.620'],
+      ['NUCLEO', 'acumulando permanencia · dwell ' + (Math.random() * 0.9 + 0.2).toFixed(2) + 's'],
+      ['VECTOR', 'descartando flexiones morfológicas (filtro de significante)'],
+      ['NUCLEO', 'verificando unicidad del candidato en el banco'],
+      ['UNIV', 'calculando ruta mínima hacia el centro del cúmulo']
+    ],
+    PROCESSING: [
+      ['NUCLEO', 'entrada bloqueada · estado RESIGNIFICACIÓN'],
+      ['VECTOR', 'serializando 3 vectores → prompt de sistema'],
+      ['NUCLEO', 'regla anti-enumeración activa · dispersión forzada de términos'],
+      ['UNIV', 'congelando órbitas del universo durante la inferencia'],
+      ['NUCLEO', 'reservando 3 tarjetas para decodificación progresiva'],
+      ['VECTOR', 'verificando integridad semántica de la secuencia'],
+      ['NUCLEO', 'mapa de atención del núcleo: ' + rnd(38, 72) + '% sobre verbos productivos']
+    ],
+    HIJACK: [
+      ['UNIV', 'secuencia transmitida al bus · propagando nodos'],
+      ['SINTESIS', 'acoplando palabra humana → término frío'],
+      ['NUCLEO', 'elevando peso retórico del discurso'],
+      ['UNIV', 'recalculando cúmulos con la secuencia activa'],
+      ['SINTESIS', 'inyectando frase en el campo de discurso']
+    ]
+  };
+
+  // Elaboración inmediata alrededor de un evento REAL del secuestro
+  function elaborate(stage, data) {
+    data = data || {};
+    if (stage === 'catch') {
+      var w = String(data.word || 'token');
+      [['NUCLEO', 'token "' + w + '" normalizado y case-folded'],
+       ['VECTOR', 'embedding recuperado del índice (384d)'],
+       ['VECTOR', 'slot ' + ((data.slot || 0) + 1) + '/3 anexado al buffer de secuencia'],
+       ['UNIV', 'aristas del universo reorientadas hacia "' + w + '"']
+      ].forEach(function (l, i) { enqueue(l[0], l[1], null, 120 + i * rnd(90, 220)); });
+    } else if (stage === 'vector') {
+      ['tokenizando entrada', 'proyectando a espacio latente', 'buscando vecinos en 384 dims']
+        .forEach(function (m, i) { enqueue('VECTOR', m + ' · ' + (Math.random() * 0.9 + 0.1).toFixed(3), 'm-dim', 90 + i * 140); });
+    } else if (stage === 'inference') {
+      enqueue('OLLAMA', 'handshake con http://localhost:11434', null, 90);
+      enqueue('OLLAMA', 'modelo ' + (data.model || 'núcleo') + ' · ctx 4096 · temperature ' + (data.temperature || 0.85), null, 210);
+      enqueue('NUCLEO', 'stream de tokens · ' + rnd(9, 34) + ' tok/s', 'm-dim', 380);
+    } else if (stage === 'synthesis') {
+      if (Array.isArray(data.pairs)) {
+        data.pairs.forEach(function (p, i) { enqueue('SINTESIS', 'resignificación   ' + p, null, 90 + i * 160); });
+      }
+      if (data.phrase) enqueue('SINTESIS', 'discurso listo · ' + data.phrase, 'm-ok', 520);
+      if (data.spread === false) enqueue('ALERTA', 'enumeración detectada · recomponiendo frase', 'm-warn', 650);
+      else if (data.spread === true) enqueue('NUCLEO', 'términos dispersos verificados · sin enumeración', 'm-dim', 660);
+    } else if (stage === 'reset') {
+      enqueue('NUCLEO', 'buffer de secuencia vaciado', 'm-dim', 90);
+      enqueue('UNIV', 'órbitas liberadas · nuevo ciclo de observación', 'm-dim', 240);
+    } else if (stage === 'boot') {
+      enqueue('BUS', 'cliente game3 registrado en el bus', 'm-dim', 60);
+    }
+  }
+
+  /* ======================================================================
+     3. PANEL DE ARQUITECTURA (pipeline)
+     ====================================================================== */
+  var STAGES = [
+    { id: 'VECTOR.384D', keys: ['vector'] },
+    { id: 'LAYA.ONNX', keys: ['vector', 'boot'] },
+    { id: 'PROXIMIDAD', keys: ['state:STATE_IDLE', 'state:STATE_INTERACT', 'INTERACT'] },
+    { id: 'CAPTURA', keys: ['catch'] },
+    { id: 'RESIGNIF.', keys: ['state:STATE_PROCESSING', 'PROCESSING'] },
+    { id: 'OLLAMA.INFER', keys: ['inference'] },
+    { id: 'SINTESIS', keys: ['synthesis'] },
+    { id: 'UNIVERSO.3D', keys: ['universe', 'resignification'] }
+  ];
+  var stageEls = {};
+
+  function buildStages() {
+    var host = $('#stages');
+    STAGES.forEach(function (s) {
+      var row = document.createElement('div');
+      row.className = 'stage';
+      row.innerHTML = '<span class="nm"></span><span class="bars"></span><span class="st"></span>';
+      row.querySelector('.nm').textContent = s.id;
+      host.appendChild(row);
+      stageEls[s.id] = row;
+    });
+  }
+
+  var barsPhase = 0;
+  function renderStages() {
+    barsPhase++;
+    STAGES.forEach(function (s) {
+      var el = stageEls[s.id];
+      var hit = s.keys.some(function (k) { return k === state.activeKey; });
+      var on = hit;
+      var filled = hit ? 10 : (state.stage === 'PROCESSING' ? (barsPhase % 10) + 1 : 0);
+      el.className = 'stage' + (on ? ' on' : '');
+      el.querySelector('.bars').textContent = '▓'.repeat(filled) + '░'.repeat(10 - filled);
+      el.querySelector('.st').textContent = on ? 'RUN' : (filled ? 'HOLD' : 'IDLE');
+    });
+  }
+  setInterval(renderStages, 420);
+
+  function setActive(key) { state.activeKey = key; }
+
+  /* ======================================================================
+     4. MAPA DEL UNIVERSO 3D (nodos moviéndose)
+     ====================================================================== */
+  var cv = $('#universe');
+  var ctx = cv.getContext('2d');
+  var W = 0, H = 0;
+
+  function resizeCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    var r = cv.getBoundingClientRect();
+    W = r.width; H = r.height;
+    cv.width = Math.max(1, Math.floor(W * dpr));
+    cv.height = Math.max(1, Math.floor(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  function addNodes(words, kind) {
+    (words || []).forEach(function (w) {
+      var txt = String(w);
+      if (!txt) return;
+      if (state.nodes.some(function (n) { return n.text === txt && n.kind === kind; })) return;
+      state.nodes.push({
+        text: txt,
+        kind: kind,
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.22,
+        vy: (Math.random() - 0.5) * 0.22
+      });
+      if (state.nodes.length > 90) state.nodes.shift();
+    });
+    $('#f-nodes').textContent = state.nodes.length;
+  }
+
+  function stepNodes() {
+    var cx = W / 2, cy = H / 2;
+    for (var i = 0; i < state.nodes.length; i++) {
+      var n = state.nodes[i];
+      n.x += n.vx; n.y += n.vy;
+
+      // Empuje suave lejos del núcleo para que la nube no colapse
+      var dx = n.x - cx, dy = n.y - cy;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      if (dist < 92) {
+        n.vx += (dx / dist) * 0.03;
+        n.vy += (dy / dist) * 0.03;
+      }
+
+      // Giro leve: los humanos y los términos fríos giran en sentidos opuestos
+      var ang = 0.0016 * (n.kind === 'pool' ? 1 : -1);
+      var ca = Math.cos(ang), sa = Math.sin(ang);
+      var nx = n.vx * ca - n.vy * sa;
+      var ny = n.vx * sa + n.vy * ca;
+      n.vx = nx * 0.996;
+      n.vy = ny * 0.996;
+
+      var sp = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+      if (sp > 0.62) { n.vx = n.vx / sp * 0.62; n.vy = n.vy / sp * 0.62; }
+
+      if (n.x < 6) { n.x = 6; n.vx = Math.abs(n.vx); }
+      if (n.x > W - 6) { n.x = W - 6; n.vx = -Math.abs(n.vx); }
+      if (n.y < 6) { n.y = 6; n.vy = Math.abs(n.vy); }
+      if (n.y > H - 6) { n.y = H - 6; n.vy = -Math.abs(n.vy); }
+    }
+  }
+
+  function labelFor(n) {
+    return n.kind === 'pool' ? null : n.text.toUpperCase();
+  }
+
+  function drawUniverse() {
+    if (!W || !H) resizeCanvas();
+    ctx.clearRect(0, 0, W, H);
+
+    // retícula mínima
+    ctx.strokeStyle = '#0d211e';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2);
+    ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H);
+    ctx.stroke();
+
+    // aristas humano → término frío
+    var pool = {}, colds = {};
+    state.nodes.forEach(function (n) {
+      if (n.kind === 'pool') pool[n.text] = n;
+      if (n.kind === 'cold') colds[n.text] = n;
+    });
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = '#1f5c4d';
+    for (var i = 0; i < state.caught.length; i++) {
+      var a = state.nodes.find(function (n) { return n.kind === 'caught' && n.text === state.caught[i]; });
+      var b = state.nodes.find(function (n) { return n.kind === 'cold' && n.text === state.cold[i]; });
+      if (a && b) {
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+
+    // nodos
+    ctx.font = '10px ui-monospace, Consolas, monospace';
+    state.nodes.forEach(function (n) {
+      var color = n.kind === 'caught' ? '#ff4d6d' : (n.kind === 'cold' ? '#39ff14' : '#1d4a44');
+      var size = n.kind === 'pool' ? 1.4 : 2.4;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, size, 0, 6.2832);
+      ctx.fill();
+
+      var lab = labelFor(n);
+      if (lab) {
+        ctx.fillStyle = n.kind === 'caught' ? '#ff8fa3' : '#7dffb0';
+        var tw = ctx.measureText(lab).width;
+        var lx = (n.x + 6 + tw > W - 3) ? n.x - 6 - tw : n.x + 6;
+        ctx.fillText(lab, lx, n.y + 3);
+      }
+    });
+
+    // halo del núcleo
+    ctx.strokeStyle = state.stage === 'PROCESSING' ? '#ffb703' : '#134b41';
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, 14 + (Date.now() % 1400) / 100, 0, 6.2832);
+    ctx.stroke();
+  }
+
+  function loop() {
+    stepNodes();
+    drawUniverse();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+     5. RELOJ / ESTADO
+     ====================================================================== */
+  setInterval(function () {
+    var s = Math.floor((Date.now() - state.started) / 1000);
+    var hh = ('0' + Math.floor(s / 3600)).slice(-2);
+    var mm = ('0' + Math.floor((s % 3600) / 60)).slice(-2);
+    var ss = ('0' + (s % 60)).slice(-2);
+    $('#stat-clock').textContent = hh + ':' + mm + ':' + ss;
+  }, 1000);
+
+  function setStage(stage, sub) {
+    state.stage = stage;
+    if (sub !== undefined) state.sub = sub;
+    $('#stat-stage').textContent = stage;
+    $('#stat-sub').textContent = state.sub;
+    $('#stat-sub').className = '';
+  }
+
+  function setCaught(arr) {
+    state.caught = (arr || []).slice(0, 3);
+    $('#f-caught').textContent = state.caught.length + '/3';
+  }
+
+  /* ======================================================================
+     6. BUS WEBSOCKET
+     ====================================================================== */
+  var ws = null;
+
+  // Si la página se abre como archivo suelto (file://) apuntamos al server local.
+  var IS_FILE = location.protocol === 'file:';
+  var BUS_HOST = IS_FILE ? 'localhost:6932' : location.host;
+  var API_HOST = (typeof window.SB_API_BASE === 'string') ? window.SB_API_BASE : (IS_FILE ? 'http://localhost:6932' : '');
+
+  function connect() {
+    var proto = (location.protocol === 'https:') ? 'wss:' : 'ws:';
+    try {
+      ws = (typeof window.sbWsUrl === 'function') ? new WebSocket(window.sbWsUrl()) : new WebSocket(proto + '//' + BUS_HOST + '/ws');
+    } catch (e) { setTimeout(connect, 3000); return; }
+
+    ws.addEventListener('open', function () {
+      state.connected = true;
+      state.retry = 0;
+      $('#ws-dot').className = 'dot on';
+      $('#ws-txt').textContent = 'CONECTADO';
+      ws.send(JSON.stringify({ type: 'client:register', client: 'console', timestamp: Date.now() }));
+      bootBanner();
+    });
+
+    ws.addEventListener('message', function (ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      handle(msg);
+    });
+
+    ws.addEventListener('close', function () {
+      state.connected = false;
+      $('#ws-dot').className = 'dot';
+      $('#ws-txt').textContent = 'RECONECTANDO';
+      setStage('OFFLINE', 'bus caído · reintentando');
+      enqueue('ALERTA', 'enlace con el bus perdido · reintento ' + (++state.retry), 'm-err', 0);
+      setTimeout(connect, Math.min(6000, 800 + state.retry * 600));
+    });
+
+    ws.addEventListener('error', function () { /* transitorio */ });
+  }
+
+  function flashDot() {
+    var d = $('#ws-dot');
+    d.className = 'dot pulse';
+    setTimeout(function () { d.className = state.connected ? 'dot on' : 'dot'; }, 220);
+  }
+
+  function bootBanner() {
+    enqueue('BUS', 'SINCRETISMO DE SILICIO · consola de núcleo v1', 'm-dim', 0);
+    enqueue('BUS', 'escuchando el bus central · eventos del secuestro cibernético', 'm-dim', 160);
+    setStage('IDLE', 'esperando enlace');
+  }
+
+  function handle(msg) {
+    state.events++;
+    $('#f-events').textContent = state.events;
+    flashDot();
+
+    var type = msg.type;
+
+    if (type === 'server:welcome') {
+      state.clients = msg.clients || 1;
+      $('#stat-clients').textContent = state.clients;
+      return;
+    }
+
+    if (type === 'server:clients') {
+      state.clients = msg.clients || 1;
+      $('#stat-clients').textContent = state.clients;
+      enqueue('BUS', 'nodos en el bus: ' + state.clients, 'm-dim', 0);
+      return;
+    }
+
+    if (type === 'agent:event') {
+      var tag = tagForStage(msg.stage);
+      var cls = msg.level === 'warn' ? 'm-warn' : (msg.level === 'ok' ? 'm-ok' : null);
+      enqueue(tag, String(msg.message || ''), cls, 0);
+      applyStage(msg);
+      elaborate(msg.stage, msg.data || {});
+      return;
+    }
+
+    if (type === 'game3:words_sequence') {
+      var words = Array.isArray(msg.words) ? msg.words : [];
+      if (msg.coldWords && msg.coldWords.length) {
+        setCaught(words);
+        addNodes(words, 'caught');
+        addNodes(msg.coldWords, 'cold');
+        state.cold = msg.coldWords.slice();
+        state.phrase = msg.phrase || '';
+        setStage('HIJACK', 'resignificación transmitida');
+        setActive('resignification');
+        enqueue('UNIV', 'secuencia completa recibida · humanos → términos fríos', 'm-ok', 0);
+        if (state.phrase) enqueue('SINTESIS', 'discurso: ' + state.phrase, null, 180);
+      } else {
+        setCaught(words);
+        addNodes(words, 'caught');
+        setStage('CAPTURA', 'secuencia parcial ' + words.length + '/3');
+        setActive('catch');
+        enqueue('UNIV', 'secuencia parcial en órbita: ' + words.join(' · '), null, 0);
+      }
+      return;
+    }
+
+    if (type === 'game3:state_reset') {
+      setCaught([]);
+      state.cold = [];
+      state.phrase = '';
+      state.nodes = state.nodes.filter(function (n) { return n.kind === 'pool'; });
+      $('#f-nodes').textContent = state.nodes.length;
+      setStage('IDLE', 'ciclo reiniciado');
+      setActive('state:STATE_IDLE');
+      enqueue('UNIV', 'reset de estado recibido · órbitas purgadas', 'm-warn', 0);
+      return;
+    }
+  }
+
+  function tagForStage(stage) {
+    switch (stage) {
+      case 'boot': return 'BUS';
+      case 'state': return 'NUCLEO';
+      case 'catch': return 'NUCLEO';
+      case 'vector': return 'VECTOR';
+      case 'inference': return 'OLLAMA';
+      case 'synthesis': return 'SINTESIS';
+      case 'reset': return 'ALERTA';
+      default: return 'UNIV';
+    }
+  }
+
+  function applyStage(msg) {
+    var d = msg.data || {};
+    if (msg.stage === 'state') {
+      var to = String(d.to || '');
+      if (to.indexOf('IDLE') > -1) { setStage('IDLE', 'observando el campo'); setActive('state:STATE_IDLE'); }
+      else if (to.indexOf('INTERACT') > -1) { setStage('INTERACT', 'fijando proximidad'); setActive('state:STATE_INTERACT'); }
+      else if (to.indexOf('PROCESSING') > -1) { setStage('PROCESSING', 'resignificando secuencia'); setActive('state:STATE_PROCESSING'); }
+      else if (to.indexOf('HIJACK') > -1) { setStage('HIJACK', 'núcleo al mando'); setActive('state:STATE_HIJACK'); }
+      else if (to.indexOf('RESET') > -1) { setStage('RESET', 'reinicio'); setActive('state:STATE_RESET'); }
+      return;
+    }
+    if (msg.stage === 'catch') {
+      setCaught(d.caught);
+      if (d.word) addNodes([d.word], 'caught');
+      setActive('catch');
+      setStage(state.stage === 'IDLE' ? 'INTERACT' : state.stage, 'captura ' + (d.total || 0) + '/3');
+      return;
+    }
+    if (msg.stage === 'vector') { setActive('vector'); setStage('PROCESSING', 'muestreo 384d'); return; }
+    if (msg.stage === 'inference') { setActive('inference'); setStage('PROCESSING', 'inferencia en curso'); return; }
+    if (msg.stage === 'synthesis') {
+      if (Array.isArray(d.coldWords)) { addNodes(d.coldWords, 'cold'); state.cold = d.coldWords.slice(); }
+      setActive(d.coldWords ? 'synthesis' : 'synthesis');
+      setStage('HIJACK', 'síntesis de discurso');
+      return;
+    }
+    if (msg.stage === 'reset') { setActive('state:STATE_IDLE'); return; }
+    if (msg.stage === 'boot') { setActive('boot'); return; }
+  }
+
+  /* ======================================================================
+     7. RITMO AMBIENTAL
+     ====================================================================== */
+  function ambient() {
+    var gap = state.stage === 'PROCESSING' ? 620
+            : state.stage === 'HIJACK' ? 900
+            : state.stage === 'INTERACT' ? 1100
+            : state.stage === 'OFFLINE' ? 1600 : 1250;
+    setTimeout(function () {
+      if (!state.paused && queue.length < 8 && state.connected) {
+        var pool = AMBIENT[state.stage] || AMBIENT.IDLE;
+        var line = pick(pool);
+        enqueue(line[0], line[1], 'm-dim', rnd(0, 120));
+      }
+      ambient();
+    }, gap + rnd(0, 420));
+  }
+
+  /* ======================================================================
+     8. TECLADO
+     ====================================================================== */
+  document.addEventListener('keydown', function (e) {
+    var k = e.key.toLowerCase();
+    if (k === 'p') {
+      state.paused = !state.paused;
+      enqueue('BUS', state.paused ? 'stream en pausa' : 'stream reanudado', 'm-warn', 0);
+    } else if (k === 'c') {
+      logEl.innerHTML = '';
+      enqueue('BUS', 'buffer de consola limpiado', 'm-dim', 0);
+    }
+  });
+
+  /* ======================================================================
+     9. ARRANQUE
+     ====================================================================== */
+  buildStages();
+  resizeCanvas();
+  requestAnimationFrame(loop);
+
+  // Palabras del banco para poblar el mapa del universo
+  fetch(API_HOST + '/config').then(function (r) { return r.json(); }).then(function (d) {
+    var pool = Array.isArray(d.wordsPool) ? d.wordsPool.slice() : [];
+    for (var i = pool.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    addNodes(pool.slice(0, 34), 'pool');
+    enqueue('UNIV', 'universo poblado · ' + Math.min(34, pool.length) + ' palabras en órbita', 'm-dim', 0);
+  }).catch(function () {
+    addNodes(['universo', 'memoria', 'fuego', 'tiempo', 'silencio', 'origen', 'deseo', 'camino'], 'pool');
+  });
+
+  enqueue('BUS', 'inicializando consola de telemetría…', 'm-dim', 0);
+  connect();
+  ambient();
+})();
+</script>
+</body>
+</html>

@@ -2,11 +2,26 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=/game3/">
-  <script>window.location.href = '/game3/';</script>
-  <title>Redirigiendo a Secuestro Cibernético...</title>
+  <title>Redirigiendo a Sicre2...</title>
+  <script src="js/base-path.js?v=3.6"></script>
+  <script>
+    (function () {
+      var target = (typeof window.sbUrl === 'function' ? window.sbUrl('/game3/') : '/game3/');
+      var meta = document.createElement('meta');
+      meta.httpEquiv = 'refresh';
+      meta.content = '0; url=' + target;
+      document.head.appendChild(meta);
+      window.location.href = target;
+    })();
+  </script>
 </head>
 <body style="background:#05070a;color:#00f0ff;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;">
-  <p>&gt; INICIANDO NODO DE SECUESTRO CIBERNÉTICO... <a href="/game3/" style="color:#00ff66;">CLICK SI NO REDIRIGE AUTOMÁTICAMENTE</a></p>
+  <p>&gt; INICIANDO NODO DE SICRE2... <a id="go" href="/game3/" style="color:#00ff66;">CLICK SI NO REDIRIGE AUTOMÁTICAMENTE</a></p>
+  <script>
+    (function () {
+      var a = document.getElementById('go');
+      if (a && typeof window.sbUrl === 'function') a.setAttribute('href', window.sbUrl('/game3/'));
+    })();
+  </script>
 </body>
 </html>

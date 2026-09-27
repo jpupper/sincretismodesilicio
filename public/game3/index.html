@@ -3,17 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sincretismo de Silicio - Secuestro Cibernético</title>
+  <title>Sincretismo de Silicio - Sicre2</title>
   <meta name="description" content="Instalación interactiva: captura palabras humanas con tu cuerpo antes de que el núcleo corporativo secuestre el sistema.">
-  <base href="/game3/">
+  <!-- Base dinámica: funciona en la raíz (/game3/), en subpath (/sincretismo/game3/)
+       y en el hosting estático del FTP, sin recompilar nada. -->
+  <script>
+    (function () {
+      var m = location.pathname.match(/^\/(sincretismo|sincretismodesilicio)(?=\/|$)/);
+      document.write('<base href="' + (m ? '/' + m[1] : '') + '/game3/">');
+    })();
+  </script>
+  <script src="../js/base-path.js?v=3.8"></script>
   <link rel="icon" type="image/svg+xml" href="../favicon.svg">
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,500;0,700;1,400&family=Share+Tech+Mono&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=2.7">
+  <link rel="stylesheet" href="style.css?v=3.8">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -26,6 +34,9 @@
 
     <!-- Capa 1: Video de la Webcam (Fondo Fullscreen) -->
     <video id="webcam-video" autoplay playsinline muted></video>
+
+    <!-- Capa 1.2: Recorte de Silueta por Depth Map / Segmentación (Cutout) -->
+    <canvas id="cutout-camera-canvas"></canvas>
 
     <!-- Capa 1.5: Shader ASCII sobre la Webcam (WebGL Canvas) -->
     <canvas id="ascii-camera-canvas"></canvas>
@@ -77,6 +88,13 @@
           <span class="btn-icon">🌌</span>
           <span>CÚMULO 3D</span>
           <kbd>U</kbd>
+        </button>
+
+        <!-- Botón Log de Sucesos (solo stream de eventos) -->
+        <button class="cctv-btn" id="btn-open-log" title="Abrir el Log de Sucesos en otra ventana (Tecla O)">
+          <span class="btn-icon">📜</span>
+          <span>LOG</span>
+          <kbd>O</kbd>
         </button>
 
         <!-- Botón Configuración (P) -->
@@ -136,12 +154,6 @@
 
     <!-- Capa 5: Contenedor Central Inferior de Palabras Atrapadas (3 SLOTS) -->
     <div id="caught-section">
-      <div class="caught-header">
-        <span class="bracket">[</span>
-        <span class="label">REGISTRO DE CONCEPTOS ORGÁNICOS ATRAPADOS (3 MÁXIMO)</span>
-        <span class="bracket">]</span>
-      </div>
-
       <div class="slots-container" id="slots-container">
         <!-- Slot 01 -->
         <div class="slot-box empty" id="slot-0" data-index="0">
@@ -184,7 +196,6 @@
         <div class="desp-content">
           <span class="desp-pulse-dot"></span>
           <span class="desp-title">&gt;&gt; DESPROCESANDO &lt;&lt;</span>
-          <span class="desp-sub">[DESMANTELANDO FACTOR ORGÁNICO // PROCESANDO SÍNTESIS...]</span>
         </div>
       </div>
 
@@ -192,15 +203,15 @@
       <div id="mutation-words-container" class="mutation-words-container">
         <div class="mutation-word-card" id="mut-card-0">
           <div class="mutation-word-text" id="mut-text-0"></div>
-          <div class="mutation-sub-badge" id="mut-badge-0">[CONCEPTO 01]</div>
+
         </div>
         <div class="mutation-word-card" id="mut-card-1">
           <div class="mutation-word-text" id="mut-text-1"></div>
-          <div class="mutation-sub-badge" id="mut-badge-1">[CONCEPTO 02]</div>
+
         </div>
         <div class="mutation-word-card" id="mut-card-2">
           <div class="mutation-word-text" id="mut-text-2"></div>
-          <div class="mutation-sub-badge" id="mut-badge-2">[CONCEPTO 03]</div>
+
         </div>
       </div>
 
@@ -279,7 +290,7 @@
         <div class="modal-header">
           <div class="modal-title">
             <span class="modal-icon">⚙️</span>
-            <span>PARÁMETROS DEL SISTEMA &amp; OLLAMA</span>
+            <span>PARÁMETROS DEL SISTEMA</span>
           </div>
           <button class="modal-close-btn" id="btn-close-config" title="Cerrar modal (Esc)">&times;</button>
         </div>
@@ -306,6 +317,14 @@
           <button type="button" class="modal-tab-btn" data-tab="tab-render">
             <span class="tab-icon">🎛️</span>
             <span class="tab-text">RENDER &amp; CAPAS</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-particles">
+            <span class="tab-icon">✨</span>
+            <span class="tab-text">PARTÍCULAS</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-colors">
+            <span class="tab-icon">🎨</span>
+            <span class="tab-text">COLORES</span>
           </button>
         </div>
 
@@ -335,6 +354,22 @@
               <select id="cfg-model-select" class="cyber-select">
                 <option value="">Detectando modelos instalados en Ollama...</option>
               </select>
+            </div>
+
+            <!-- Servidor Ollama local (los modelos corren en ESTA máquina) -->
+            <div class="form-group">
+              <label for="cfg-ollama-url">
+                <span>Servidor Ollama local (los modelos corren en esta máquina):</span>
+                <small>(Por defecto http://localhost:11434 — cambialo si Ollama corre en otra IP de tu red)</small>
+              </label>
+              <div class="input-with-presets">
+                <input type="text" id="cfg-ollama-url" placeholder="http://localhost:11434">
+                <div class="preset-chips">
+                  <button type="button" class="chip-btn" data-ollama-url="http://localhost:11434">localhost</button>
+                  <button type="button" class="chip-btn" data-ollama-url="http://127.0.0.1:11434">127.0.0.1</button>
+                  <button type="button" class="chip-btn" data-ollama-url="http://192.168.0.100:11434">LAN</button>
+                </div>
+              </div>
             </div>
 
             <!-- Campo Manual / Personalizado -->
@@ -413,10 +448,59 @@
                   <input type="checkbox" id="cfg-ascii-enabled" checked>
                   <span>Activar Shader ASCII sobre el fondo de video</span>
                 </label>
+
                 <div class="ascii-slider-group">
                   <label for="cfg-ascii-size">Densidad de Caracteres ASCII: <span id="val-ascii-size">11</span>px</label>
-                  <input type="range" id="cfg-ascii-size" min="6" max="22" step="1" value="11">
+                  <input type="range" id="cfg-ascii-size" min="6" max="26" step="1" value="11">
                 </div>
+
+                <div class="ascii-slider-group">
+                  <label for="cfg-ascii-glyph-scale">Escala de las Letras (glifos): <span id="val-ascii-glyph-scale">0.90</span>x</label>
+                  <input type="range" id="cfg-ascii-glyph-scale" min="0.30" max="1.40" step="0.05" value="0.90">
+                </div>
+
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cfg-ascii-draw-bg" checked>
+                  <span>Dibujar letras de fondo (desactivar = solo silueta corporal)</span>
+                </label>
+
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cfg-ascii-auto-tint" checked>
+                  <span>Tinte automático por estado (REC / RESIGNIFICACIÓN / SECUESTRO)</span>
+                </label>
+
+                <div class="ascii-colors-grid">
+                  <div class="ascii-color-item">
+                    <label for="cfg-ascii-base-color">Letras del Fondo (REC / normal):</label>
+                    <input type="color" id="cfg-ascii-base-color" value="#26f2e6">
+                  </div>
+                  <div class="ascii-color-item">
+                    <label for="cfg-ascii-processing-color">Letras del Fondo en DESPROCESANDO:</label>
+                    <input type="color" id="cfg-ascii-processing-color" value="#ff1a59">
+                  </div>
+                  <div class="ascii-color-item">
+                    <label for="cfg-ascii-hijack-color">Letras del Fondo en SECUESTRO:</label>
+                    <input type="color" id="cfg-ascii-hijack-color" value="#1aff4d">
+                  </div>
+                  <div class="ascii-color-item">
+                    <label for="cfg-ascii-body-color">Letras de la Silueta:</label>
+                    <input type="color" id="cfg-ascii-body-color" value="#39ff14">
+                  </div>
+                  <div class="ascii-color-item">
+                    <label for="cfg-ascii-bg-color">Color de Fondo del Shader:</label>
+                    <input type="color" id="cfg-ascii-bg-color" value="#05070a">
+                  </div>
+                </div>
+
+                <div class="ascii-slider-group">
+                  <label for="cfg-ascii-bg-alpha">Opacidad del Fondo del Shader: <span id="val-ascii-bg-alpha">0</span>%</label>
+                  <input type="range" id="cfg-ascii-bg-alpha" min="0" max="100" step="1" value="0">
+                </div>
+
+                <label class="checkbox-label">
+                  <input type="checkbox" id="cfg-ascii-silhouette" checked>
+                  <span>Pintar la silueta corporal con un color distinto al fondo</span>
+                </label>
               </div>
             </div>
           </div>
@@ -732,6 +816,22 @@
                   </div>
                 </div>
 
+                <!-- Capa 1b: Recorte de Silueta (Depth Cutout) -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Recorte de Silueta (Depth Map)">
+                      <input type="checkbox" id="cfg-render-cutout-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">1b. Recorte de Silueta (Depth Cutout)</span>
+                  </div>
+                  <small class="item-desc">Aísla tu cuerpo del fondo usando el mapa de profundidad / segmentación humana</small>
+                  <div class="layer-slider-group" style="margin-top: 6px;">
+                    <label for="cfg-render-cutout-contrast">Umbral de Máscara: <span id="val-render-cutout-contrast">28</span>%</label>
+                    <input type="range" id="cfg-render-cutout-contrast" min="5" max="90" step="1" value="28">
+                  </div>
+                </div>
+
                 <!-- Capa 2: Shader ASCII -->
                 <div class="render-layer-item">
                   <div class="layer-header">
@@ -869,6 +969,142 @@
             </div>
           </div>
 
+          <!-- TAB 6: PARTÍCULAS (VARIABLES DE LAS PALABRAS GENERADAS) -->
+          <div class="modal-tab-pane" id="tab-particles">
+            <div class="particles-controls-card">
+              <div class="section-subtitle">
+                <span>✨ MOTOR DE PARTÍCULAS Y PALABRAS ORGÁNICAS</span>
+              </div>
+              <p class="words-help-text">
+                Controla cada variable de las palabras que flotan en pantalla: tipografía, tamaño, color, contorno, tiempo de vida, cantidad máxima y velocidad.
+              </p>
+
+              <div class="calibration-grid">
+                <div class="calib-item">
+                  <label for="cfg-part-fontsize">Tamaño de Fuente: <span id="val-part-fontsize">16</span>px</label>
+                  <input type="range" id="cfg-part-fontsize" min="12" max="64" step="1" value="16">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-fontfamily"><strong>Tipografía:</strong></label>
+                  <select id="cfg-part-fontfamily" class="cyber-select-sm">
+                    <option value="organic">Share Tech Mono (Terminal Ciber)</option>
+                    <option value="outfit">Outfit (Geométrica Moderna)</option>
+                    <option value="share-tech" selected>Share Tech Mono (Terminal Ciber)</option>
+                    <option value="space-mono">Space Mono (Monoespaciada Poética)</option>
+                    <option value="serif">Serif Clásica (Literaria)</option>
+                  </select>
+                </div>
+
+                <div class="calib-item calib-item-inline">
+                  <label for="cfg-part-color"><strong>Color de la Palabra:</strong></label>
+                  <input type="color" id="cfg-part-color" class="word-color-swatch" value="#ffffff" title="Elegir color de la palabra">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-outline">Grosor del Reborde: <span id="val-part-outline">1.0</span>px</label>
+                  <input type="range" id="cfg-part-outline" min="0" max="8" step="0.5" value="1.0">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-lifetime">Tiempo de Vida de cada Palabra: <span id="val-part-lifetime">0</span>s <small>(0 = infinita)</small></label>
+                  <input type="range" id="cfg-part-lifetime" min="0" max="60" step="1" value="0">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-maxwords">Máxima Cantidad de Palabras en Pantalla: <span id="val-part-maxwords">9</span></label>
+                  <input type="range" id="cfg-part-maxwords" min="3" max="30" step="1" value="9">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-speed">Velocidad de las Palabras: <span id="val-part-speed">1.0</span>x</label>
+                  <input type="range" id="cfg-part-speed" min="0.1" max="4" step="0.1" value="1.0">
+                </div>
+
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-part-outline-glow" checked>
+                    <strong>Resplandor del Reborde (Glow Neón)</strong>
+                  </label>
+                  <small class="item-desc">Aplica halo luminoso alrededor del contorno de cada palabra</small>
+                </div>
+              </div>
+
+              <div class="calib-actions-row">
+                <button type="button" class="btn-calib-action" id="btn-part-reset">
+                  ↺ Restaurar Valores Predeterminados
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 7: COLORES GLOBALES DE LA INTERFAZ -->
+          <div class="modal-tab-pane" id="tab-colors">
+            <div class="ascii-controls-card">
+              <div class="section-subtitle"><span>🎚️ PALETAS GLOBALES (3 COLORES)</span></div>
+              <p class="words-help-text">
+                Elegí una paleta: se recalcularán <strong>todos los colores de todos los elementos</strong> de la interfaz y el fondo general. Después podés afinar color por color.
+              </p>
+              <div class="palette-grid" id="palette-grid"></div>
+              <div class="palette-status">
+                <span>PALETA ACTIVA:</span>
+                <strong id="palette-current-name">Cian Ciber</strong>
+                <span class="palette-base-chips" id="palette-base-chips"></span>
+              </div>
+
+              <details class="color-advanced">
+                <summary>⚙️ Ajuste fino por elemento (modo avanzado)</summary>
+                <div class="color-advanced-body">
+              <div class="section-subtitle"><span>🎨 COLORES GLOBALES DE LA INTERFAZ</span></div>
+              <p class="words-help-text">
+                Todos los colores de la aplicación como variables CSS. Se guardan en el navegador (localStorage).<br>
+                Al tocar cualquier color se pasa a <em>paleta personalizada</em>.
+              </p>
+              <div class="ascii-colors-grid">
+                <div class="ascii-color-item"><label for="cfg-ui-cyan">Cian Principal (acentos, HUD, palabras)</label><input type="color" id="cfg-ui-cyan"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-green">Verde (éxito, texto CCTV)</label><input type="color" id="cfg-ui-green"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-neon-green">Verde Neón (silueta, secuestro)</label><input type="color" id="cfg-ui-neon-green"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-red">Rojo (alertas, desprocesamiento)</label><input type="color" id="cfg-ui-red"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-amber">Ámbar (advertencias)</label><input type="color" id="cfg-ui-amber"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-purple">Violeta (acentos secundarios)</label><input type="color" id="cfg-ui-purple"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-text">Texto Principal</label><input type="color" id="cfg-ui-colors-text"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-muted">Texto Secundario (labels, HUD)</label><input type="color" id="cfg-ui-muted"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-dark">Fondo Base de la App</label><input type="color" id="cfg-ui-bg-dark"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-border-cyan">Bordes Cian (marcos, botones)</label><input type="color" id="cfg-ui-border-cyan"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-border-green">Bordes Verdes (estado secuestrado)</label><input type="color" id="cfg-ui-border-green"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-border-red">Bordes Rojos (alertas)</label><input type="color" id="cfg-ui-border-red"></div>
+              </div>
+
+              <div class="section-subtitle"><span>🖼️ FONDOS DE LA INTERFAZ</span></div>
+              <p class="words-help-text">Cada fondo de la app. Los translúcidos conservan su opacidad original; solo cambia el tono.</p>
+              <div class="ascii-colors-grid">
+                <div class="ascii-color-item"><label for="cfg-ui-bg-hud">Fondo HUD / CCTV</label><input type="color" id="cfg-ui-bg-hud"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-surface-btn">Fondo Botones HUD</label><input type="color" id="cfg-ui-bg-surface-btn"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-accent-soft">Fondo Acento Suave</label><input type="color" id="cfg-ui-bg-accent-soft"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-accent">Fondo Acento (tabs, chips)</label><input type="color" id="cfg-ui-bg-accent"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-accent-strong">Fondo Acento Fuerte (hover)</label><input type="color" id="cfg-ui-bg-accent-strong"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-panel">Fondo Paneles / Tarjetas</label><input type="color" id="cfg-ui-bg-panel"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-panel-deep">Fondo Paneles Profundos</label><input type="color" id="cfg-ui-bg-panel-deep"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-slot">Fondo Slots de Palabras</label><input type="color" id="cfg-ui-bg-slot"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-card">Fondo Tarjeta de Palabra</label><input type="color" id="cfg-ui-bg-card"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-mutated">Fondo Palabra Resignificada</label><input type="color" id="cfg-ui-bg-mutated"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-final">Fondo Discurso Final</label><input type="color" id="cfg-ui-bg-final"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-modal">Fondo Modal de Config</label><input type="color" id="cfg-ui-bg-modal"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-overlay">Fondo Overlay del Modal</label><input type="color" id="cfg-ui-bg-overlay"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-toast">Fondo Notificaciones (toast)</label><input type="color" id="cfg-ui-bg-toast"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-desp">Fondo Banner DESPROCESANDO</label><input type="color" id="cfg-ui-bg-desp"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-input">Fondo Inputs / Selects</label><input type="color" id="cfg-ui-bg-input"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-success">Fondo Estado Online / Éxito</label><input type="color" id="cfg-ui-bg-success"></div>
+                <div class="ascii-color-item"><label for="cfg-ui-bg-danger">Fondo Estado Offline / Alerta</label><input type="color" id="cfg-ui-bg-danger"></div>
+              </div>
+              <div class="calib-actions-row">
+                <button type="button" class="btn-calib-action" id="btn-ui-colors-reset">↺ Restaurar Colores Predeterminados</button>
+              </div>
+                </div>
+              </details>
+            </div>
+          </div>
+
           <div class="config-status-msg" id="config-status-msg"></div>
         </div>
 
@@ -892,6 +1128,6 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=2.8"></script>
+  <script src="script.js?v=3.8"></script>
 </body>
 </html>

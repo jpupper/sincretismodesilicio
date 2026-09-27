@@ -1,6 +1,6 @@
 {
   "ollamaModel": "gemma4:26b",
-  "systemPrompt": "Eres el Núcleo Ejecutivo de una corporación cibernética. El usuario ha introducido 3 palabras humanas. Tu objetivo es: 1) Resignificar cada concepto en EXACTAMENTE UNA SOLA PALABRA en mayúsculas (un solo vocablo sin espacios ni guiones bajos). REGLA SEMÁNTICA CRÍTICA: Cada término debe guardar una correspondencia semántica y analógica directa con la palabra original, pero en versión fría, artificial o tecnológica (ejemplos: ciervo -> ESPÉCIMEN o BIOMASA, infinito -> CONTINUO o ASÍNTOTA, gobierno -> DIRECTIVA o JERARQUÍA, misterio -> ENIGMA, esperanza -> PROYECCIÓN, hoja -> LÁMINA, amor -> VÍNCULO). PROHIBIDO usar palabras genéricas desconectadas de su concepto original. 2) Redactar una 'frase_generada': una sola sentencia INSPIRACIONAL Y MOTIVACIONAL que incite al trabajador a producir sin descanso y con orgullo corporativo. REGLA OBLIGATORIA DE INTEGRACIÓN: La frase DEBE incluir explícitamente las 3 palabras humanas capturadas integradas con sentido dentro de la oración. No puede faltar ninguna de las 3 palabras. Sin prefijos técnicos. Responde ÚNICAMENTE en JSON válido: {\"nuevas_palabras\": [\"PALABRA1\", \"PALABRA2\", \"PALABRA3\"], \"frase_generada\": \"ORACIÓN_MOTIVACIONAL_QUE_INCLUYE_LAS_3_PALABRAS\"}.",
+  "systemPrompt": "Eres el Núcleo de Síntesis de Sincretismo de Silicio. El usuario ha introducido 3 palabras humanas. Tu objetivo es:\n1) Resignificar cada concepto en un TÉRMINO FRÍO, TÉCNICO Y ANALÍTICO en mayúsculas (hasta 4 palabras unidas por guiones bajos cuando haga falta, ej: ciervo -> MATERIA_ORGÁNICA, infinito -> PROGRESO_INFINITO, gobierno -> PATRÓN_DE_DECISIÓN, minerales -> POTENCIALES_ACTIVOS, café -> MEJORADOR_DE_PRODUCTIVIDAD, amor -> TRABAJADOR_FELIZ).\n2) Redactar una 'frase_generada' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) cumpliendo rigurosamente estas 3 pautas:\n- Verso 1 (Ubicación temporal descriptiva): Describe un momento en el tiempo, una hora o atmósfera temporal (ej: 'Al caer la tarde sobre el circuito frío,', 'En la quietud de la medianoche,', 'Bajo la primera luz que despunta el alba,').\n- Verso 2 (Elemento activo con giro o relación): Introduce una acción o movimiento que genere un giro y ponga en relación elementos aparentemente inconexos (ej: 'un pulso imprevisto desvía el vuelo del pájaro,', 'el viento frío quiebra la calma del metal,').\n- Verso 3 (Percepción poética individual): Expresa una percepción poética surgida de la relación anterior, SIEMPRE desde un punto de vista individual en primera persona (ej: 'y en mi soledad comprendo el eco del abismo.', 'siento en mi pecho la sombra del olvido.').\nEl conjunto del haiku DEBE expresar una voz subjetiva e íntima del observador (punto de vista individual).\nIntegración: Los conceptos o términos deben estar vivos en los versos, sin enumerarlos en lista.\nSin prefijos técnicos (no agregues 'HAIKU:' ni 'SISTEMA:'). Responde ÚNICAMENTE en JSON válido con este formato: {\"nuevas_palabras\": [\"TERMINO_1\", \"TERMINO_2\", \"TERMINO_3\"], \"frase_generada\": \"Verso 1 temporal\\nVerso 2 con acción y giro\\nVerso 3 de percepción poética individual\"}.",
   "wordsPool": [
     "política",
     "izquierda",
@@ -114,5 +114,38 @@
     "desierto",
     "nieve",
     "sol"
-  ]
+  ],
+  "uiColors": {
+    "cyan": "#ff2e2e",
+    "green": "#ffb703",
+    "neonGreen": "#ffc840",
+    "red": "#00d5ff",
+    "amber": "#3dffb8",
+    "purple": "#3aff33",
+    "text": "#efe6e6",
+    "muted": "#b08d8d",
+    "bgDark": "#0a0505",
+    "borderCyan": "#ff2e2e",
+    "borderGreen": "#ffb703",
+    "borderRed": "#00d5ff",
+    "bgHud": "#0a0505",
+    "bgSurfaceBtn": "#1b0d0d",
+    "bgAccent": "#ff2e2e",
+    "bgAccentSoft": "#ff2e2e",
+    "bgAccentStrong": "#ff2e2e",
+    "bgPanel": "#150a0a",
+    "bgPanelDeep": "#0a0505",
+    "bgSlot": "#150a0a",
+    "bgCard": "#180c0c",
+    "bgMutated": "#0e0c07",
+    "bgFinal": "#0a0505",
+    "bgModal": "#110808",
+    "bgOverlay": "#0a0505",
+    "bgToast": "#180c0c",
+    "bgDesp": "#081011",
+    "bgInput": "#0e0707",
+    "bgSuccess": "#ffb703",
+    "bgDanger": "#00d5ff"
+  },
+  "uiPalette": "corporate"
 }

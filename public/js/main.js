@@ -1,7 +1,6 @@
 import { semanticEngine } from './engine/semanticVectorEngine.js';
 import { GraphVisualizer } from './visualizer/graphVisualizer.js';
 import { Cosmos3DVisualizer } from './visualizer/cosmos3DVisualizer.js';
-import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js';
 import { DistanceCalculatorUI } from './components/distanceCalculator.js';
 import { ClusterLibraryUI } from './components/clusterLibraryUI.js';
 import { GameMode } from './game/gameMode.js';
@@ -9,7 +8,6 @@ import { soundFX } from './audio/soundFX.js';
 
 let visualizer = null;
 let cosmosVisualizer = null;
-let clusterCosmosVisualizer = null;
 let distanceCalculatorUI = null;
 let clusterLibraryUI = null;
 let gameMode = null;
@@ -37,17 +35,24 @@ const tabClusterLibBtn = document.getElementById('tab-cluster-lib-btn');
 const tabCosmosClustersBtn = document.getElementById('tab-cosmos-clusters-btn');
 const tabCosmosBtn = document.getElementById('tab-cosmos-btn');
 const tabGameBtn = document.getElementById('tab-game-btn');
+const tabOthersBtn = document.getElementById('tab-others-btn');
+const navDropdownOthers = document.getElementById('nav-dropdown-others');
+
+const cardToggleOthers = document.getElementById('card-toggle-others');
+const btnToggleOthersDrawer = document.getElementById('btn-toggle-others-drawer');
+const hubOthersSection = document.getElementById('hub-others-section');
+const btnCloseOthersDrawer = document.getElementById('btn-close-others-drawer');
+const othersDrawerLabel = document.getElementById('others-drawer-label');
+const othersChevron = document.getElementById('others-chevron');
 
 const viewHub = document.getElementById('view-hub');
 const viewExplorer = document.getElementById('view-explorer');
 const viewDistance = document.getElementById('view-distance');
 const viewClusterLib = document.getElementById('view-cluster-lib');
-const viewCosmosClusters = document.getElementById('view-cosmos-clusters');
 const viewCosmos = document.getElementById('view-cosmos');
 const viewGame = document.getElementById('view-game');
 
 const cosmosViewport = document.getElementById('cosmos-viewport');
-const cosmosClustersViewport = document.getElementById('cosmos-clusters-viewport');
 const cosmosSearchInput = document.getElementById('cosmos-search-input');
 const btnCosmosWarp = document.getElementById('btn-cosmos-warp');
 const btnCosmosRandom = document.getElementById('btn-cosmos-random');
@@ -105,12 +110,10 @@ async function initApp() {
       }
     });
 
-    // 4. Initialize 3D Cosmos Visualizers
+    // 4. Initialize 3D Cosmos Visualizer (10.000 palabras)
     cosmosVisualizer = new Cosmos3DVisualizer(cosmosViewport, {
       onSelectWord: (word) => {}
     });
-
-    clusterCosmosVisualizer = new ClusterCosmos3D(cosmosClustersViewport, {});
 
     // 5. Initialize UI Components
     const distCalcRoot = document.getElementById('distance-calc-root');
@@ -345,6 +348,71 @@ function setupControls() {
   if (tabCosmosBtn) tabCosmosBtn.addEventListener('click', () => switchTab('cosmos'));
   if (tabGameBtn) tabGameBtn.addEventListener('click', () => switchTab('game'));
 
+  // Dropdown "Otros" in Nav
+  if (tabOthersBtn && navDropdownOthers) {
+    tabOthersBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = navDropdownOthers.classList.contains('open');
+      navDropdownOthers.classList.toggle('open', !isOpen);
+      tabOthersBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!navDropdownOthers.contains(e.target)) {
+        navDropdownOthers.classList.remove('open');
+        tabOthersBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    navDropdownOthers.querySelectorAll('.dropdown-item[data-tab]').forEach(item => {
+      item.addEventListener('click', () => {
+        navDropdownOthers.classList.remove('open');
+        tabOthersBtn.setAttribute('aria-expanded', 'false');
+        const tab = item.getAttribute('data-tab');
+        if (tab) switchTab(tab);
+      });
+    });
+  }
+
+  // Toggle Hub Others Drawer
+  function toggleOthersDrawer(forceOpen = null) {
+    if (!hubOthersSection) return;
+    const isCurrentlyOpen = hubOthersSection.style.display !== 'none';
+    const nextState = forceOpen !== null ? forceOpen : !isCurrentlyOpen;
+
+    if (nextState) {
+      hubOthersSection.style.display = 'block';
+      if (othersDrawerLabel) othersDrawerLabel.textContent = 'Ocultar Pruebas y Experimentos (6)';
+      if (othersChevron) othersChevron.textContent = '▴';
+      hubOthersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      hubOthersSection.style.display = 'none';
+      if (othersDrawerLabel) othersDrawerLabel.textContent = 'Ver Pruebas y Experimentos (6)';
+      if (othersChevron) othersChevron.textContent = '▾';
+    }
+  }
+
+  if (btnToggleOthersDrawer) {
+    btnToggleOthersDrawer.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleOthersDrawer();
+    });
+  }
+
+  if (cardToggleOthers) {
+    cardToggleOthers.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      toggleOthersDrawer();
+    });
+  }
+
+  if (btnCloseOthersDrawer) {
+    btnCloseOthersDrawer.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleOthersDrawer(false);
+    });
+  }
+
   soundToggleBtn.addEventListener('click', () => {
     const isEnabled = soundFX.toggle();
     soundIcon.textContent = isEnabled ? '🔊' : '🔇';
@@ -527,27 +595,28 @@ function setupControls() {
 
 function switchTab(tabId) {
   // Clear active tab buttons
-  [tabHubBtn, tabExplorerBtn, tabDistanceBtn, tabClusterLibBtn, tabCosmosClustersBtn, tabCosmosBtn, tabGameBtn].forEach(btn => {
+  [tabHubBtn, tabExplorerBtn, tabDistanceBtn, tabClusterLibBtn, tabCosmosClustersBtn, tabCosmosBtn, tabGameBtn, tabOthersBtn].forEach(btn => {
     if (btn) btn.classList.remove('active');
   });
 
   // Clear active view panels
-  [viewHub, viewExplorer, viewDistance, viewClusterLib, viewCosmosClusters, viewCosmos, viewGame].forEach(panel => {
+  [viewHub, viewExplorer, viewDistance, viewClusterLib, viewCosmos, viewGame].forEach(panel => {
     if (panel) panel.classList.remove('active');
   });
 
   // Stop 3D animations when leaving 3D tabs
   if (cosmosVisualizer) cosmosVisualizer.stop();
-  if (clusterCosmosVisualizer) clusterCosmosVisualizer.stop();
 
   if (tabId === 'hub') {
     if (tabHubBtn) tabHubBtn.classList.add('active');
     if (viewHub) viewHub.classList.add('active');
   } else if (tabId === 'explorer') {
+    if (tabOthersBtn) tabOthersBtn.classList.add('active');
     if (tabExplorerBtn) tabExplorerBtn.classList.add('active');
     if (viewExplorer) viewExplorer.classList.add('active');
     if (visualizer) visualizer.resize();
   } else if (tabId === 'distance') {
+    if (tabOthersBtn) tabOthersBtn.classList.add('active');
     if (tabDistanceBtn) tabDistanceBtn.classList.add('active');
     if (viewDistance) viewDistance.classList.add('active');
     if (distanceCalculatorUI) distanceCalculatorUI.calculateAndRenderResults();
@@ -555,13 +624,10 @@ function switchTab(tabId) {
     if (tabClusterLibBtn) tabClusterLibBtn.classList.add('active');
     if (viewClusterLib) viewClusterLib.classList.add('active');
   } else if (tabId === 'cosmos-clusters') {
-    if (tabCosmosClustersBtn) tabCosmosClustersBtn.classList.add('active');
-    if (viewCosmosClusters) viewCosmosClusters.classList.add('active');
-    if (clusterCosmosVisualizer) {
-      clusterCosmosVisualizer.handleResize();
-      clusterCosmosVisualizer.start();
-    }
+    window.open('./cosmos-clusters.html', '_blank');
+    return;
   } else if (tabId === 'cosmos') {
+    if (tabOthersBtn) tabOthersBtn.classList.add('active');
     if (tabCosmosBtn) tabCosmosBtn.classList.add('active');
     if (viewCosmos) viewCosmos.classList.add('active');
     if (cosmosVisualizer) {
@@ -569,6 +635,7 @@ function switchTab(tabId) {
       cosmosVisualizer.start();
     }
   } else if (tabId === 'game') {
+    if (tabOthersBtn) tabOthersBtn.classList.add('active');
     if (tabGameBtn) tabGameBtn.classList.add('active');
     if (viewGame) viewGame.classList.add('active');
     if (gameMode && gameMode.screen === 'start') {

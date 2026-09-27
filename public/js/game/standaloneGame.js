@@ -715,7 +715,7 @@ class FloatingFeedback {
  */
 async function loadServerConfig() {
   try {
-    const res = await fetch('/api/game-config');
+    const res = await (window.sbFetch || fetch)('/api/game-config');
     if (res.ok) {
       const serverCfg = await res.json();
       config = deepMerge(config, serverCfg);
@@ -746,7 +746,7 @@ function deepMerge(target, source) {
 async function saveServerConfig() {
   readSettingsUI();
   try {
-    const res = await fetch('/api/game-config', {
+    const res = await (window.sbFetch || fetch)('/api/game-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config)

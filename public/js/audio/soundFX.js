@@ -52,6 +52,11 @@ class SoundFX {
     }
   }
 
+  playClick() {
+    // Sonido de clic de interfaz (usado por la navegación de pestañas)
+    this.playHover();
+  }
+
   playActivate() {
     if (!this.enabled) return;
     this.init();

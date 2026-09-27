@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sincretismo de Silicio // Universo 3D de Neuronas &amp; Cúmulos</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  
+  <!-- Tipografías de Alta Fidelidad -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  
+  <script src="js/base-path.js?v=3.8"></script>
+  <link rel="stylesheet" href="css/cosmos-clusters.css" />
+</head>
+<body>
+
+  <!-- Barra Superior de Navegación Independiente -->
+  <header class="cosmos-standalone-header">
+    <div class="header-brand">
+      <span class="header-brand-icon">🌌</span>
+      <span class="header-brand-title">SINCRETISMO DE SILICIO</span>
+      <span class="header-brand-sub">UNIVERSO 3D DE NEURONAS &amp; SINAPSIS</span>
+    </div>
+
+    <div class="header-nav-actions">
+      <a href="./" class="btn-standalone-nav" title="Volver al Menú Principal">
+        <span>⌂</span>
+        <span>Menú Principal</span>
+      </a>
+      <a href="./game3" target="_blank" rel="noopener noreferrer" class="btn-standalone-nav highlight" title="Abrir Sicre2 para capturar palabras y enviar órdenes">
+        <span>🎮</span>
+        <span>Abrir Sicre2</span>
+      </a>
+      <a href="./log.html" target="_blank" rel="noopener noreferrer" class="btn-standalone-nav" title="Ver log de sucesos y telemetría de eventos">
+        <span>📋</span>
+        <span>log.html</span>
+      </a>
+      <button type="button" class="btn-standalone-nav" id="btn-fullscreen-cluster-cosmos" title="Alternar Pantalla Completa (F)">
+        <span>⛶</span>
+        <span>Pantalla Completa (F)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Viewport de Renderizado WebGL Three.js -->
+  <main class="cosmos-clusters-viewport" id="cosmos-clusters-viewport">
+
+    <!-- HUD DE ÓRDENES CEREBRALES / PENSAMIENTO SINÁPTICO (SICRE2 <-> CÚMULO 3D) -->
+    <div class="neural-orders-hud" id="neural-orders-hud">
+      <div class="orders-hud-top">
+        <div class="orders-hud-badge">
+          <span class="orders-pulse-dot"></span>
+          <span class="orders-title">PENSAMIENTO SINÁPTICO • ÓRDENES CEREBRALES (SICRE2)</span>
+        </div>
+        <div class="orders-hud-actions">
+          <button class="btn-demo-orders" id="btn-demo-orders" type="button" title="Simular 3 órdenes de pensamiento para ver la conexión de neuronas en 3D">
+            <span>⚡ Simular Órdenes</span>
+          </button>
+          <button class="btn-reset-orders" id="btn-reset-orders" type="button" title="Limpiar órdenes cerebrales">
+            <span>↺</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="orders-slots-container">
+        <div class="order-slot-pill empty" id="order-slot-1">
+          <span class="slot-badge">ORDEN #1</span>
+          <span class="slot-word" id="order-word-1">EN ESPERA</span>
+        </div>
+        <div class="order-synapse-connector" id="order-connector-1">
+          <span class="connector-spark">⚡</span>
+        </div>
+        <div class="order-slot-pill empty" id="order-slot-2">
+          <span class="slot-badge">ORDEN #2</span>
+          <span class="slot-word" id="order-word-2">EN ESPERA</span>
+        </div>
+        <div class="order-synapse-connector" id="order-connector-2">
+          <span class="connector-spark">⚡</span>
+        </div>
+        <div class="order-slot-pill empty" id="order-slot-3">
+          <span class="slot-badge">ORDEN #3</span>
+          <span class="slot-word" id="order-word-3">EN ESPERA</span>
+        </div>
+      </div>
+
+      <div class="orders-status-bar">
+        <span class="status-indicator-icon">🧠</span>
+        <span class="status-indicator-text" id="orders-hud-status">Esperando que el usuario active palabras en Sicre2 (o presiona "Simular Órdenes")...</span>
+      </div>
+
+      <div class="orders-speech-box" id="orders-speech-box" style="display: none;">
+        <div class="speech-header">
+          <span class="speech-badge">TRANSFORMACIÓN SINÁPTICA // HAIKU GENERADO:</span>
+        </div>
+        <div class="speech-text" id="orders-speech-text"></div>
+      </div>
+    </div>
+
+    <!-- Telemetría Nodal en 3D -->
+    <div class="cosmos-hud-telemetry">
+      <div class="telemetry-item">
+        <span class="tel-label">OBJETIVO:</span>
+        <span class="tel-val highlight" id="cluster-hud-target">Ninguno</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="tel-label">COORDENADAS:</span>
+        <span class="tel-val" id="cluster-hud-coords">X: 0 Y: 0 Z: 0</span>
+      </div>
+    </div>
+
+    <!-- Guía Rápida de Vuelo en el Cosmos -->
+    <div class="cosmos-flight-hints">
+      <div class="hint-chip">
+        <span class="hint-key">WASD / Flechas</span>
+        <span>Volar</span>
+      </div>
+      <div class="hint-chip">
+        <span class="hint-key">Click Izquierdo</span>
+        <span>Enfocar Neurona</span>
+      </div>
+      <div class="hint-chip">
+        <span class="hint-key">Arrastrar Mouse</span>
+        <span>Rotar Cámara</span>
+      </div>
+      <div class="hint-chip">
+        <span class="hint-key">F</span>
+        <span>Pantalla Completa</span>
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module" src="js/cosmos-clusters.js"></script>
+</body>
+</html>

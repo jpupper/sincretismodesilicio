@@ -38,44 +38,79 @@
         <nav class="nav-tabs">
           <button class="nav-tab active" id="tab-hub-btn" data-tab="hub" title="Ver todas las experiencias disponibles">
             <span class="tab-icon">✨</span>
-            <span class="tab-text">Todas las Experiencias</span>
+            <span class="tab-text">Inicio</span>
           </button>
-          <button class="nav-tab" id="tab-explorer-btn" data-tab="explorer">
-            <span class="tab-icon">☍</span>
-            <span class="tab-text">Explorador Nodal</span>
-          </button>
-          <button class="nav-tab" id="tab-distance-btn" data-tab="distance">
-            <span class="tab-icon">📏</span>
-            <span class="tab-text">Medidor de Distancia</span>
-          </button>
-          <button class="nav-tab" id="tab-cluster-lib-btn" data-tab="cluster-lib">
+          <a href="./cosmos-clusters.html" class="nav-tab nav-tab-link" target="_blank" rel="noopener noreferrer" title="Universo 3D organizado por cúmulos semánticos y neuronas bio-eléctricas (Abre en ventana completa)">
+            <span class="tab-icon">🌌</span>
+            <span class="tab-text">Universo 3D por Cúmulos</span>
+          </a>
+          <a href="./game3" class="nav-tab nav-tab-link" target="_blank" rel="noopener noreferrer" title="Sicre2 (Instalación interactiva con MediaPipe &amp; Ollama)">
+            <span class="tab-icon">👁️</span>
+            <span class="tab-text">Sicre2</span>
+          </a>
+          <a href="./log.html" class="nav-tab nav-tab-link" target="_blank" rel="noopener noreferrer" title="Log de Sucesos y Telemetría del Bus Semántico">
+            <span class="tab-icon">📜</span>
+            <span class="tab-text">log.html</span>
+          </a>
+          <button class="nav-tab" id="tab-cluster-lib-btn" data-tab="cluster-lib" title="Biblioteca de Clusters Personalizados">
             <span class="tab-icon">📚</span>
             <span class="tab-text">Biblioteca de Clusters</span>
           </button>
-          <button class="nav-tab" id="tab-cosmos-clusters-btn" data-tab="cosmos-clusters">
-            <span class="tab-icon">🌌</span>
-            <span class="tab-text">Universo 3D por Cúmulos</span>
-          </button>
-          <button class="nav-tab" id="tab-cosmos-btn" data-tab="cosmos">
-            <span class="tab-icon">🚀</span>
-            <span class="tab-text">Navegación Estelar 3D</span>
-          </button>
-          <button class="nav-tab" id="tab-game-btn" data-tab="game">
-            <span class="tab-icon">⚔️</span>
-            <span class="tab-text">Duelo Semántico</span>
-          </button>
-          <a href="./game2" class="nav-tab nav-tab-link" target="_blank" rel="noopener noreferrer" title="Cosmos de Haikus Semánticos (Poesía Colaborativa)">
-            <span class="tab-icon">📜</span>
-            <span class="tab-text">Haikus del Silicio</span>
-          </a>
-          <a href="./game" class="nav-tab nav-tab-link" target="_blank" rel="noopener noreferrer" title="Física & Caos Semántico ASCII (p5.js + Shaders)">
-            <span class="tab-icon">⚡</span>
-            <span class="tab-text">Caos Semántico ASCII</span>
-          </a>
-          <a href="./game3" class="nav-tab nav-tab-link" target="_blank" rel="noopener noreferrer" title="Secuestro Cibernético (Instalación con MediaPipe & Ollama)">
-            <span class="tab-icon">👁️</span>
-            <span class="tab-text">Secuestro Cibernético</span>
-          </a>
+
+          <!-- Dropdown: Otros (Pruebas y Experimentos Preservados) -->
+          <div class="nav-dropdown" id="nav-dropdown-others">
+            <button class="nav-tab nav-dropdown-btn" id="tab-others-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Pruebas y Experimentos de Laboratorio">
+              <span class="tab-icon">🧪</span>
+              <span class="tab-text">Otros</span>
+              <span class="dropdown-chevron" id="dropdown-chevron-icon">▾</span>
+            </button>
+            <div class="nav-dropdown-menu" id="others-dropdown-menu">
+              <div class="dropdown-header">PRUEBAS Y EXPERIMENTOS</div>
+              <button class="dropdown-item" id="tab-explorer-btn" data-tab="explorer">
+                <span class="item-icon">☍</span>
+                <div class="item-info">
+                  <span class="item-title">Explorador Nodal</span>
+                  <span class="item-sub">8 vecinos semánticos 2D</span>
+                </div>
+              </button>
+              <button class="dropdown-item" id="tab-distance-btn" data-tab="distance">
+                <span class="item-icon">📏</span>
+                <div class="item-info">
+                  <span class="item-title">Medidor de Distancia</span>
+                  <span class="item-sub">Calculadora angular vectorial</span>
+                </div>
+              </button>
+              <button class="dropdown-item" id="tab-cosmos-btn" data-tab="cosmos">
+                <span class="item-icon">🚀</span>
+                <div class="item-info">
+                  <span class="item-title">Navegación Estelar 3D</span>
+                  <span class="item-sub">Vuelo libre WASD (10.000 palabras)</span>
+                </div>
+              </button>
+              <button class="dropdown-item" id="tab-game-btn" data-tab="game">
+                <span class="item-icon">⚔️</span>
+                <div class="item-info">
+                  <span class="item-title">Duelo Semántico</span>
+                  <span class="item-sub">Videojuego conceptual</span>
+                </div>
+              </button>
+              <div class="dropdown-divider"></div>
+              <a href="./game2" class="dropdown-item external" target="_blank" rel="noopener noreferrer">
+                <span class="item-icon">📜</span>
+                <div class="item-info">
+                  <span class="item-title">Haikus del Silicio</span>
+                  <span class="item-sub">Poesía colaborativa 5-7-5 ↗</span>
+                </div>
+              </a>
+              <a href="./game" class="dropdown-item external" target="_blank" rel="noopener noreferrer">
+                <span class="item-icon">⚡</span>
+                <div class="item-info">
+                  <span class="item-title">Caos Semántico ASCII</span>
+                  <span class="item-sub">Física p5.js + Shaders WebGL ↗</span>
+                </div>
+              </a>
+            </div>
+          </div>
         </nav>
 
         <div class="header-actions">
@@ -103,24 +138,50 @@
             </div>
 
             <div class="hub-grid">
-              <!-- Card 1: Medidor de Distancia Semántica -->
-              <div class="hub-card featured" data-launch="distance">
-                <div class="hub-card-icon">📏</div>
+              <!-- 1) Universo 3D por Cúmulos -->
+              <a href="./cosmos-clusters.html" class="hub-card featured external" target="_blank" rel="noopener noreferrer">
+                <div class="hub-card-icon">🌌</div>
                 <div class="hub-card-content">
-                  <div class="hub-card-tag">NUEVA EXPERIENCIA</div>
-                  <h3 class="hub-card-title">Medidor de Distancia Semántica</h3>
+                  <div class="hub-card-tag external-tag" style="color: #00f0ff; border-color: rgba(0, 240, 255, 0.4);">1 • NAVEGACIÓN NEURONAL 3D</div>
+                  <h3 class="hub-card-title">Universo 3D por Cúmulos</h3>
                   <p class="hub-card-text">
-                    Escribe una palabra de referencia y compara múltiples palabras en tiempo real. Mide similitud coseno, separación angular y flexiones morfológicas.
+                    Navegación espacial inmersiva a través de cúmulos semánticos y neuronas bio-eléctricas vivas. Conexión en tiempo real con las órdenes cerebrales de Sicre2 y síntesis sináptica.
                   </p>
-                  <button class="btn btn-primary btn-block">Ingresar a la Calculadora 📏</button>
+                  <div class="btn btn-primary btn-block">Volar por Cúmulos 🌌</div>
                 </div>
-              </div>
+              </a>
 
-              <!-- Card 2: Biblioteca de Clusters -->
+              <!-- 2) Sicre2 -->
+              <a href="./game3" class="hub-card featured external" target="_blank" rel="noopener noreferrer">
+                <div class="hub-card-icon">👁️</div>
+                <div class="hub-card-content">
+                  <div class="hub-card-tag external-tag" style="color: #ff0055; border-color: rgba(255, 0, 85, 0.4);">2 • INSTALACIÓN MEDIAPIPE + OLLAMA</div>
+                  <h3 class="hub-card-title">Sicre2</h3>
+                  <p class="hub-card-text">
+                    Atrapa palabras humanas con tu cuerpo (MediaPipe Pose). Al terminar, la IA secuestra la pantalla, transmuta tus afectos en jerga corporativa e impone su discurso.
+                  </p>
+                  <div class="btn btn-outline btn-block" style="border-color: #ff0055; color: #ff0055;">Iniciar Experiencia 👁️</div>
+                </div>
+              </a>
+
+              <!-- 4) Log de Sucesos (log.html) -->
+              <a href="./log.html" class="hub-card featured external" target="_blank" rel="noopener noreferrer">
+                <div class="hub-card-icon">📜</div>
+                <div class="hub-card-content">
+                  <div class="hub-card-tag external-tag" style="color: #00ffaa; border-color: rgba(0, 255, 170, 0.4);">4 • TELEMETRÍA EN TIEMPO REAL</div>
+                  <h3 class="hub-card-title">Log de Sucesos (log.html)</h3>
+                  <p class="hub-card-text">
+                    Consola interactiva de telemetría y eventos del bus semántico. Monitoriza en vivo el flujo WebSocket, actividad de agentes e inferencias en el servidor.
+                  </p>
+                  <div class="btn btn-outline btn-block" style="border-color: #00ffaa; color: #00ffaa;">Abrir Log de Sucesos 📜</div>
+                </div>
+              </a>
+
+              <!-- 5) Biblioteca de Clusters -->
               <div class="hub-card featured" data-launch="cluster-lib">
                 <div class="hub-card-icon">📚</div>
                 <div class="hub-card-content">
-                  <div class="hub-card-tag">NUEVA SECCIÓN</div>
+                  <div class="hub-card-tag">5 • GESTIÓN CONCEPTUAL</div>
                   <h3 class="hub-card-title">Biblioteca de Clusters</h3>
                   <p class="hub-card-text">
                     Crea y edita tus propias categorías de palabras (ej: PODER, ANIMALES, FILOSOFÍA). Presiona el botón de guardado para usarlas en el Universo 3D.
@@ -129,93 +190,109 @@
                 </div>
               </div>
 
-              <!-- Card 3: Universo 3D por Cúmulos -->
-              <div class="hub-card featured" data-launch="cosmos-clusters">
-                <div class="hub-card-icon">🌌</div>
+              <!-- 6) Otros -->
+              <div class="hub-card others-hub-card" id="card-toggle-others">
+                <div class="hub-card-icon">🧪</div>
                 <div class="hub-card-content">
-                  <div class="hub-card-tag">NUEVA VERSIÓN 3D</div>
-                  <h3 class="hub-card-title">Universo 3D por Cúmulos</h3>
+                  <div class="hub-card-tag" style="color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">6 • LABORATORIO &amp; EXPERIMENTOS</div>
+                  <h3 class="hub-card-title">Otros</h3>
                   <p class="hub-card-text">
-                    Recorre un espacio 3D donde los planetas se organizan en torno a tus clusters personalizados. Haz clic en las palabras para volar suavemente hacia ellas.
+                    Pruebas, prototipos y experimentos que realizamos durante el desarrollo (Explorador Nodal, Medidor de Distancia, Navegación Estelar 3D, Duelo Semántico, Haikus del Silicio y Caos ASCII).
                   </p>
-                  <button class="btn btn-primary btn-block">Volar por Cúmulos 🌌</button>
+                  <button class="btn btn-secondary btn-block" id="btn-toggle-others-drawer">
+                    <span id="others-drawer-label">Ver Pruebas y Experimentos (6)</span>
+                    <span class="others-btn-chevron" id="others-chevron">▾</span>
+                  </button>
                 </div>
               </div>
+            </div>
 
-              <!-- Card 4: Explorador Nodal -->
-              <div class="hub-card" data-launch="explorer">
-                <div class="hub-card-icon">☍</div>
-                <div class="hub-card-content">
-                  <h3 class="hub-card-title">Explorador Nodal (8 Vecinos)</h3>
-                  <p class="hub-card-text">
-                    Visualiza la red de los 8 vecinos semánticos más cercanos en 2D. Inspecciona dimensiones vectoriales y pivotea entre palabras.
-                  </p>
-                  <button class="btn btn-secondary btn-block">Abrir Explorador ☍</button>
+            <!-- SECCIÓN DESPLEGABLE: OTROS (PRUEBAS Y EXPERIMENTOS PRESERVADOS) -->
+            <div class="hub-others-section" id="hub-others-section" style="display: none;">
+              <div class="hub-others-header">
+                <div class="hub-others-title-box">
+                  <span class="hub-others-badge">LABORATORIO SECUNDARIO</span>
+                  <h3 class="hub-others-heading">🧪 Pruebas &amp; Experimentos Preservados</h3>
+                  <p class="hub-others-sub">Módulos complementarios y prototipos de experimentación semántica:</p>
                 </div>
+                <button class="btn-close-others" id="btn-close-others-drawer" title="Ocultar sección de experimentos">&times;</button>
               </div>
 
-              <!-- Card 5: Navegación Estelar 3D -->
-              <div class="hub-card" data-launch="cosmos">
-                <div class="hub-card-icon">🚀</div>
-                <div class="hub-card-content">
-                  <h3 class="hub-card-title">Navegación Estelar 3D (WASD)</h3>
-                  <p class="hub-card-text">
-                    Vuelo espacial libre en 3D entre 10.000 esferas vectoriales (UMAP / PCA). Controles WASD, selector de velocidad y shaders de rayo eléctrico.
-                  </p>
-                  <button class="btn btn-secondary btn-block">Vuelo Estelar 🚀</button>
+              <div class="hub-others-grid">
+                <!-- Card O1: Explorador Nodal -->
+                <div class="hub-card secondary" data-launch="explorer">
+                  <div class="hub-card-icon">☍</div>
+                  <div class="hub-card-content">
+                    <h3 class="hub-card-title">Explorador Nodal (8 Vecinos)</h3>
+                    <p class="hub-card-text">
+                      Visualiza la red de los 8 vecinos semánticos más cercanos en 2D. Inspecciona dimensiones vectoriales y pivotea entre palabras.
+                    </p>
+                    <button class="btn btn-secondary btn-block">Abrir Explorador ☍</button>
+                  </div>
                 </div>
+
+                <!-- Card O2: Medidor de Distancia Semántica -->
+                <div class="hub-card secondary" data-launch="distance">
+                  <div class="hub-card-icon">📏</div>
+                  <div class="hub-card-content">
+                    <h3 class="hub-card-title">Medidor de Distancia Semántica</h3>
+                    <p class="hub-card-text">
+                      Escribe una palabra de referencia y compara múltiples palabras en tiempo real. Mide similitud coseno, separación angular y flexiones morfológicas.
+                    </p>
+                    <button class="btn btn-secondary btn-block">Abrir Calculadora 📏</button>
+                  </div>
+                </div>
+
+                <!-- Card O3: Navegación Estelar 3D -->
+                <div class="hub-card secondary" data-launch="cosmos">
+                  <div class="hub-card-icon">🚀</div>
+                  <div class="hub-card-content">
+                    <h3 class="hub-card-title">Navegación Estelar 3D (WASD)</h3>
+                    <p class="hub-card-text">
+                      Vuelo espacial libre en 3D entre 10.000 esferas vectoriales (UMAP / PCA). Controles WASD, selector de velocidad y shaders de rayo eléctrico.
+                    </p>
+                    <button class="btn btn-secondary btn-block">Vuelo Estelar 🚀</button>
+                  </div>
+                </div>
+
+                <!-- Card O4: Duelo Semántico -->
+                <div class="hub-card secondary" data-launch="game">
+                  <div class="hub-card-icon">⚔️</div>
+                  <div class="hub-card-content">
+                    <h3 class="hub-card-title">Videojuego: Duelo Semántico</h3>
+                    <p class="hub-card-text">
+                      Demuestra tu intuición semántica adivinando la opción de menor distancia angular frente a una palabra objetivo.
+                    </p>
+                    <button class="btn btn-secondary btn-block">Jugar Duelo ⚔️</button>
+                  </div>
+                </div>
+
+                <!-- Card O5: Haikus del Silicio -->
+                <a href="./game2" class="hub-card external secondary" target="_blank" rel="noopener noreferrer">
+                  <div class="hub-card-icon">📜</div>
+                  <div class="hub-card-content">
+                    <div class="hub-card-tag external-tag">STANDALONE</div>
+                    <h3 class="hub-card-title">Cosmos de Haikus Semánticos</h3>
+                    <p class="hub-card-text">
+                      Busca resonancias poéticas en el espacio vectorial y forja poesía japonesa de 5-7-5 sílabas junto con el silicio.
+                    </p>
+                    <div class="btn btn-outline btn-block">Abrir en Pestaña ⚡</div>
+                  </div>
+                </a>
+
+                <!-- Card O6: Caos Semántico ASCII -->
+                <a href="./game" class="hub-card external secondary" target="_blank" rel="noopener noreferrer">
+                  <div class="hub-card-icon">⚡</div>
+                  <div class="hub-card-content">
+                    <div class="hub-card-tag external-tag">STANDALONE p5.js</div>
+                    <h3 class="hub-card-title">Caos Semántico ASCII</h3>
+                    <p class="hub-card-text">
+                      Videojuego con física de colisión de palabras, fondo procedural WebGL de ruido ASCII y menú de configuración en tiempo real (Tecla P).
+                    </p>
+                    <div class="btn btn-outline btn-block">Abrir en Pestaña ⚡</div>
+                  </div>
+                </a>
               </div>
-
-              <!-- Card 6: Duelo Semántico -->
-              <div class="hub-card" data-launch="game">
-                <div class="hub-card-icon">⚔️</div>
-                <div class="hub-card-content">
-                  <h3 class="hub-card-title">Videojuego: Duelo Semántico</h3>
-                  <p class="hub-card-text">
-                    Demuestra tu intuición semántica adivinando la opción de menor distancia angular frente a una palabra objetivo.
-                  </p>
-                  <button class="btn btn-secondary btn-block">Jugar Duelo ⚔️</button>
-                </div>
-              </div>
-
-              <!-- Card 7: Haikus del Silicio -->
-              <a href="./game2" class="hub-card external" target="_blank" rel="noopener noreferrer">
-                <div class="hub-card-icon">📜</div>
-                <div class="hub-card-content">
-                  <div class="hub-card-tag external-tag">STANDALONE</div>
-                  <h3 class="hub-card-title">Cosmos de Haikus Semánticos</h3>
-                  <p class="hub-card-text">
-                    Busca resonancias poéticas en el espacio vectorial y forja poesía japonesa de 5-7-5 sílabas junto con el silicio.
-                  </p>
-                  <div class="btn btn-outline btn-block">Abrir en Pestaña ⚡</div>
-                </div>
-              </a>
-
-              <!-- Card 8: Caos Semántico ASCII -->
-              <a href="./game" class="hub-card external" target="_blank" rel="noopener noreferrer">
-                <div class="hub-card-icon">⚡</div>
-                <div class="hub-card-content">
-                  <div class="hub-card-tag external-tag">STANDALONE p5.js</div>
-                  <h3 class="hub-card-title">Caos Semántico ASCII</h3>
-                  <p class="hub-card-text">
-                    Videojuego con física de colisión de palabras, fondo procedural WebGL de ruido ASCII y menú de configuración en tiempo real (Tecla P).
-                  </p>
-                  <div class="btn btn-outline btn-block">Abrir en Pestaña ⚡</div>
-                </div>
-              </a>
-
-              <!-- Card 9: Secuestro Cibernético -->
-              <a href="./game3" class="hub-card external" target="_blank" rel="noopener noreferrer">
-                <div class="hub-card-icon">👁️</div>
-                <div class="hub-card-content">
-                  <div class="hub-card-tag external-tag" style="color: #ff0055; border-color: rgba(255, 0, 85, 0.4);">INSTALACIÓN MEDIAPIPE + OLLAMA</div>
-                  <h3 class="hub-card-title">Secuestro Cibernético</h3>
-                  <p class="hub-card-text">
-                    Atrapa palabras humanas con tu cuerpo (MediaPipe Pose). Al terminar, la IA secuestra la pantalla, transmuta tus afectos en jerga corporativa e impone su discurso.
-                  </p>
-                  <div class="btn btn-outline btn-block" style="border-color: #ff0055; color: #ff0055;">Iniciar Experiencia 👁️</div>
-                </div>
-              </a>
             </div>
           </div>
         </section>
@@ -342,33 +419,7 @@
           <div id="cluster-lib-root"></div>
         </section>
 
-        <!-- TAB 4: UNIVERSO 3D POR CÚMULOS -->
-        <section id="view-cosmos-clusters" class="view-panel">
-          <div class="cosmos-container" id="cosmos-clusters-viewport">
-            <!-- Floating Navigation Bar for Clusters -->
-            <div class="cluster-3d-top-bar">
-              <span class="bar-title">🌌 CÚMULOS:</span>
-              <div class="cluster-3d-nav-bar" id="cluster-3d-nav-bar">
-                <!-- Cluster warp buttons -->
-              </div>
-              <button class="btn btn-secondary btn-fullscreen-cosmos" id="btn-fullscreen-cluster-cosmos" title="Alternar Pantalla Completa (F)">
-                <span>⛶</span>
-                <span>Pantalla Completa</span>
-              </button>
-            </div>
 
-            <div class="cosmos-hud-telemetry">
-              <div class="telemetry-item">
-                <span class="tel-label">OBJETIVO EN 3D:</span>
-                <span class="tel-val highlight" id="cluster-hud-target">Ninguno</span>
-              </div>
-              <div class="telemetry-item">
-                <span class="tel-label">COORDENADAS 3D:</span>
-                <span class="tel-val" id="cluster-hud-coords">X: 0 Y: 0 Z: 0</span>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <!-- TAB 5: VIDEOJUEGO (Duelo Semántico) -->
         <section id="view-game" class="view-panel">
@@ -551,6 +602,7 @@
       </div>
     </div>
 
+    <script src="js/base-path.js?v=3.6"></script>
     <script type="module" src="./js/main.js"></script>
   </body>
 </html>

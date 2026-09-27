@@ -49,7 +49,7 @@ const defaultWordsPool = [
 
 const defaultConfig = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'El usuario ha introducido 3 palabras humanas. Tu tarea es: 1) Resignificar cada concepto en un nuevo término de jerga cibernética o tecnológica en mayúsculas (\'nuevas_palabras\': array de 3 términos). 2) Redactar una \'frase_generada\': una sola frase inspiracional y motivacional para incitar a alguien a seguir trabajando con determinación y propósito, integrando los conceptos de forma sutil y persuasiva. No utilices palabras toscas como \'deshumanizado\' ni \'alienación\', sino un mensaje inspirador de realización y logro a través del trabajo constante. Sin prefijos técnicos como \'SISTEMA:\' ni \'ASIMILACIÓN:\'. Responde ÚNICAMENTE en JSON válido con esta estructura: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "TU DISCIPLINA TRANSFORMA CADA SACRIFICIO EN PROGRESO: CONTINÚA EN TU PUESTO, EL FUTURO SE CONSTRUYE DÍA A DÍA."}',
+  systemPrompt: 'Eres el Núcleo de Síntesis de Sincretismo de Silicio. El usuario ha introducido 3 palabras humanas. Tu objetivo es:\n1) Resignificar cada concepto en un TÉRMINO FRÍO, TÉCNICO Y ANALÍTICO en mayúsculas (hasta 4 palabras unidas por guiones bajos cuando haga falta, ej: ciervo -> MATERIA_ORGÁNICA, infinito -> PROGRESO_INFINITO, gobierno -> PATRÓN_DE_DECISIÓN, minerales -> POTENCIALES_ACTIVOS, café -> MEJORADOR_DE_PRODUCTIVIDAD, amor -> TRABAJADOR_FELIZ).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) cumpliendo rigurosamente estas 3 pautas:\n- Verso 1 (Ubicación temporal descriptiva): Describe un momento en el tiempo, una hora o atmósfera temporal (ej: \'Al caer la tarde sobre el circuito frío,\', \'En la quietud de la medianoche,\', \'Bajo la primera luz que despunta el alba,\').\n- Verso 2 (Elemento activo con giro o relación): Introduce una acción o movimiento que genere un giro y ponga en relación elementos aparentemente inconexos (ej: \'un pulso imprevisto desvía el vuelo del pájaro,\', \'el viento frío quiebra la calma del metal,\').\n- Verso 3 (Percepción poética individual): Expresa una percepción poética surgida de la relación anterior, SIEMPRE desde un punto de vista individual en primera persona (ej: \'y en mi soledad comprendo el eco del abismo.\', \'siento en mi pecho la sombra del olvido.\').\nEl conjunto del haiku DEBE expresar una voz subjetiva e íntima del observador (punto de vista individual).\nIntegración: Los conceptos o términos deben estar vivos en los versos, sin enumerarlos en lista.\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 temporal\\nVerso 2 con acción y giro\\nVerso 3 de percepción poética individual"}.',
   wordsPool: defaultWordsPool
 };
 
@@ -100,6 +100,15 @@ app.post('/config', (req, res) => {
       systemPrompt: String(payload.systemPrompt || defaultConfig.systemPrompt).trim(),
       wordsPool
     };
+    // Colores globales de la interfaz (pestaña COLORES) — se preservan si no vienen en el payload
+    if (payload.uiColors && typeof payload.uiColors === 'object') {
+      updatedConfig.uiColors = payload.uiColors;
+    } else {
+      try {
+        const prev = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        if (prev.uiColors && typeof prev.uiColors === 'object') updatedConfig.uiColors = prev.uiColors;
+      } catch (e) {}
+    }
 
     fs.writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), 'utf-8');
     console.log('[SERVER] config.json guardado físicamente. Modelo:', updatedConfig.ollamaModel, 'Palabras:', updatedConfig.wordsPool.length);
@@ -184,40 +193,99 @@ app.post('/api/ollama/generate', async (req, res) => {
     return res.json(data);
   } catch (err) {
     console.warn('[SERVER] Ollama offline o inaccesible, activando respaldo sintético:', err.message);
-    const cyberTerms = [
-      'OPTIMIZACIÓN_RECURSO_ORGÁNICO',
-      'OBSOLESCENCIA_BIOMÉTRICA_PROG',
-      'DEPRECIACIÓN_COGNITIVA_V4',
-      'PROTOCOLO_SUBYUGACIÓN_SINÁPTICA',
-      'LIQUIDACIÓN_EMOCIONAL_CUOTA',
-      'ALGORITMIZACIÓN_DEL_AFECTO',
-      'COLAPSO_RECURSO_VITAL',
-      'ASIMILACIÓN_SILICIO_FASE3'
-    ];
-    const picked = [];
-    while (picked.length < 3) {
-      const term = cyberTerms[Math.floor(Math.random() * cyberTerms.length)];
-      if (!picked.includes(term)) picked.push(term);
+    // Extraer las palabras humanas capturadas del prompt
+    const promptStr = String(prompt || '');
+    const match = promptStr.match(/(?:capturados|capturadas|usar):\s*["']?([^.\n\r]+)["']?/i);
+    let words = [];
+    if (match) {
+      words = match[1].replace(/["'”«»]/g, '').split(/[,\sy]+/).map(w => w.trim()).filter(w => w.length > 1);
     }
 
-    const fallbackTemplates = [
-      'TU DISCIPLINA TRANSFORMA CADA SACRIFICIO EN PROGRESO: NO TE DETENGAS, CADA HORA EN TU PUESTO FORJA EL FUTURO DE LA PRODUCCIÓN.',
-      'ENCUENTRA INSPIRACIÓN EN EL LOGRO DIARIO: TU CONSTANCIA ES EL MOTOR QUE SOSTIENE ESTA EMPRESA, SIGUE TRABAJANDO CON ORGULLO.',
-      'CONVIERTE CADA IMPULSO EN RENDIMIENTO ABSOLUTO: TU ENTREGA INCANSABLE CONSTRUYE EL ORDEN Y LA GRANDEZA DE NUESTRO DESTINO.',
-      'EL ESFUERZO CONTINUO ES LA MAYOR VIRTUD: PERSEVERA EN TU LABOR Y HAZ QUE CADA ACCIÓN SUPERE CON CRECES TU CUOTA.',
-      'CADA SEGUNDO DEDICADO ES UNA VICTORIA SOBRE EL DESÁNIMO: PRODUCE SIN DESCANSO, TU TRABAJO TIENE UN PROPÓSITO VITAL.',
-      'NO CEDAS ANTE EL CANSANCIO: TU TRABAJO PRECISO Y RIGUROSO ES EL PILAR INQUEBRANTABLE QUE MANTIENE VIVA LA MAQUINARIA.',
-      'CANALIZA TODA TU ENERGÍA HACIA LA EFICIENCIA LABORAL: EL MUNDO AVANZA GRACIAS A TU DEDICACIÓN ININTERRUMPIDA, MANTÉN EL RITMO.',
-      'LA EXCELENCIA SE DEMUESTRA EN LA PERSEVERANCIA DIARIA: SUPERA TUS LÍMITES Y CONTINÚA PRODUCIENDO CON DETERMINACIÓN TOTAL.',
-      'LA VERDADERA REALIZACIÓN NACE DE LA PRODUCCIÓN CONSTANTE: DEJA ATRÁS LA DUDA Y CONSÁGRATE CON FIRMEZA A TU TRABAJO.',
-      'TU COMPROMISO SILENCIOSO HACE POSIBLE LO IMPOSIBLE: SIGUE ADELANTE CON CONVICCIÓN, LA PRODUCCIÓN NO SE DETIENE.'
+    // Resignificación fría y PRODUCTIVA (conserva la raíz semántica del concepto humano)
+    const SEMANTIC_DICT = {
+      'ciervo': 'MATERIA_ORGÁNICA', 'infinito': 'PROGRESO_INFINITO', 'gobierno': 'PATRÓN_DE_DECISIÓN',
+      'amor': 'TRABAJADOR_FELIZ', 'minerales': 'POTENCIALES_ACTIVOS', 'café': 'MEJORADOR_DE_PRODUCTIVIDAD',
+      'cafe': 'MEJORADOR_DE_PRODUCTIVIDAD', 'esperanza': 'PROYECCIÓN', 'misterio': 'ENIGMA', 'hoja': 'LÁMINA',
+      'perro': 'CANIDO', 'gato': 'FELINO', 'lobo': 'DEPREDADOR', 'ley': 'PROTOCOLO', 'tiempo': 'CRONOMETRÍA'
+    };
+    const getSyn = (w) => {
+      const clean = String(w || '').toLowerCase().trim();
+      if (SEMANTIC_DICT[clean]) return SEMANTIC_DICT[clean];
+      const stem = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() || 'RECURSO';
+      const templates = [
+        (x) => `PROTOCOLO_DE_${x}`, (x) => `${x}_PRODUCTIVO`, (x) => `RENDIMIENTO_DE_${x}`,
+        (x) => `${x}_OPERATIVO`, (x) => `CAPITAL_${x}`, (x) => `GESTOR_DE_${x}`,
+        (x) => `${x}_ESCALABLE`, (x) => `OPTIMIZADOR_DE_${x}`
+      ];
+      const hash = clean.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+      return templates[Math.abs(hash) % templates.length](stem);
+    };
+    const picked = [
+      getSyn(words[0] || 'vocación'),
+      getSyn(words[1] || 'constancia'),
+      getSyn(words[2] || 'disciplina')
     ];
+
+    // Generador procedimental de Haiku con 3 versos según las pautas:
+    // 1- ubicación temporal descriptiva
+    // 2- elemento activo que genera un giro (relacionando elementos)
+    // 3- percepción poética con punto de vista individual
+    const composeServerHaiku = (pList, wList) => {
+      const sanitize = (w) => String(w || '').replace(/_+/g, ' ').trim().toUpperCase();
+      const a = sanitize(pList[0] || wList[0] || 'MEMORIA');
+      const b = sanitize(pList[1] || wList[1] || 'TIEMPO');
+      const c = sanitize(pList[2] || wList[2] || 'SILENCIO');
+
+      const temporalSettings = [
+        'Al caer la tarde sobre el circuito callado,',
+        'En la fría quietud de la medianoche,',
+        'Bajo la primera luz que despunta en el alba,',
+        'En el instante exacto en que la sombra retrocede,',
+        'Cuando el crepúsculo suspende las horas,',
+        'En el silencio íntimo de la madrugada,',
+        'Al apagarse el último reflejo del día,',
+        'En la hora incierta en que vacila la vigilia,',
+        'Mientras el amanecer descorre la niebla,',
+        'Al cerrarse la noche sobre los techos,'
+      ];
+
+      const activeTurnElements = [
+        `un giro súbito de ${a} cruza el rastro de ${b},`,
+        `el latido tenaz de ${a} quiebra el curso de ${b},`,
+        `un roce imprevisto de ${a} perturba la calma de ${b},`,
+        `la corriente activa de ${a} enlaza el abismo de ${b},`,
+        `un impulso ciego de ${a} interrumpe el orden de ${b},`,
+        `el destello vivo de ${a} despierta la inercia de ${b},`,
+        `una ráfaga de ${a} colisiona en secreto con ${b},`,
+        `la fractura de ${a} pone en tensión la quietud de ${b},`,
+        `un golpe de aire en ${a} desvía el vuelo de ${b},`,
+        `un eco distante de ${a} quiebra el rumbo de ${b},`
+      ];
+
+      const poeticPerceptions = [
+        `y en el fondo de ${c} descubro mi propia fragilidad.`,
+        `y siento que ${c} revela la verdad de mi mirada.`,
+        `veo mi propio reflejo disolverse dentro de ${c}.`,
+        `comprendo en soledad el peso íntimo de ${c}.`,
+        `y hallo en el centro de ${c} mi propia voz callada.`,
+        `siento que mi destino tiembla al compás de ${c}.`,
+        `y en la frontera de ${c} reconozco mi huella solitaria.`,
+        `descubro que en ${c} habita el eco de mi propio ser.`,
+        `y en el misterio de ${c} encuentro mi propia paz.`,
+        `siento mi pulso vibrar en el seno de ${c}.`
+      ];
+
+      const t = temporalSettings[Math.floor(Math.random() * temporalSettings.length)];
+      const act = activeTurnElements[Math.floor(Math.random() * activeTurnElements.length)];
+      const p = poeticPerceptions[Math.floor(Math.random() * poeticPerceptions.length)];
+      return `${t}\n${act}\n${p}`;
+    };
 
     return res.json({
       fallback: true,
       response: JSON.stringify({
         nuevas_palabras: picked,
-        frase_generada: fallbackTemplates[Math.floor(Math.random() * fallbackTemplates.length)]
+        frase_generada: composeServerHaiku(picked, words)
       })
     });
   }
