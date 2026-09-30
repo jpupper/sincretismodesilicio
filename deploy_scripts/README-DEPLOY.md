@@ -99,6 +99,6 @@ Aplicar con `nginx -t && systemctl reload nginx`.
 | URL | Estado |
 |---|---|
 | https://vps-4455523-x.dattaweb.com/ | app completa (slot raíz, puerto 3000) |
-| https://vps-4455523-x.dattaweb.com/game3/ | instalación "Secuestro Cibernético" |
+| https://vps-4455523-x.dattaweb.com/cambiapalabras.html | instalación "CambiaPalabras" (ex game3; /game3 redirige 301) |
 | https://vps-4455523-x.dattaweb.com/sincretismo/ | **requiere el location de nginx** |
 | https://fullscreencode.com/sincretismodesilicio/ | copia estática en FTP |

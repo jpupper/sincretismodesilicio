@@ -2,11 +2,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Redirigiendo a Sicre2...</title>
-  <script src="js/base-path.js?v=3.6"></script>
+  <title>Redirigiendo a CambiaPalabras...</title>
+  <script src="js/base-path.js?v=3.10"></script>
   <script>
+    // game3 pasó a llamarse cambiapalabras.html: este archivo sólo redirige.
     (function () {
-      var target = (typeof window.sbUrl === 'function' ? window.sbUrl('/game3/') : '/game3/');
+      var target = (typeof window.sbUrl === 'function' ? window.sbUrl('/cambiapalabras.html') : '/cambiapalabras.html');
       var meta = document.createElement('meta');
       meta.httpEquiv = 'refresh';
       meta.content = '0; url=' + target;
@@ -16,12 +17,6 @@
   </script>
 </head>
 <body style="background:#05070a;color:#00f0ff;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;">
-  <p>&gt; INICIANDO NODO DE SICRE2... <a id="go" href="/game3/" style="color:#00ff66;">CLICK SI NO REDIRIGE AUTOMÁTICAMENTE</a></p>
-  <script>
-    (function () {
-      var a = document.getElementById('go');
-      if (a && typeof window.sbUrl === 'function') a.setAttribute('href', window.sbUrl('/game3/'));
-    })();
-  </script>
+  <p>&gt; INICIANDO NODO CAMBIAPALABRAS... <a id="go" href="/cambiapalabras.html" style="color:#00ff66;">CLICK SI NO REDIRIGE AUTOMÁTICAMENTE</a></p>
 </body>
 </html>

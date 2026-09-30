@@ -41,6 +41,6 @@ rm -f "$TAR"
 
 echo "[deploy] Verificando..."
 curl -sk -o /dev/null -w "  /          -> %{http_code}\n" "https://vps-4455523-x.dattaweb.com/"
-curl -sk -o /dev/null -w "  /game3/    -> %{http_code}\n" "https://vps-4455523-x.dattaweb.com/game3/"
+curl -sk -o /dev/null -w "  /cambiapalabras.html -> %{http_code}\n" "https://vps-4455523-x.dattaweb.com/cambiapalabras.html"
 curl -sk -o /dev/null -w "  /config    -> %{http_code}\n" "https://vps-4455523-x.dattaweb.com/config"
 echo "[deploy] Listo."

@@ -3,26 +3,79 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sincretismo de Silicio - Sicre2</title>
+  <title>Sincretismo de Silicio - CambiaPalabras</title>
   <meta name="description" content="Instalación interactiva: captura palabras humanas con tu cuerpo antes de que el núcleo corporativo secuestre el sistema.">
-  <script src="js/base-path.js?v=3.8"></script>
-  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <!-- Los assets viven en ./cambiapalabras/ y son RELATIVOS a esta página: funciona
+       en la raíz (/cambiapalabras.html), en subpath (/sincretismo/cambiapalabras.html)
+       y en el hosting estático del FTP, sin <base> ni recompilar nada. -->
+  <script src="js/base-path.js?v=3.12"></script>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=3.8">
+  <link rel="stylesheet" href="style.css?v=3.12">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+  <!-- JPShaderEditor Include (Engine embebible de Nodos y Shaders de Galería) -->
+  <script>
+    (function () {
+      var base = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+        ? location.origin + '/jpshadereditor'
+        : 'https://vps-4455523-x.dattaweb.com/jpshadereditor';
+
+      function loadScript(url, next) {
+        var s = document.createElement('script');
+        s.src = url;
+        s.async = false;
+        s.onload = next;
+        s.onerror = function () {
+          if (!url.startsWith('https://vps-4455523-x')) {
+            var vpsUrl = 'https://vps-4455523-x.dattaweb.com/jpshadereditor' + url.replace(/^.*?\/jpshadereditor/, '');
+            var fb = document.createElement('script');
+            fb.src = vpsUrl;
+            fb.async = false;
+            fb.onload = next;
+            fb.onerror = next;
+            document.head.appendChild(fb);
+          } else {
+            next();
+          }
+        };
+        document.head.appendChild(s);
+      }
+
+      // Pre-cargar en orden secuencial las dependencias para que WebGLRenderer esté 100% instanciado
+      loadScript(base + '/js/lib/jp-pointers.js', function () {
+        loadScript(base + '/js/lib/socket.js', function () {
+          loadScript(base + '/js/lib/jp-node-graph.js', function () {
+            loadScript(base + '/js/shadereditor/webglrenderer.js', function () {
+              var s = document.createElement('script');
+              s.src = base + '/include.js';
+              s.dataset.base = base;
+              s.dataset.panel = '1';
+              s.dataset.keepBg = '1';
+              s.dataset.refresh = '20';
+              document.head.appendChild(s);
+            });
+          });
+        });
+      });
+    })();
+  </script>
 </head>
 <body>
 
   <!-- Contenedor Principal de la Instalación -->
   <div id="installation-container">
+
+    <!-- Capa 1.0: Shader Maestro de Salida (WebGL Canvas) -->
+    <canvas id="master-output-canvas"></canvas>
 
     <!-- Capa 1: Video de la Webcam (Fondo Fullscreen) -->
     <video id="webcam-video" autoplay playsinline muted></video>
@@ -48,8 +101,8 @@
     <div id="cctv-vignette" class="vignette-layer"></div>
     <canvas id="noise-canvas"></canvas>
 
-    <!-- Capa 3: HUD Superior de Cámara de Seguridad & Controles -->
-    <header id="cctv-hud">
+    <!-- Capa 3: HUD Superior de Cámara de Seguridad & Controles (Oculto por defecto, alternable con Tecla M) -->
+    <header id="cctv-hud" class="hud-hidden" title="Presiona la tecla M para alternar este menú">
       <div class="hud-left">
         <div class="cctv-indicator rec-active">
           <span class="blinking-dot"></span>
@@ -65,6 +118,12 @@
           <span class="state-dot"></span>
           <span id="hud-state-text">ESTADO: OBSERVACIÓN (IDLE)</span>
         </div>
+
+        <!-- Indicador LIVE de Ollama (IA Local) -->
+        <div class="hud-ollama-pill checking" id="hud-ollama-pill" title="Estado de conexión con Ollama Local (Click para verificar/reintentar)">
+          <span class="ollama-live-dot"></span>
+          <span class="ollama-live-text" id="hud-ollama-text">OLLAMA: CHEQUEANDO...</span>
+        </div>
       </div>
 
       <div class="hud-right">
@@ -73,6 +132,13 @@
           <span class="btn-icon" id="input-mode-icon">🖱️</span>
           <span id="input-mode-label">TRACK: MOUSE</span>
           <kbd>C</kbd>
+        </button>
+
+        <!-- Botón JPShader Editor Include (Tecla S) -->
+        <button class="cctv-btn" id="btn-open-jpshader" title="Indexar combinación de JPShaderEditor Include (Tecla S)">
+          <span class="btn-icon">🎨</span>
+          <span>JP SHADER</span>
+          <kbd>S</kbd>
         </button>
 
         <!-- Botón Universo 3D por Cúmulos -->
@@ -144,37 +210,8 @@
       <div class="reticle-label" id="reticle-label">LOCK_OFF</div>
     </div>
 
-    <!-- Capa 5: Contenedor Central Inferior de Palabras Atrapadas (3 SLOTS) -->
-    <div id="caught-section">
-      <div class="slots-container" id="slots-container">
-        <!-- Slot 01 -->
-        <div class="slot-box empty" id="slot-0" data-index="0">
-          <div class="slot-header">SLOT_01</div>
-          <div class="slot-content">
-            <span class="placeholder-text">&lt;ESPERANDO ENLACE&gt;</span>
-          </div>
-          <div class="slot-glow"></div>
-        </div>
-
-        <!-- Slot 02 -->
-        <div class="slot-box empty" id="slot-1" data-index="1">
-          <div class="slot-header">SLOT_02</div>
-          <div class="slot-content">
-            <span class="placeholder-text">&lt;ESPERANDO ENLACE&gt;</span>
-          </div>
-          <div class="slot-glow"></div>
-        </div>
-
-        <!-- Slot 03 -->
-        <div class="slot-box empty" id="slot-2" data-index="2">
-          <div class="slot-header">SLOT_03</div>
-          <div class="slot-content">
-            <span class="placeholder-text">&lt;ESPERANDO ENLACE&gt;</span>
-          </div>
-          <div class="slot-glow"></div>
-        </div>
-      </div>
-    </div>
+    <!-- Los slots inferiores se eliminaron: las 3 palabras elegidas se
+         posicionan ARRIBA (izquierda / centro / derecha) sobre el shader. -->
 
     <!-- Capa 6: Escenario Central de Resignificación y Síntesis IA -->
     <div id="mutation-stage" class="mutation-stage hidden">
@@ -191,21 +228,8 @@
         </div>
       </div>
 
-      <!-- Contenedor de las 3 Palabras Centrales en Grande -->
-      <div id="mutation-words-container" class="mutation-words-container">
-        <div class="mutation-word-card" id="mut-card-0">
-          <div class="mutation-word-text" id="mut-text-0"></div>
-
-        </div>
-        <div class="mutation-word-card" id="mut-card-1">
-          <div class="mutation-word-text" id="mut-text-1"></div>
-
-        </div>
-        <div class="mutation-word-card" id="mut-card-2">
-          <div class="mutation-word-text" id="mut-text-2"></div>
-
-        </div>
-      </div>
+      <!-- Las 3 tarjetas del medio se eliminaron: las palabras son el mismo
+           objeto unificado que baja al centro y luego vuela a su lugar en la frase. -->
 
       <!-- Discurso Final de la IA (Aparece abajo tras la resignificación) -->
       <div id="final-speech-box" class="final-speech-box hidden">
@@ -968,13 +992,24 @@
                 <span>✨ MOTOR DE PARTÍCULAS Y PALABRAS ORGÁNICAS</span>
               </div>
               <p class="words-help-text">
-                Controla cada variable de las palabras que flotan en pantalla: tipografía, tamaño, color, contorno, tiempo de vida, cantidad máxima y velocidad.
+                Controla cada variable de las palabras: tipografía, tamaño EN CADA ESTADO (flotando, en el centro girando, y en la frase final), color, contorno, tiempo de vida, cantidad máxima y velocidad.
               </p>
 
               <div class="calibration-grid">
                 <div class="calib-item">
-                  <label for="cfg-part-fontsize">Tamaño de Fuente: <span id="val-part-fontsize">16</span>px</label>
-                  <input type="range" id="cfg-part-fontsize" min="12" max="64" step="1" value="16">
+                  <label for="cfg-part-fontsize"><strong>Tamaño en FLOTACIÓN</strong> (antes de agarrarlas): <span id="val-part-fontsize">16</span>px</label>
+                  <input type="range" id="cfg-part-fontsize" min="12" max="90" step="1" value="16">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-fontsize-center"><strong>Tamaño en el CENTRO</strong> (girando y transformándose): <span id="val-part-fontsize-center">38</span>px</label>
+                  <input type="range" id="cfg-part-fontsize-center" min="12" max="140" step="1" value="38">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-fontsize-phrase"><strong>Tamaño en la FRASE FINAL</strong>: <span id="val-part-fontsize-phrase">26</span>px</label>
+                  <input type="range" id="cfg-part-fontsize-phrase" min="10" max="90" step="1" value="26">
+                  <small class="item-desc">Las palabras auxiliares de la frase se escalan al 86% de este valor.</small>
                 </div>
 
                 <div class="calib-item">
@@ -1120,6 +1155,6 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=3.8"></script>
+  <script src="script.js?v=3.12"></script>
 </body>
 </html>

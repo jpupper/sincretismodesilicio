@@ -179,6 +179,13 @@ html, body {
   border-bottom: 1px solid rgba(0, 240, 255, 0.15);
   font-size: 12px;
   letter-spacing: 1px;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+}
+
+#cctv-hud.hud-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .hud-left {
@@ -277,6 +284,95 @@ html, body {
 #installation-container.state-hijack .state-dot {
   background: var(--accent-green);
   box-shadow: 0 0 8px var(--accent-green);
+}
+
+/* ==========================================================================
+   INDICADOR LIVE DE OLLAMA EN HUD (TECLA M)
+   ========================================================================== */
+.hud-ollama-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: rgba(8, 12, 18, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 4px;
+  color: #a4b8d4;
+  font-family: var(--font-cyber);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.hud-ollama-pill:hover {
+  background: rgba(14, 22, 34, 0.95);
+  border-color: rgba(0, 240, 255, 0.6);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.ollama-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  background: #888;
+  transition: all 0.3s ease;
+}
+
+.hud-ollama-pill.checking .ollama-live-dot {
+  background: #ffd34d;
+  box-shadow: 0 0 8px #ffd34d;
+  animation: pulseOllama 1s infinite alternate;
+}
+
+.hud-ollama-pill.live {
+  background: rgba(0, 40, 30, 0.85);
+  border-color: rgba(0, 255, 204, 0.5);
+  color: #d0fff5;
+}
+
+.hud-ollama-pill.live .ollama-live-dot {
+  background: #00ffcc;
+  box-shadow: 0 0 10px #00ffcc, 0 0 16px rgba(0, 255, 204, 0.6);
+  animation: pulseOllama 2s infinite ease-in-out;
+}
+
+.hud-ollama-pill.offline {
+  background: rgba(45, 12, 15, 0.85);
+  border-color: rgba(255, 68, 68, 0.5);
+  color: #ffb8b8;
+}
+
+.hud-ollama-pill.offline .ollama-live-dot {
+  background: #ff4444;
+  box-shadow: 0 0 8px #ff4444;
+}
+
+@keyframes pulseOllama {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Ocultar el canvas original de JPShaderInclude en el DOM pero mantenerlo
+   100% activo para que WebGL dibuje y el MasterOutputShader lo capture
+   en el uniform sampler2D renderJPSHADER */
+#jpsi-canvas {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: -9999 !important;
+  opacity: 0.001 !important;
+  pointer-events: none !important;
+}
+
+/* El panel secreto / indexador de JPShaderInclude debe estar en el plano superior */
+#jpsi-panel {
+  z-index: 2147483647 !important;
 }
 
 .hud-right {
@@ -390,38 +486,29 @@ html, body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 22px;
-  background: var(--bg-accent-soft);
-  border: 1.5px solid var(--accent-1-mid);
+  /* SIN CONTENEDOR: la palabra es sólo texto flotando sobre el shader maestro.
+     El padding no se ve (fondo transparente) y sólo agranda el área de clic. */
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
   border-radius: 0;
   font-family: var(--word-font-family, var(--font-organic));
   font-size: var(--word-font-size, 19px);
-  font-weight: 500;
-  letter-spacing: 0.5px;
+  font-weight: 600;
+  letter-spacing: 1px;
   color: var(--word-color, #ffffff);
   /* Reborde del texto configurable desde la pestaña PARTÍCULAS */
   -webkit-text-stroke: var(--word-outline, 1px) var(--word-outline-color, rgba(4, 8, 18, 0.85));
   paint-order: stroke fill;
-  text-shadow: var(--word-glow, 0 2px 10px rgba(0, 0, 0, 0.8), 0 0 14px rgba(255, 255, 255, 0.4));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 15px var(--accent-1-soft);
+  text-shadow: var(--word-glow, 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 18px rgba(255, 255, 255, 0.45));
   will-change: transform, opacity;
   pointer-events: auto;
-  overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: color 0.2s ease, filter 0.2s ease, text-shadow 0.2s ease;
 }
 
-/* Relleno progresivo horizontal que llena la cápsula de forma unificada */
+/* Sin cápsula: el relleno progresivo ya no existe (la palabra es texto libre) */
 .word-pill-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 0%;
-  background: var(--bg-accent-strong);
-  border-radius: 0;
-  pointer-events: none;
-  transition: width 0.05s linear;
-  box-shadow: inset 0 0 14px var(--accent-1-mid), 0 0 12px var(--accent-1-strong);
+  display: none !important;
 }
 
 .word-label {
@@ -443,18 +530,137 @@ html, body {
 
 /* Estado de Fijación / Proximidad: Resplandor cyberpunk estático, SIN vibración ni destellos */
 .organic-word-item.targeting {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 25px var(--accent-1-mid), 0 0 50px var(--accent-1-strong);
   color: #ffffff;
-  filter: brightness(1.2) drop-shadow(0 0 14px var(--accent-1-strong));
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
 }
 
-/* Desvanecimiento limpio y suave sin destello blanco ni salto de brillo */
-.organic-word-item.caught-flash {
-  opacity: 0 !important;
-  transform: translate(-50%, -50%) scale(0.65) !important;
-  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+/* ==========================================================================
+   ESTADOS DEL SISTEMA UNIFICADO DE PALABRAS
+   ========================================================================== */
+/* Estado 1: Palabra Atrapada y Alojada en Slot */
+.organic-word-item.word-slotted {
+  position: fixed !important;
+  z-index: 30 !important;
+  padding: 8px 24px !important;
+  font-size: var(--word-font-size, 19px) !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 20px var(--accent-1-strong) !important;
+  color: var(--accent-cyan) !important;
+  letter-spacing: 2px !important;
+  font-family: var(--font-cyber) !important;
   pointer-events: none !important;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease !important;
+}
+
+/* Estado 2: Rotación / Scramble en Escenario Central */
+.organic-word-item.word-scrambling {
+  position: fixed !important;
+  z-index: 32 !important;
+  min-width: 280px !important;
+  max-width: 85vw !important;
+  padding: 14px 36px !important;
+  font-size: var(--word-font-size-center, 38px) !important;
+  font-family: var(--font-cyber) !important;
+  font-weight: 700 !important;
+  letter-spacing: 4px !important;
+  color: var(--accent-cyan) !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.95), 0 0 30px var(--accent-1-strong) !important;
+  pointer-events: none !important;
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease !important;
+}
+
+/* Estado 3: Resignificada / Mutada a Frío IA */
+.organic-word-item.word-transformed {
+  position: fixed !important;
+  z-index: 32 !important;
+  min-width: 280px !important;
+  max-width: 85vw !important;
+  padding: 14px 36px !important;
+  font-size: var(--word-font-size-center, 38px) !important;
+  font-family: var(--font-cyber) !important;
+  font-weight: 800 !important;
+  letter-spacing: 3px !important;
+  color: var(--accent-neon-green) !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.95), 0 0 28px var(--accent-2-strong) !important;
+  pointer-events: none !important;
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease !important;
+}
+
+/* Estado 4: Miembro de la Frase Final Integrada */
+.organic-word-item.word-phrase-member {
+  position: relative !important;
+  display: inline-flex !important;
+  transform: none !important;
+  margin: 3px 6px !important;
+  padding: 4px 14px !important;
+  font-size: var(--word-font-size-phrase, 26px) !important;
+  font-family: var(--font-cyber) !important;
+  font-weight: 800 !important;
+  letter-spacing: 1.5px !important;
+  color: var(--accent-neon-green) !important;
+  border: none !important;
+  background: transparent !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 20px var(--accent-2-strong) !important;
+  box-shadow: none !important;   /* sin halo rectangular: la palabra es texto limpio */
+  text-shadow: 0 0 10px var(--accent-neon-green) !important;
+  pointer-events: none !important;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Estado 5: Palabras Auxiliares de la Frase */
+.organic-word-item.word-auxiliary {
+  position: relative !important;
+  display: inline-flex !important;
+  transform: none !important;
+  margin: 3px 4px !important;
+  padding: 4px 10px !important;
+  font-size: calc(var(--word-font-size-phrase, 26px) * 0.86) !important;
+  font-family: var(--font-cyber) !important;
+  font-weight: 500 !important;
+  letter-spacing: 1px !important;
+  color: #ffffff !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 14px var(--accent-1-mid) !important;
+  opacity: 0;
+  animation: auxGlitchIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none !important;
+}
+
+@keyframes auxGlitchIn {
+  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* SISTEMA UNIFICADO: cuando el slot está ocupado, el texto propio se oculta y
+   el marco queda sólo como anclaje: la palabra que se ve es el objeto unificado
+   (.organic-word-item.word-slotted) que vuela hasta ese centro. */
+.slot-box.filled .slot-content,
+.slot-box.filled .slot-header,
+.slot-box.filled .slot-glow {
+  visibility: hidden !important;
+}
+
+/* Contenedor flexible para frase compuesta */
+.phrase-flow-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 4px;
+  line-height: 1.8;
+  width: 100%;
+  text-align: center;
 }
 
 /* ==========================================================================
@@ -880,17 +1086,18 @@ html, body {
   z-index: 2;
   width: 100%;
   max-width: 960px;
-  background: var(--bg-final);
-  border: 1px solid var(--border-cyan);
-  border-left: 4px solid var(--accent-cyan);
-  box-shadow: 0 0 35px var(--accent-1-mid), 0 15px 40px rgba(0, 0, 0, 0.8);
+  /* Contenedor de la frase ELIMINADO visualmente: sólo anclaje de layout, el
+     texto flota directo sobre el shader maestro. */
+  background: transparent;
+  border: none;
+  box-shadow: none;
   padding: 24px 36px;
   border-radius: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
   opacity: 1;
   transform: translateY(0);
   transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1425,8 +1632,31 @@ textarea:focus {
 }
 
 /* ==========================================================================
-   CANVAS DE SHADER ASCII SOBRE LA CÁMARA
+   CANVAS DE SHADER MAESTRO DE SALIDA & SHADERS SOBRE LA CÁMARA
    ========================================================================== */
+#master-output-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+  display: block;
+}
+
+/* Cuando el SHADER MAESTRO está activo (clase puesta por MasterOutputShader),
+   estas capas pasan a ser ENTRADAS del shader: siguen renderizando en su canvas
+   (el maestro las muestrea como textura) pero dejan de verse como capa.
+   La salida visible queda: #master-output-canvas al fondo y las palabras /
+   partículas / HUD por encima. */
+html.master-output-active #webcam-video,
+html.master-output-active #cutout-camera-canvas,
+html.master-output-active #ascii-camera-canvas,
+html.master-output-active #framediff-camera-canvas,
+html.master-output-active #openpose-overlay-canvas {
+  visibility: hidden !important;
+}
+
 #ascii-camera-canvas {
   position: fixed;
   inset: 0;
@@ -2654,12 +2884,14 @@ textarea {
   font-family: 'Share Tech Mono', 'VT323', 'IBM Plex Mono', monospace !important;
 }
 
-/* Look consola: paddings y brillos reducidos */
+/* Look consola: paddings y brillos reducidos (sin cápsula).
+   OJO: NO fijar font-size acá con !important — mataba los controles de
+   tamaño por estado de la pestaña PARTÍCULAS (--word-font-size*). */
 .organic-word-item {
   padding: 4px 10px !important;
-  font-size: 15px !important;
-  border-width: 1px !important;
-  box-shadow: 0 0 4px var(--accent-1-soft) !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .word-pill-fill {
@@ -2695,8 +2927,9 @@ textarea {
 
 .final-speech-box {
   padding: 16px 28px !important;
-  border-left-width: 1px !important;
-  box-shadow: 0 0 12px var(--accent-1-soft) !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
   backdrop-filter: none !important;
   min-height: 130px;
 }
@@ -2727,8 +2960,9 @@ textarea {
 }
 
 .organic-word-item.targeting {
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.35) !important;
-  filter: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border: none !important;
 }
 
 .word-chip,
@@ -2753,3 +2987,30 @@ textarea {
 }
 
 
+
+/* ==========================================================================
+   FRASE FINAL: huecos y aparición de auxiliares (coreografía unificada)
+   ========================================================================== */
+/* Reserva el lugar de cada palabra transformada con la MISMA métrica que
+   .word-phrase-member, pero invisible: las 3 palabras vuelan hasta acá. */
+.phrase-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 3px 6px;
+  padding: 4px 14px;
+  font-family: var(--font-cyber);
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  /* Debe medir EXACTAMENTE igual que la palabra real que va a ocupar el hueco */
+  font-size: var(--word-font-size-phrase, 26px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Auxiliares ya maquetadas pero todavía invisibles: aparecen cuando las 3
+   palabras transformadas terminaron de llegar a su lugar en la frase. */
+.organic-word-item.word-auxiliary.aux-pending {
+  opacity: 0 !important;
+  animation: none !important;
+}

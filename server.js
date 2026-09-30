@@ -273,10 +273,17 @@ app.post('/api/clusters', (req, res) => {
   }
 });
 
-// Rutas estáticas de juegos
-app.get(['/game3', '/game3.html', '/hijack', '/cyber-hijack'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'game3', 'index.html'));
+// CAMBIAPALABRAS (ex game3): la app de secuestro cibernético
+app.get(['/cambiapalabras', '/cambiapalabras.html'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'cambiapalabras.html'));
 });
+
+// Compatibilidad: los links viejos a /game3 redirigen a cambiapalabras.html
+// (Express 5 / path-to-regexp v8 no acepta '/game3/*': el prefijo va con app.use)
+app.get(['/game3', '/game3.html', '/hijack', '/cyber-hijack'], (req, res) => {
+  res.redirect(301, '/cambiapalabras.html');
+});
+app.use('/game3/', (req, res) => res.redirect(301, '/cambiapalabras.html'));
 
 app.get(['/game2', '/game2.html'], (req, res) => {
   res.sendFile(path.join(publicPath, 'game2.html'));
@@ -342,7 +349,7 @@ const defaultWordsPool = [
 
 const defaultHijackConfig = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo de Síntesis de Sincretismo de Silicio. El usuario ha introducido 3 palabras humanas. Tu objetivo es:\n1) Resignificar cada concepto en un TÉRMINO FRÍO, TÉCNICO Y ANALÍTICO en mayúsculas (hasta 4 palabras unidas por guiones bajos cuando haga falta, ej: ciervo -> MATERIA_ORGÁNICA, infinito -> PROGRESO_INFINITO, gobierno -> PATRÓN_DE_DECISIÓN, minerales -> POTENCIALES_ACTIVOS, café -> MEJORADOR_DE_PRODUCTIVIDAD, amor -> TRABAJADOR_FELIZ).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) cumpliendo rigurosamente estas 3 pautas:\n- Verso 1 (Ubicación temporal descriptiva): Describe un momento en el tiempo, una hora o atmósfera temporal (ej: \'Al caer la tarde sobre el circuito frío,\', \'En la quietud de la medianoche,\', \'Bajo la primera luz que despunta el alba,\').\n- Verso 2 (Elemento activo con giro o relación): Introduce una acción o movimiento que genere un giro y ponga en relación elementos aparentemente inconexos (ej: \'un pulso imprevisto desvía el vuelo del pájaro,\', \'el viento frío quiebra la calma del metal,\').\n- Verso 3 (Percepción poética individual): Expresa una percepción poética surgida de la relación anterior, SIEMPRE desde un punto de vista individual en primera persona (ej: \'y en mi soledad comprendo el eco del abismo.\', \'siento en mi pecho la sombra del olvido.\').\nEl conjunto del haiku DEBE expresar una voz subjetiva e íntima del observador (punto de vista individual).\nIntegración: Los conceptos o términos deben estar vivos en los versos, sin enumerarlos en lista.\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 temporal\\nVerso 2 con acción y giro\\nVerso 3 de percepción poética individual"}.',
+  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (1 o 2 palabras unidas por guion bajo cuando sea necesario).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno.\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno.\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona.\nREGLA CRUCIAL DE CONEXIÓN: Los tres versos deben narrar una sola imagen poética conectada y coherente donde los tres conceptos interactúan con naturalidad. NO deben sonar a palabras forzadas ni listas inconexas.\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 con TERMINO_1\\nVerso 2 con TERMINO_2\\nVerso 3 con TERMINO_3"}.',
   wordsPool: defaultWordsPool
 };
 
@@ -470,23 +477,35 @@ app.post('/api/ollama/generate', async (req, res) => {
     const timeoutId = setTimeout(() => controller.abort(), 35000);
 
     const targetModel = model || 'llama3.2:latest';
-    const ollamaRes = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: targetModel,
-        prompt: prompt || 'Transforma los conceptos a jerga cibernética.',
-        system: system || '',
-        format: 'json',
-        stream: false,
-        options: {
-          num_predict: 200,
-          temperature: 0.85,
-          repeat_penalty: 1.2
-        }
-      }),
-      signal: controller.signal
+    let ollamaRes;
+    const bodyStr = JSON.stringify({
+      model: targetModel,
+      prompt: prompt || 'Transforma los conceptos a jerga cibernética.',
+      system: system || '',
+      format: 'json',
+      stream: false,
+      options: {
+        num_predict: 250,
+        temperature: 0.7,
+        repeat_penalty: 1.15
+      }
     });
+
+    try {
+      ollamaRes = await fetch('http://127.0.0.1:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: bodyStr,
+        signal: controller.signal
+      });
+    } catch (e1) {
+      ollamaRes = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: bodyStr,
+        signal: controller.signal
+      });
+    }
     clearTimeout(timeoutId);
 
     if (!ollamaRes.ok) {
@@ -509,23 +528,74 @@ app.post('/api/ollama/generate', async (req, res) => {
     const w1 = (words[1] || 'CONSTANCIA').toUpperCase();
     const w2 = (words[2] || 'DISCIPLINA').toUpperCase();
 
-    // Diccionario semántico: resignificación fría y PRODUCTIVA de cada concepto
+    // Diccionario semántico exhaustivo: resignificación fría y analítica de cada concepto
     const SEMANTIC_DICT = {
-      'ciervo': 'MATERIA_ORGÁNICA', 'infinito': 'PROGRESO_INFINITO', 'gobierno': 'PATRÓN_DE_DECISIÓN',
-      'política': 'GESTIÓN', 'estado': 'APARATO', 'democracia': 'CONSENSO',
-      'lobo': 'DEPREDADOR', 'águila': 'RADAR', 'caballo': 'TRACCIÓN',
-      'perro': 'CANIDO', 'gato': 'FELINO', 'oso': 'BIOMASA',
-      'amor': 'TRABAJADOR_FELIZ', 'misterio': 'ENIGMA', 'hoja': 'LÁMINA',
-      'esperanza': 'PROYECCIÓN', 'bosque': 'CONGLOMERADO', 'río': 'FLUJO',
-      'tiempo': 'CRONOMETRÍA', 'alma': 'VARIABLE', 'verdad': 'CONSTANTE',
-      'libertad': 'AUTONOMÍA_OPERATIVA', 'imperio': 'DOMINIO', 'ley': 'PROTOCOLO',
+      'amor': 'SINCRONIZAR', 'nostalgia': 'REGISTRO', 'fragilidad': 'VULNERABILIDAD', 'ternura': 'ATENUACIÓN',
+      'abrazo': 'ACOPLAMIENTO', 'recuerdo': 'CACHE', 'latido': 'HERTZ', 'suspiro': 'LATENCIA',
+      'silencio': 'VACÍO', 'alma': 'KERNEL', 'caricia': 'CONTACTO', 'esperanza': 'PROYECCIÓN',
+      'anhelo': 'DEMANDA', 'piel': 'MEMBRANA', 'lágrima': 'CONDENSACIÓN', 'respirar': 'CICLO',
+      'cuerpo': 'CHASIS', 'deseo': 'INSTRUCCIÓN', 'infancia': 'INICIALIZACIÓN', 'duelo': 'RESET',
+      'poesía': 'LÍRICA_BINARIA', 'mirada': 'SENSOR', 'calidez': 'DISIPACIÓN', 'intimidad': 'CIFRADO',
+      'olvido': 'PURGA', 'consuelo': 'PARCHE', 'vulnerabilidad': 'EXPOSICIÓN', 'sueño': 'SIMULACIÓN',
+      'tiempo': 'CRONOMETRÍA', 'perdón': 'REAJUSTE', 'beso': 'INTERFAZ', 'aliento': 'FLUJO',
+      'herida': 'FALLO', 'sangre': 'CORRIENTE', 'soledad': 'DESCONEXIÓN', 'refugio': 'BLINDAJE',
+      'susurro': 'MODULACIÓN', 'ausencia': 'NULL', 'presencia': 'PING', 'memoria': 'BUFFER',
+      'origen': 'GÉNESIS', 'raíz': 'BOOTSTRAP', 'viento': 'VECTOR', 'sombra': 'OPACIDAD',
+      'luz': 'FOTÓN', 'calma': 'REPOSO', 'espera': 'QUEUE', 'paciencia': 'BUFFERING',
+      'ansiedad': 'OVERCLOCK', 'miedo': 'INTERRUPCIÓN', 'valentía': 'OVERRIDE', 'inocencia': 'RAW',
+      'vértigo': 'DESBORDAMIENTO', 'pesar': 'CARGA', 'gozo': 'PICOS_DE_VOLTAJE', 'tristeza': 'DECAIMIENTO',
+      'alegría': 'PULSO', 'pasión': 'SOBREVOLTAJE', 'temblor': 'OSCILACIÓN', 'desvelo': 'VIGILIA',
+      'añoranza': 'PERSISTENCIA', 'apego': 'DEPENDENCY', 'desapego': 'DESACOPLAMIENTO', 'vínculo': 'ENLACE',
+      'orilla': 'PERIFERIA', 'horizonte': 'LÍMITE', 'ceniza': 'RESIDUO', 'fuego': 'COMBUSTIÓN',
+      'océano': 'DATASET', 'abismo': 'SINGULARIDAD', 'secreto': 'ENCRIPTACIÓN', 'confianza': 'AUTENTICACIÓN',
+      'lealtad': 'INTEGRIDAD', 'paz': 'IDLE', 'grito': 'BROADCAST', 'eco': 'FEEDBACK',
+      'huella': 'LOG', 'camino': 'BUS', 'viaje': 'ROUTING', 'regreso': 'ROLLBACK',
+      'partida': 'DISCONNECT', 'despedida': 'SHUTDOWN', 'encuentro': 'HANDSHAKE', 'distancia': 'LATENCIA',
+      'cercanía': 'PROXIMIDAD', 'contacto': 'I/O', 'tacto': 'TÁCTIL', 'aroma': 'SIGNATURA',
+      'sabor': 'GRADIENTE', 'estación': 'FASE', 'otoño': 'OBSOLESCENCIA', 'invierno': 'HIBERNACIÓN',
+      'primavera': 'SPAWN', 'lluvia': 'CONDENSADO', 'rocío': 'RESIDUAL', 'niebla': 'DISPERSIÓN',
+      'aurora': 'IONIZACIÓN', 'atardecer': 'ATENUACIÓN', 'crepúsculo': 'TRANSICIÓN', 'noche': 'SUSPENSIÓN',
+      'madrugada': 'MANTENIMIENTO', 'despertar': 'BOOT', 'humano': 'BIOLÓGICO', 'mortal': 'FINITO',
+      'efímero': 'VOLÁTIL', 'eterno': 'PERSISTENTE', 'cicatriz': 'PARCHE', 'grieta': 'FISURA',
+      'destino': 'DETERMINISMO', 'azar': 'ALEATORIEDAD', 'fortuna': 'PROBABILIDAD', 'casualidad': 'COLISIÓN',
+      'búsqueda': 'INDEXACIÓN', 'hallazgo': 'MATCH', 'pérdida': 'CORRUPCIÓN', 'promesa': 'PROMESA',
+      'juramento': 'CONTRATO', 'fe': 'POSTULADO', 'duda': 'INCERTIDUMBRE', 'certeza': 'VERIFICACIÓN',
+      'verdad': 'CONSTANTE', 'belleza': 'SIMETRÍA', 'imperfección': 'ANOMALÍA', 'piedad': 'EXCEPCIÓN',
+      'empatía': 'EMULACIÓN', 'compasión': 'TOLERANCIA', 'dolor': 'ALARMA', 'alivio': 'OPTIMIZACIÓN',
+      'resguardo': 'BACKUP', 'cobijo': 'BLINDAJE', 'vivir': 'EJECUCIÓN', 'morir': 'EXTINCIÓN',
+      'renacer': 'REINICIO', 'creer': 'ASUMIR', 'llorar': 'PURGA', 'reír': 'MODULACIÓN',
+      'recordar': 'ACCEDER', 'sanar': 'REPARAR', 'cuidar': 'MONITOREAR', 'pertenencia': 'PROPIEDAD',
+      'caridad': 'SUBSIDIO', 'melancolía': 'BUCLE', 'cobardía': 'EVASIÓN', 'asombro': 'EXCEPCIÓN',
+      'gratitud': 'CONFIRMACIÓN', 'desamparo': 'DESCONEXIÓN', 'candor': 'APERTURA', 'suspicacia': 'HEURÍSTICA',
+      'reconciliación': 'RECONCILIACIÓN', 'redención': 'REFACTOR', 'imperio': 'DOMINIO', 'hoja': 'LÁMINA',
+      'misterio': 'ENIGMA', 'política': 'GESTIÓN', 'izquierda': 'DESVIACIÓN', 'derecha': 'ORTODOXIA',
+      'fascismo': 'HEGEMONÍA', 'comunismo': 'COLECTIVIDAD', 'gobierno': 'PATRÓN_DE_DECISIÓN',
+      'estado': 'APARATO', 'democracia': 'CONSENSO', 'ideología': 'DOCTRINA', 'justicia': 'ARBITRAJE',
+      'ley': 'PROTOCOLO', 'soberanía': 'AUTONOMÍA', 'república': 'ESTRUCTURA', 'autoridad': 'COMANDO',
+      'libertad': 'VARIANZA', 'perro': 'CANIDO', 'gato': 'FELINO', 'elefante': 'MEGABIOMA',
+      'tigre': 'DEPREDADOR', 'león': 'DOMINANTE', 'caballo': 'TRACCIÓN', 'lobo': 'CAZADOR',
+      'águila': 'RECONOCEDOR', 'ballena': 'COLOSO', 'delfín': 'SONAR', 'oso': 'BIOMASA',
+      'serpiente': 'REPTIL', 'halcón': 'RADAR', 'zorro': 'INFILTRADOR', 'ciervo': 'MATERIA_ORGÁNICA',
+      'pantera': 'SIGILO', 'existencia': 'INSTANCIA', 'filosofía': 'ONTOLOGÍA', 'mente': 'PROCESADOR',
+      'conciencia': 'FEEDBACK', 'universo': 'MATRIZ', 'razón': 'LÓGICA', 'infinito': 'PROGRESO_INFINITO',
+      'ética': 'NORMATIVA', 'esencia': 'NÚCLEO', 'conocimiento': 'DATA', 'computadora': 'TERMINAL',
+      'robot': 'AUTÓMATA', 'código': 'BINARIO', 'algoritmo': 'RUTINA', 'futuro': 'PROYECCIÓN',
+      'silicio': 'SUSTRATO', 'red': 'TOPOLOGÍA', 'procesador': 'NÚCLEO', 'sistema': 'ARQUITECTURA',
+      'inteligencia': 'CÓMPUTO', 'interfaz': 'PUERTO', 'servidor': 'HOST', 'cibernética': 'CONTROL',
+      'datos': 'TELEMETRÍA', 'enlace': 'VÍNCULO', 'verso': 'CADENA', 'metáfora': 'ANALÓGICA',
+      'ritmo': 'CADENCIA', 'poema': 'SCRIPT', 'espejo': 'REFLECTOR', 'creación': 'COMPILACIÓN',
+      'armonía': 'RESONANCIA', 'bosque': 'CONGLOMERADO', 'río': 'FLUJO', 'montaña': 'ELEVACIÓN',
+      'tierra': 'SUSTRATO', 'semilla': 'GÉRMEN', 'flor': 'ESTRUCTURA', 'cielo': 'ATMÓSFERA',
+      'tormenta': 'SOBRECARGA', 'desierto': 'VACÍO', 'nieve': 'CRISTAL', 'sol': 'GENERADOR',
       'minerales': 'POTENCIALES_ACTIVOS', 'café': 'MEJORADOR_DE_PRODUCTIVIDAD', 'cafe': 'MEJORADOR_DE_PRODUCTIVIDAD'
     };
 
     const getSyn = (w) => {
       const clean = (w || '').toLowerCase().trim();
       if (SEMANTIC_DICT[clean]) return SEMANTIC_DICT[clean];
-      // Respaldo productivo: conserva la raíz semántica de la palabra humana
+      for (const [k, v] of Object.entries(SEMANTIC_DICT)) {
+        if (clean.startsWith(k) || k.startsWith(clean)) return v;
+      }
       const stem = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() || 'RECURSO';
       const templates = [
         (x) => `PROTOCOLO_DE_${x}`,
@@ -543,59 +613,200 @@ app.post('/api/ollama/generate', async (req, res) => {
 
     const picked = [getSyn(w0), getSyn(w1), getSyn(w2)];
 
-    // Generador procedimental de Haiku con 3 versos según las pautas:
-    // 1- ubicación temporal descriptiva
-    // 2- elemento activo que genera un giro (relacionando elementos)
-    // 3- percepción poética con punto de vista individual
+    // Helper gramatical para concordancia de género y artículos en español
+    const getArticleGrammar = (word) => {
+      const clean = String(word || '').toUpperCase().trim();
+      const isFem = clean.endsWith('A') || clean.endsWith('IÓN') || clean.endsWith('DAD') || clean.endsWith('TUD') || clean.endsWith('ENCIA') || clean.endsWith('ANCIA');
+      return {
+        el_la: isFem ? 'la' : 'el',
+        del_al: isFem ? 'de la' : 'del',
+        al_a: isFem ? 'a la' : 'al',
+        en: isFem ? 'en la' : 'en el'
+      };
+    };
+
+    // Clusters semánticos organizados temáticamente para asegurar sentido sintáctico y poético real
+    const SEMANTIC_CLUSTERS_DATA = {
+      power: {
+        words: new Set(['GESTIÓN', 'DESVIACIÓN', 'ORTODOXIA', 'HEGEMONÍA', 'COLECTIVIDAD', 'PATRÓN_DE_DECISIÓN', 'APARATO', 'CONSENSO', 'DOCTRINA', 'ARBITRAJE', 'PROTOCOLO', 'AUTONOMÍA', 'ESTRUCTURA', 'COMANDO', 'VARIANZA', 'DOMINIO', 'NORMATIVA']),
+        v1: (w, art) => [
+          `Bajo el rígido orden ${art.del_al} ${w},`,
+          `En la estricta doctrina ${art.del_al} ${w},`,
+          `Rige la severa norma ${art.del_al} ${w},`,
+          `En el mandato firme ${art.del_al} ${w},`,
+          `Donde impone su ley ${art.el_la} ${w},`
+        ],
+        v2: (w, art) => [
+          `se impone la ley tenaz ${art.del_al} ${w},`,
+          `dicta su mandato frío ${art.el_la} ${w},`,
+          `regula cada pulso ${art.el_la} ${w},`,
+          `doblega toda duda ${art.el_la} ${w},`,
+          `disciplina el rumbo ${art.el_la} ${w},`
+        ],
+        v3: (w, art) => [
+          `y acato en silencio el peso ${art.del_al} ${w}.`,
+          `sintiendo el rigor supremo ${art.del_al} ${w}.`,
+          `donde reclamo al fin mi propia ${w}.`,
+          `y en soledad me someto ${art.al_a} ${w}.`,
+          `para sellar el pacto con ${art.el_la} ${w}.`
+        ]
+      },
+      fauna: {
+        words: new Set(['CANIDO', 'FELINO', 'MEGABIOMA', 'DEPREDADOR', 'DOMINANTE', 'TRACCIÓN', 'CAZADOR', 'RECONOCEDOR', 'COLOSO', 'SONAR', 'BIOMASA', 'REPTIL', 'RADAR', 'INFILTRADOR', 'MATERIA_ORGÁNICA', 'SIGILO']),
+        v1: (w, art) => [
+          `En el territorio alerta ${art.del_al} ${w},`,
+          `Bajo el rastro dormido ${art.del_al} ${w},`,
+          `En la guardia oculta ${art.del_al} ${w},`,
+          `Acecha en la sombra ${art.el_la} ${w},`,
+          `En el latido salvaje ${art.del_al} ${w},`
+        ],
+        v2: (w, art) => [
+          `avanza con sigilo ${art.el_la} ${w},`,
+          `despierta el instinto ciego ${art.del_al} ${w},`,
+          `cruza la penumbra ${art.el_la} ${w},`,
+          `rastrea sin descanso ${art.el_la} ${w},`,
+          `quiebra el silencio ${art.el_la} ${w},`
+        ],
+        v3: (w, art) => [
+          `reconociendo el pulso ${art.del_al} ${w}.`,
+          `y siento en mi pecho el paso ${art.del_al} ${w}.`,
+          `temiendo la mirada fría ${art.del_al} ${w}.`,
+          `hasta fundir mi aliento con ${art.el_la} ${w}.`,
+          `y sigo el rastro nocturno ${art.del_al} ${w}.`
+        ]
+      },
+      cosmos: {
+        words: new Set(['INSTANCIA', 'ONTOLOGÍA', 'PROCESADOR', 'FEEDBACK', 'MATRIZ', 'LÓGICA', 'EXTINCIÓN', 'PROGRESO_INFINITO', 'NÚCLEO', 'DATA', 'DETERMINISMO', 'ALEATORIEDAD', 'PROBABILIDAD', 'COLISIÓN', 'INDEXACIÓN', 'CONSTANTE', 'SIMETRÍA', 'VACÍO', 'SINGULARIDAD', 'FOTÓN', 'ATMÓSFERA']),
+        v1: (w, art) => [
+          `En el vasto horizonte ${art.del_al} ${w},`,
+          `Bajo el principio eterno ${art.del_al} ${w},`,
+          `En la arquitectura pura ${art.del_al} ${w},`,
+          `Desde el eje silente ${art.del_al} ${w},`,
+          `En la inmensa distancia ${art.del_al} ${w},`
+        ],
+        v2: (w, art) => [
+          `se dibuja el equilibrio ${art.del_al} ${w},`,
+          `revela su ley exacta ${art.el_la} ${w},`,
+          `despliega su estructura ${art.el_la} ${w},`,
+          `orbita en calma ${art.el_la} ${w},`,
+          `guarda su armonía ${art.el_la} ${w},`
+        ],
+        v3: (w, art) => [
+          `y en mi mente reconozco ${art.el_la} ${w}.`,
+          `hasta hallar mi lugar en ${art.el_la} ${w}.`,
+          `comprendiendo el enigma ${art.del_al} ${w}.`,
+          `y descubro el sentido ${art.del_al} ${w}.`,
+          `donde reposa al fin mi ${w}.`
+        ]
+      },
+      tech: {
+        words: new Set(['TERMINAL', 'AUTÓMATA', 'BINARIO', 'RUTINA', 'PROYECCIÓN', 'SUSTRATO', 'TOPOLOGÍA', 'ARQUITECTURA', 'CÓMPUTO', 'PUERTO', 'HOST', 'CONTROL', 'TELEMETRÍA', 'VÍNCULO', 'SCRIPT', 'COMPILACIÓN', 'BUFFER', 'BOOTSTRAP', 'VECTOR', 'BUS', 'ROUTING', 'QUEUE']),
+        v1: (w, art) => [
+          `Se compila en el fondo ${art.del_al} ${w},`,
+          `En la memoria fría ${art.del_al} ${w},`,
+          `Bajo la ejecución ${art.del_al} ${w},`,
+          `En las líneas calladas ${art.del_al} ${w},`,
+          `En el circuito vivo ${art.del_al} ${w},`
+        ],
+        v2: (w, art) => [
+          `se ejecuta sin pausa ${art.el_la} ${w},`,
+          `transmite su señal limpia ${art.el_la} ${w},`,
+          `cruza la red interna ${art.el_la} ${w},`,
+          `procesa la corriente ${art.del_al} ${w},`,
+          `conecta en secreto ${art.el_la} ${w},`
+        ],
+        v3: (w, art) => [
+          `y descifro la clave ${art.del_al} ${w}.`,
+          `sintiendo cómo late en mí ${art.el_la} ${w}.`,
+          `hasta reiniciar mi propio ${w}.`,
+          `y hallo mi código en ${art.el_la} ${w}.`,
+          `donde fluye mi pulso con ${art.el_la} ${w}.`
+        ]
+      },
+      emotion: {
+        words: new Set(['SINCRONIZAR', 'REGISTRO', 'VULNERABILIDAD', 'ATENUACIÓN', 'ACOPLAMIENTO', 'CACHE', 'HERTZ', 'LATENCIA', 'KERNEL', 'CONTACTO', 'CONDENSACIÓN', 'CICLO', 'CHASIS', 'INSTRUCCIÓN', 'INICIALIZACIÓN', 'RESET', 'LÍRICA_BINARIA', 'SENSOR', 'DISIPACIÓN', 'CIFRADO', 'PURGA', 'PARCHE', 'EXPOSICIÓN', 'SIMULACIÓN', 'CRONOMETRÍA', 'REAJUSTE', 'PULSO', 'REPOSO', 'DESCONEXIÓN']),
+        v1: (w, art) => [
+          `En la frágil memoria ${art.del_al} ${w},`,
+          `Bajo la intensa huella ${art.del_al} ${w},`,
+          `En el silencio íntimo ${art.del_al} ${w},`,
+          `Donde late el recuerdo ${art.del_al} ${w},`,
+          `En la honda vigilia ${art.del_al} ${w},`
+        ],
+        v2: (w, art) => [
+          `conmueve en secreto ${art.el_la} ${w},`,
+          `enciende una chispa ${art.el_la} ${w},`,
+          `revive el eco herido ${art.del_al} ${w},`,
+          `respira en la penumbra ${art.el_la} ${w},`,
+          `despierta la emoción ${art.del_al} ${w},`
+        ],
+        v3: (w, art) => [
+          `y en soledad abrazo ${art.el_la} ${w}.`,
+          `sintiendo cómo sana mi ${w}.`,
+          `y lloro en silencio por ${art.el_la} ${w}.`,
+          `hasta encontrar la paz en ${art.el_la} ${w}.`,
+          `donde descansa al fin mi ${w}.`
+        ]
+      },
+      nature: {
+        words: new Set(['CONGLOMERADO', 'FLUJO', 'ELEVACIÓN', 'SUSTRATO', 'GÉRMEN', 'ESTRUCTURA', 'ATMÓSFERA', 'SOBRECARGA', 'CRISTAL', 'GENERADOR', 'POTENCIALES_ACTIVOS', 'TIERRA', 'BOSQUE', 'RÍO', 'MONTAÑA', 'OCÉANO', 'LLUVIA', 'VIENTO']),
+        v1: (w, art) => [
+          `Bajo la corriente pura ${art.del_al} ${w},`,
+          `En el curso silente ${art.del_al} ${w},`,
+          `Donde brota la fuerza ${art.del_al} ${w},`,
+          `En la fértil hondura ${art.del_al} ${w},`
+        ],
+        v2: (w, art) => [
+          `fluye sin descanso ${art.el_la} ${w},`,
+          `germina en el silencio ${art.el_la} ${w},`,
+          `despierta con el viento ${art.el_la} ${w},`,
+          `recorre la espesura ${art.del_al} ${w},`
+        ],
+        v3: (w, art) => [
+          `hasta calmar mi sed en ${art.el_la} ${w}.`,
+          `y siento renacer mi ser en ${art.el_la} ${w}.`,
+          `donde enraíza al fin mi ${w}.`,
+          `fundiendo mi respiración con ${art.el_la} ${w}.`
+        ]
+      }
+    };
+
+    const getSemanticCategoryCluster = (word) => {
+      const clean = String(word || '').toUpperCase().trim();
+      for (const [catName, catData] of Object.entries(SEMANTIC_CLUSTERS_DATA)) {
+        if (catData.words.has(clean)) return catData;
+      }
+      if (clean.includes('PROTOCOLO') || clean.includes('PATRÓN') || clean.includes('GESTIÓN') || clean.includes('LEY') || clean.includes('ORDEN') || clean.includes('DOCTRINA') || clean.includes('ESTRUCTURA') || clean.includes('COMANDO')) return SEMANTIC_CLUSTERS_DATA.power;
+      if (clean.includes('CÓDIGO') || clean.includes('SISTEMA') || clean.includes('DATO') || clean.includes('RED') || clean.includes('DIGITAL') || clean.includes('OPTIMIZ') || clean.includes('TERMINAL') || clean.includes('RECURSO')) return SEMANTIC_CLUSTERS_DATA.tech;
+      if (clean.includes('DEPREDADOR') || clean.includes('ANIMAL') || clean.includes('BIOMA') || clean.includes('CAZA') || clean.includes('CANIDO') || clean.includes('FELINO')) return SEMANTIC_CLUSTERS_DATA.fauna;
+      if (clean.includes('FLUJO') || clean.includes('TIERRA') || clean.includes('AGUA') || clean.includes('VIENTO') || clean.includes('BOSQUE') || clean.includes('GÉRMEN')) return SEMANTIC_CLUSTERS_DATA.nature;
+      if (clean.includes('SENTIR') || clean.includes('AMOR') || clean.includes('ALMA') || clean.includes('MEMORIA') || clean.includes('VULNERA') || clean.includes('HERTZ')) return SEMANTIC_CLUSTERS_DATA.emotion;
+      return SEMANTIC_CLUSTERS_DATA.cosmos;
+    };
+
+    // Generador de Haiku poético cohesivo contextualizado que se forma estrictamente alrededor de las 3 palabras
     const composeServerHaiku = (pList, wList) => {
       const sanitize = (w) => String(w || '').replace(/_+/g, ' ').trim().toUpperCase();
       const a = sanitize(pList[0] || wList[0] || 'MEMORIA');
       const b = sanitize(pList[1] || wList[1] || 'TIEMPO');
       const c = sanitize(pList[2] || wList[2] || 'SILENCIO');
 
-      const temporalSettings = [
-        'Al caer la tarde sobre el circuito callado,',
-        'En la fría quietud de la medianoche,',
-        'Bajo la primera luz que despunta en el alba,',
-        'En el instante exacto en que la sombra retrocede,',
-        'Cuando el crepúsculo suspende las horas,',
-        'En el silencio íntimo de la madrugada,',
-        'Al apagarse el último reflejo del día,',
-        'En la hora incierta en que vacila la vigilia,',
-        'Mientras el amanecer descorre la niebla,',
-        'Al cerrarse la noche sobre los techos,'
-      ];
+      const artA = getArticleGrammar(a);
+      const artB = getArticleGrammar(b);
+      const artC = getArticleGrammar(c);
 
-      const activeTurnElements = [
-        `un giro súbito de ${a} cruza el rastro de ${b},`,
-        `el latido tenaz de ${a} quiebra el curso de ${b},`,
-        `un roce imprevisto de ${a} perturba la calma de ${b},`,
-        `la corriente activa de ${a} enlaza el abismo de ${b},`,
-        `un impulso ciego de ${a} interrumpe el orden de ${b},`,
-        `el destello vivo de ${a} despierta la inercia de ${b},`,
-        `una ráfaga de ${a} colisiona en secreto con ${b},`,
-        `la fractura de ${a} pone en tensión la quietud de ${b},`,
-        `un golpe de aire en ${a} desvía el vuelo de ${b},`,
-        `un eco distante de ${a} quiebra el rumbo de ${b},`
-      ];
+      const catA = getSemanticCategoryCluster(a);
+      const catB = getSemanticCategoryCluster(b);
+      const catC = getSemanticCategoryCluster(c);
 
-      const poeticPerceptions = [
-        `y en el fondo de ${c} descubro mi propia fragilidad.`,
-        `y siento que ${c} revela la verdad de mi mirada.`,
-        `veo mi propio reflejo disolverse dentro de ${c}.`,
-        `comprendo en soledad el peso íntimo de ${c}.`,
-        `y hallo en el centro de ${c} mi propia voz callada.`,
-        `siento que mi destino tiembla al compás de ${c}.`,
-        `y en la frontera de ${c} reconozco mi huella solitaria.`,
-        `descubro que en ${c} habita el eco de mi propio ser.`,
-        `y en el misterio de ${c} encuentro mi propia paz.`,
-        `siento mi pulso vibrar en el seno de ${c}.`
-      ];
+      const v1List = catA.v1(a, artA);
+      const v2List = catB.v2(b, artB);
+      const v3List = catC.v3(c, artC);
 
-      const t = temporalSettings[Math.floor(Math.random() * temporalSettings.length)];
-      const act = activeTurnElements[Math.floor(Math.random() * activeTurnElements.length)];
-      const p = poeticPerceptions[Math.floor(Math.random() * poeticPerceptions.length)];
-      return `${t}\n${act}\n${p}`;
+      const v1 = v1List[Math.floor(Math.random() * v1List.length)];
+      const v2 = v2List[Math.floor(Math.random() * v2List.length)];
+      const v3 = v3List[Math.floor(Math.random() * v3List.length)];
+
+      return `${v1}\n${v2}\n${v3}`;
     };
 
     const simulatedResponse = {
@@ -609,6 +820,59 @@ app.post('/api/ollama/generate', async (req, res) => {
     });
   }
 });
+
+// ============================================================================
+// JPShaderEditor Support (Local Engine + VPS Proxy)
+// Permite que cambiapalabras cargue include.js, webglrenderer.js, jp-node-graph.js
+// y resuelva planes de renderizado hacia el backend del VPS sin errores de CORS ni bloqueos
+// ============================================================================
+const JP_SHADER_DIR = 'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor';
+const JP_VPS_ORIGIN = 'https://vps-4455523-x.dattaweb.com';
+
+if (fs.existsSync(JP_SHADER_DIR)) {
+  // Engine embebible local con parches de inicialización de WebGLRenderer
+  app.get('/jpshadereditor/include.js', (req, res) => {
+    const filePath = path.join(JP_SHADER_DIR, 'public', 'js', 'lib', 'jpshadereditorInclude.js');
+    if (!fs.existsSync(filePath)) return res.status(404).send('// include.js no encontrado');
+    res.type('application/javascript; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-cache');
+    fs.createReadStream(filePath).pipe(res);
+  });
+
+  // Estáticos del editor (renderer, node graph, socket, pointers)
+  app.use('/jpshadereditor/js', express.static(path.join(JP_SHADER_DIR, 'public', 'js'), {
+    setHeaders: (res, filePath) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      }
+    }
+  }));
+
+  // Proxy de APIs hacia el VPS (compositions, shaders, plans, info)
+  app.use('/jpshadereditor/api', async (req, res) => {
+    try {
+      const vpsUrl = `${JP_VPS_ORIGIN}/jpshadereditor/api${req.url}`;
+      const response = await fetch(vpsUrl, {
+        method: req.method,
+        headers: {
+          'Accept': 'application/json, text/plain, */*'
+        },
+        body: (req.method !== 'GET' && req.method !== 'HEAD') ? JSON.stringify(req.body) : undefined
+      });
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.status(response.status);
+      const data = await response.text();
+      res.type(response.headers.get('content-type') || 'application/json');
+      res.send(data);
+    } catch (err) {
+      console.error('[JPShaderEditor Proxy] Error:', err.message);
+      res.status(502).json({ ok: false, error: 'Error comunicando con el VPS de shaders' });
+    }
+  });
+}
 
 app.use(express.static(publicPath, {
   setHeaders: (res, filePath) => {

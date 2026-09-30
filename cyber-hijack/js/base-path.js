@@ -117,7 +117,7 @@
   // --------------------------------------------------------------------------
   // OLLAMA LOCAL (los modelos viven en la máquina del visitante)
   // --------------------------------------------------------------------------
-  var OLLAMA_DEFAULT = 'http://localhost:11434';
+  var OLLAMA_DEFAULT = 'http://127.0.0.1:11434';
   window.SB_OLLAMA_DEFAULT = OLLAMA_DEFAULT;
 
   window.getOllamaUrl = function () {
@@ -140,7 +140,7 @@
   // Candidatos en orden: el configurado por el usuario, luego los clásicos locales.
   window.getOllamaUrls = function () {
     var out = [window.getOllamaUrl()];
-    [OLLAMA_DEFAULT, 'http://127.0.0.1:11434'].forEach(function (u) {
+    ['http://127.0.0.1:11434', 'http://localhost:11434'].forEach(function (u) {
       if (out.indexOf(u) === -1) out.push(u);
     });
     return out;
