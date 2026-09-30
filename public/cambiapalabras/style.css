@@ -64,6 +64,7 @@
   --accent-3-line: rgba(255, 0, 85, 0.32);
   --accent-3-mid: rgba(255, 0, 85, 0.45);
   --accent-3-strong: rgba(255, 0, 85, 0.8);
+
 }
 
 * {
@@ -530,14 +531,17 @@ html, body {
 
 /* Estado de Fijación / Proximidad: Resplandor cyberpunk estático, SIN vibración ni destellos */
 .organic-word-item.targeting {
-  color: #ffffff;
+  /* Sólo resplandor de proximidad: el COLOR de la letra no cambia. */
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
 }
 
 /* ==========================================================================
    ESTADOS DEL SISTEMA UNIFICADO DE PALABRAS
    ========================================================================== */
-/* Estado 1: Palabra Atrapada y Alojada en Slot */
+/* Estado 1: Palabra Atrapada y Alojada en Slot.
+   SIN cambio de color entre estados: hereda color/text-shadow de
+   .organic-word-item (--word-color de la pestaña PARTÍCULAS). Lo único que
+   cambia por estado es el TAMAÑO. */
 .organic-word-item.word-slotted {
   position: fixed !important;
   z-index: 30 !important;
@@ -546,15 +550,13 @@ html, body {
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 20px var(--accent-1-strong) !important;
-  color: var(--accent-cyan) !important;
   letter-spacing: 2px !important;
   font-family: var(--font-cyber) !important;
   pointer-events: none !important;
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease !important;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.4s ease !important;
 }
 
-/* Estado 2: Rotación / Scramble en Escenario Central */
+/* Estado 2: Rotación / Scramble en Escenario Central (sólo cambia el tamaño) */
 .organic-word-item.word-scrambling {
   position: fixed !important;
   z-index: 32 !important;
@@ -565,16 +567,14 @@ html, body {
   font-family: var(--font-cyber) !important;
   font-weight: 700 !important;
   letter-spacing: 4px !important;
-  color: var(--accent-cyan) !important;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
-  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.95), 0 0 30px var(--accent-1-strong) !important;
   pointer-events: none !important;
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease !important;
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease !important;
 }
 
-/* Estado 3: Resignificada / Mutada a Frío IA */
+/* Estado 3: Resignificada / Mutada a Frío IA (sólo cambia el tamaño) */
 .organic-word-item.word-transformed {
   position: fixed !important;
   z-index: 32 !important;
@@ -585,16 +585,14 @@ html, body {
   font-family: var(--font-cyber) !important;
   font-weight: 800 !important;
   letter-spacing: 3px !important;
-  color: var(--accent-neon-green) !important;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
-  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.95), 0 0 28px var(--accent-2-strong) !important;
   pointer-events: none !important;
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease !important;
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease !important;
 }
 
-/* Estado 4: Miembro de la Frase Final Integrada */
+/* Estado 4: Miembro de la Frase Final Integrada (sólo cambia el tamaño) */
 .organic-word-item.word-phrase-member {
   position: relative !important;
   display: inline-flex !important;
@@ -605,14 +603,11 @@ html, body {
   font-family: var(--font-cyber) !important;
   font-weight: 800 !important;
   letter-spacing: 1.5px !important;
-  color: var(--accent-neon-green) !important;
   border: none !important;
   background: transparent !important;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 20px var(--accent-2-strong) !important;
   box-shadow: none !important;   /* sin halo rectangular: la palabra es texto limpio */
-  text-shadow: 0 0 10px var(--accent-neon-green) !important;
   pointer-events: none !important;
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease, margin 0.5s cubic-bezier(0.16, 1, 0.3, 1), padding 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 /* Estado 5: Palabras Auxiliares de la Frase */

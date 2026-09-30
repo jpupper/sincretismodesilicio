@@ -3,57 +3,348 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>S·S // LOG DE SUCESOS</title>
+<title>S·S // CONSOLA COGNITIVA & LOG DEL AGENTE</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <script src="js/base-path.js?v=3.8"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
-  body {
-    background: #000;
-    color: #8fe8d2;
-    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "Share Tech Mono", monospace;
+  html, body { height: 100%; background: #070303; color: #e88f93; font-family: "JetBrains Mono", "Share Tech Mono", monospace; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  /* ---------- BARRA SUPERIOR DE ESTADO ---------- */
+  #status {
+    flex: 0 0 auto;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 16px;
+    border-bottom: 1px solid #331416;
+    background: #080202;
+    color: #8b4f52;
+    font-size: 11.5px;
+    letter-spacing: .05em;
+    white-space: nowrap;
+    overflow-x: auto;
+    z-index: 10;
+  }
+  #status b { color: #f59ca0; font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #6b1f23; margin-right: 6px; vertical-align: 0px; transition: all .2s; }
+  .dot.on { background: #ff000d; box-shadow: 0 0 8px #ff000d; }
+  .dot.pulse { background: #ff000d; box-shadow: 0 0 10px #ff000d; }
+  .dot.thinking { background: #ff000d; box-shadow: 0 0 12px #ff000d; animation: blink-fast .6s infinite alternate; }
+  @keyframes blink-fast { from { opacity: 0.3; transform: scale(0.9); } to { opacity: 1; transform: scale(1.2); } }
+  .sep { color: #421a1c; }
+  .sp { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+  button.k {
+    background: #180607;
+    color: #a35e61;
+    border: 1px solid #471c1e;
+    padding: 3px 10px;
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: .06em;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all .15s ease;
+  }
+  button.k:hover { color: #ff000d; border-color: #ff000d; background: #260b0c; }
+  button.k.on { color: #ff000d; border-color: #ff000d; background: #260608; }
+  button.k.active-view { color: #ff000d; border-color: #ff000d; background: #29080a; font-weight: bold; }
+
+  /* ---------- CONTENEDOR PRINCIPAL ---------- */
+  #main-container {
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     overflow: hidden;
   }
 
-  /* ---------- barra de estado ---------- */
-  #status {
-    flex: 0 0 auto;
-    height: 26px;
+  /* ---------- PANEL COGNITIVO DEL AGENTE (HERO) ---------- */
+  #agent-monitor {
+    /* El pensamiento manda: se queda con la mayor parte de la pantalla */
+    flex: 0 0 72%;
+    min-height: 220px;
+    max-height: 86%;
+    display: flex;
+    flex-direction: column;
+    background: #0a0202;
+    border-bottom: 2px solid #401618;
+    position: relative;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
+    transition: flex 0.25s ease;
+  }
+  body.view-agent-only #agent-monitor { flex: 1 1 100%; max-height: 100%; border-bottom: none; }
+  body.view-log-only #agent-monitor { display: none; }
+
+  .agent-top-bar {
     display: flex;
     align-items: center;
-    gap: 18px;
-    padding: 0 12px;
-    border-bottom: 1px solid #0f2521;
-    background: #020604;
-    color: #47827a;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: linear-gradient(90deg, #1a0506 0%, #110303 100%);
+    border-bottom: 1px solid #381416;
     font-size: 11px;
-    letter-spacing: .04em;
-    white-space: nowrap;
+    letter-spacing: .06em;
+  }
+  .agent-title-block { display: flex; align-items: center; gap: 10px; }
+  .agent-badge {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    background: #290b0c;
+    color: #e2474f;
+    border: 1px solid #571c1f;
+  }
+  .agent-badge.thinking {
+    background: #2b0608;
+    color: #ff3b45;
+    border-color: #ff000d;
+    box-shadow: 0 0 10px rgba(255, 0, 13, 0.35);
+  }
+  .agent-badge.done {
+    background: #2e0406;
+    color: #ff000d;
+    border-color: #ff000d;
+    box-shadow: 0 0 10px rgba(255, 0, 13, 0.3);
+  }
+
+  .agent-metrics { display: flex; gap: 14px; color: #8d5356; font-size: 11px; }
+  .agent-metrics span b { color: #e88f93; }
+
+  /* Slots de Palabras Humanas vs Frías */
+  .words-pipeline {
+    display: flex;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #0d0303;
+    border-bottom: 1px solid #280d0e;
     overflow-x: auto;
   }
-  #status b { color: #8fe8d2; font-weight: 400; }
-  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #6b1f2b; margin-right: 5px; vertical-align: 1px; }
-  .dot.on { background: #39ff14; box-shadow: 0 0 6px #39ff14; }
-  .dot.pulse { background: #ffb703; }
-  .sep { color: #17322d; }
-  .sp { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-  button.k {
-    background: #041210;
-    color: #47827a;
-    border: 1px solid #17322d;
-    padding: 2px 8px;
-    font: inherit;
+  .word-pill-slot {
+    flex: 1;
+    min-width: 170px;
+    padding: 8px 12px;
+    background: #140506;
+    border: 1px solid #361618;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: all .25s ease;
+  }
+  .word-pill-slot.active {
+    border-color: #ff000d;
+    background: #220708;
+    box-shadow: 0 0 12px rgba(255, 0, 13, 0.15);
+  }
+  .word-pill-slot.hot {
+    border-color: #ff000d;
+    background: #240607;
+    box-shadow: 0 0 14px rgba(255, 0, 13, 0.25);
+  }
+  .pill-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #734144;
+    letter-spacing: .08em;
+  }
+  .pill-human {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e88f93;
+    letter-spacing: .05em;
+  }
+  .pill-cold {
+    font-size: 11.5px;
+    color: #ff000d;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .pill-cold::before { content: "➔"; color: #ff000d; font-size: 10px; }
+
+  /* Ventana de Pensamiento en Tiempo Real (Typewriter / Think Stream) */
+  .thought-stream-container {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px 16px;
+    background: #060101;
+    position: relative;
+  }
+
+  .thought-stream-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     font-size: 10.5px;
+    color: #733b3e;
+    letter-spacing: .08em;
+    margin-bottom: 6px;
+  }
+  .thought-stream-header .mode-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mode-indicator .mode-tag {
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 10px;
+  }
+  .mode-tag.tag-reasoning { background: #380407; color: #ff3b45; border: 1px solid #7a0b11; }
+  .mode-tag.tag-synthesis { background: #2b0608; color: #ff000d; border: 1px solid #611418; }
+
+  #thought-terminal {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    background: #080202;
+    border: 1px solid #311113;
+    border-radius: 4px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #eba4a8;
+    white-space: pre-wrap;
+    word-break: break-word;
+    scrollbar-width: thin;
+    scrollbar-color: #4a1a1c #080202;
+  }
+  #thought-terminal::-webkit-scrollbar { width: 6px; }
+  #thought-terminal::-webkit-scrollbar-thumb { background: #4a1a1c; }
+
+  .thought-chunk-think {
+    color: #ff4f58;
+    background: rgba(255, 0, 13, 0.07);
+    border-left: 2px solid #ff000d;
+    padding: 4px 8px;
+    margin: 4px 0;
+    display: block;
+    font-style: italic;
+  }
+  .thought-chunk-output {
+    color: #ff8a90;
+  }
+  /* Narración del propio agente (razonamiento + ensamblado de la frase) */
+  .thought-chunk-narr {
+    display: block;
+    color: #ff8a90;
+    padding: 2px 0 2px 9px;
+    margin: 3px 0;
+    border-left: 2px solid #571c1f;
+  }
+  /* Términos fríos detectados en el JSON del modelo */
+  .thought-chunk-json {
+    display: block;
+    color: #ff3b45;
+    font-weight: 700;
+    letter-spacing: .04em;
+    margin: 8px 0 2px;
+  }
+  /* El poema apareciendo en vivo mientras el modelo escribe */
+  .thought-chunk-poem {
+    display: block;
+    color: #ffffff;
+    font-weight: 600;
+    white-space: pre-wrap;
+    padding: 5px 10px;
+    margin: 3px 0;
+    border-left: 2px solid #ff000d;
+    background: rgba(255, 0, 13, 0.07);
+  }
+  .thought-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    background: #ff000d;
+    margin-left: 3px;
+    vertical-align: -2px;
+    animation: cursor-blink .8s infinite;
+  }
+  @keyframes cursor-blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+  /* Banner de Haiku Final Sintetizado */
+  #haiku-banner {
+    display: none;
+    margin-top: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(43, 6, 8, 0.95) 0%, rgba(20, 3, 4, 0.98) 100%);
+    border: 1px solid #ff000d;
+    border-radius: 5px;
+    box-shadow: 0 0 20px rgba(255, 0, 13, 0.22);
+    animation: fade-in-up .35s ease;
+  }
+  @keyframes fade-in-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .haiku-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #ff000d;
+    font-weight: 700;
+    letter-spacing: .08em;
+    margin-bottom: 6px;
+  }
+  .haiku-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #ffffff;
+    font-weight: 600;
+    white-space: pre-wrap;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .haiku-text b, .haiku-text span.kw {
+    color: #ff000d;
+    text-shadow: 0 0 8px rgba(255, 0, 13, 0.4);
+    font-weight: 900;
+  }
+
+  /* ---------- LOG DEL SISTEMA (STREAM INFERIOR) ---------- */
+  #log-section {
+    /* La telemetría del bus sigue estando, pero ya no se come media pantalla */
+    flex: 1 1 28%;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+    max-height: 34%;
+    background: #000;
+    position: relative;
+    transition: flex 0.25s ease;
+  }
+  body.view-agent-only #log-section { display: none; }
+  body.view-log-only #log-section { flex: 1 1 100%; max-height: 100%; }
+  /* Colapsable: sólo queda la barra con el contador de líneas */
+  #log-section.collapsed { flex: 0 0 auto; min-height: 0; max-height: none; }
+  #log-section.collapsed #stream { display: none; }
+
+  .log-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    background: #070102;
+    border-bottom: 1px solid #290f10;
+    font-size: 11px;
+    color: #784245;
     letter-spacing: .06em;
     cursor: pointer;
+    user-select: none;
   }
-  button.k:hover { color: #8fe8d2; border-color: #2f8f6f; }
-  button.k.on { color: #ffb703; border-color: #6b4b12; }
+  .log-bar:hover { color: #ff4f58; background: #140405; }
+  #log-toggle { color: #ff4f58; font-weight: 700; }
+  .log-bar-right { display: flex; align-items: center; gap: 14px; }
 
-  /* ---------- stream ---------- */
   #stream {
     flex: 1 1 auto;
     min-height: 0;
@@ -61,86 +352,163 @@
     overflow-x: hidden;
     padding: 8px 14px 40px;
     scrollbar-width: thin;
-    scrollbar-color: #1d4a44 #000;
+    scrollbar-color: #421a1c #000;
   }
   #stream::-webkit-scrollbar { width: 7px; }
-  #stream::-webkit-scrollbar-thumb { background: #1d4a44; }
+  #stream::-webkit-scrollbar-thumb { background: #421a1c; }
 
-  .ln { display: flex; gap: 10px; white-space: pre-wrap; word-break: break-word; }
-  .ln .t { color: #27564f; flex: 0 0 auto; }
-  .ln .g { flex: 0 0 92px; color: #47827a; }
-  .ln .m { flex: 1 1 auto; color: #8fe8d2; }
-  .g-BUS      { color: #47827a; }
-  .g-NUCLEO    { color: #8fe8d2; }
-  .g-VECTOR   { color: #6ad1ff; }
-  .g-OLLAMA   { color: #ffb703; }
-  .g-SINTESIS { color: #39ff14; }
-  .g-UNIV     { color: #b58cff; }
-  .g-ALERTA   { color: #ff4d6d; }
-  .m-warn { color: #ffb703; }
-  .m-err  { color: #ff4d6d; }
-  .m-dim  { color: #47827a; }
-  .m-ok   { color: #39ff14; }
-  .m-hot  { color: #ff4d6d; font-weight: 700; }
+  .ln { display: flex; gap: 10px; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.5; }
+  .ln .t { color: #522426; flex: 0 0 auto; }
+  .ln .g { flex: 0 0 96px; color: #854b4e; font-weight: 600; }
+  .ln .m { flex: 1 1 auto; color: #e88f93; }
+  .g-BUS      { color: #82474a; }
+  .g-NUCLEO   { color: #e88f93; }
+  .g-VECTOR   { color: #ff6a71; }
+  .g-OLLAMA   { color: #ff000d; }
+  .g-THINK    { color: #ff000d; font-weight: bold; }
+  .g-SINTESIS { color: #ff000d; font-weight: bold; }
+  .g-UNIV     { color: #ff8c92; }
+  .g-ALERTA   { color: #ff4d56; }
+  .m-warn { color: #ff000d; }
+  .m-err  { color: #ff4d56; }
+  .m-dim  { color: #754043; }
+  .m-ok   { color: #ff000d; }
+  .m-hot  { color: #ff000d; font-weight: 700; }
 
-  /* línea de detalle (datos reales del payload) */
-  .dt { display: flex; gap: 10px; color: #2f5f58; white-space: pre-wrap; word-break: break-word; }
-  .dt .t { flex: 0 0 auto; color: #14332e; }
-  .dt .g { flex: 0 0 92px; color: #14332e; }
+  .dt { display: flex; gap: 10px; color: #693235; white-space: pre-wrap; word-break: break-word; font-size: 11.5px; }
+  .dt .t { flex: 0 0 auto; color: #331416; }
+  .dt .g { flex: 0 0 96px; color: #331416; }
   .dt .m { flex: 1 1 auto; }
-  /* payload crudo (modo RAW) */
-  .rw { display: flex; gap: 10px; color: #1d4a44; white-space: pre-wrap; word-break: break-all; }
+  .rw { display: flex; gap: 10px; color: #4a1d1f; white-space: pre-wrap; word-break: break-all; font-size: 11px; }
   .rw .t { flex: 0 0 auto; }
-  .rw .g { flex: 0 0 92px; }
+  .rw .g { flex: 0 0 96px; }
+  .hr { color: #321718; margin: 6px 0 2px; }
 
-  /* separador de ciclo */
-  .hr { color: #17322d; margin: 6px 0 2px; }
-
-  /* ---------- indicador de líneas nuevas ---------- */
   #newlines {
     position: fixed;
     right: 18px;
     bottom: 16px;
     display: none;
-    background: #041210;
-    border: 1px solid #2f8f6f;
-    color: #39ff14;
+    background: #140405;
+    border: 1px solid #ff000d;
+    color: #ff000d;
     padding: 5px 12px;
     font-size: 11px;
     letter-spacing: .08em;
     cursor: pointer;
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(255, 0, 13, 0.3);
+    z-index: 50;
   }
   #newlines.show { display: block; }
-  #hint { position: fixed; left: 14px; bottom: 14px; color: #17322d; font-size: 10.5px; }
+  #hint { position: fixed; left: 14px; bottom: 12px; color: #421d1f; font-size: 10px; z-index: 5; }
 </style>
 </head>
 <body>
 
 <div id="status">
-  <span>LOG DE SUCESOS · SECUESTRO CIBERNÉTICO</span>
+  <span>S·S // CONSOLA COGNITIVA &amp; LOG</span>
   <span class="sep">|</span>
   <span><span class="dot" id="ws-dot"></span>BUS <b id="ws-txt">DESCONECTADO</b></span>
   <span class="sep">|</span>
-  <span>NODOS <b id="f-clients">1</b></span>
-  <span class="sep">|</span>
-  <span>EVENTOS <b id="f-events">0</b></span>
+  <span>MODELO <b id="f-model">GEMMA / LLAMA</b></span>
   <span class="sep">|</span>
   <span>ESTADO <b id="f-state">—</b></span>
   <span class="sep">|</span>
-  <span>ETAPA <b id="f-stage">—</b></span>
+  <span>TOKENS <b id="f-tokens">0</b></span>
   <span class="sep">|</span>
-  <span>LINEAS <b id="f-lines">0</b></span>
+  <span>EVENTOS <b id="f-events">0</b></span>
   <span class="sp">
+    <button class="k active-view" id="btn-view-split" title="Ver Monitor Cognitivo y Log del Sistema">DUAL</button>
+    <button class="k" id="btn-view-agent" title="Ver sólo el pensamiento del agente">SÓLO AGENTE</button>
+    <button class="k" id="btn-view-log" title="Ver sólo el log de sucesos">SÓLO LOG</button>
+    <span class="sep">|</span>
     <button class="k" id="btn-raw" title="Mostrar el payload JSON completo (tecla R)">RAW</button>
     <button class="k" id="btn-pause" title="Pausar la captura (tecla P)">PAUSA</button>
     <button class="k" id="btn-copy" title="Copiar todo el log al portapapeles">COPIAR</button>
-    <button class="k" id="btn-clear" title="Limpiar el buffer (tecla C)">LIMPIAR</button>
+    <button class="k" id="btn-clear" title="Limpiar buffer (tecla C)">LIMPIAR</button>
   </span>
 </div>
 
-<div id="stream"></div>
+<div id="main-container">
+
+  <!-- ====================================================================== -->
+  <!-- 1. MONITOR COGNITIVO DEL AGENTE (PROCESO DE PENSAMIENTO EN VIVO)        -->
+  <!-- ====================================================================== -->
+  <section id="agent-monitor">
+    <div class="agent-top-bar">
+      <div class="agent-title-block">
+        <span class="dot" id="agent-status-dot"></span>
+        <span>PROCESO COGNITIVO DEL AGENTE EN TIEMPO REAL</span>
+        <span class="agent-badge" id="agent-status-badge">REPOSO</span>
+      </div>
+      <div class="agent-metrics">
+        <span>Captura: <b id="mon-captured">0/3</b></span>
+        <span>Tiempo: <b id="mon-timer">0.0s</b></span>
+        <span>Tokens: <b id="mon-tokens">0</b></span>
+      </div>
+    </div>
+
+    <!-- Slots de palabras en proceso -->
+    <div class="words-pipeline">
+      <div class="word-pill-slot" id="slot-1">
+        <div class="pill-header"><span>SLOT #01</span><span id="slot-1-tag">ESPERANDO</span></div>
+        <div class="pill-human" id="slot-1-human">—</div>
+        <div class="pill-cold" id="slot-1-cold" style="display:none;"></div>
+      </div>
+      <div class="word-pill-slot" id="slot-2">
+        <div class="pill-header"><span>SLOT #02</span><span id="slot-2-tag">ESPERANDO</span></div>
+        <div class="pill-human" id="slot-2-human">—</div>
+        <div class="pill-cold" id="slot-2-cold" style="display:none;"></div>
+      </div>
+      <div class="word-pill-slot" id="slot-3">
+        <div class="pill-header"><span>SLOT #03</span><span id="slot-3-tag">ESPERANDO</span></div>
+        <div class="pill-human" id="slot-3-human">—</div>
+        <div class="pill-cold" id="slot-3-cold" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Ventana de pensamiento streaming de Gemma -->
+    <div class="thought-stream-container">
+      <div class="thought-stream-header">
+        <div class="mode-indicator">
+          <span>MONÓLOGO INTERNO // CADENA DE PENSAMIENTO:</span>
+          <span class="mode-tag tag-reasoning" id="mode-badge" style="display:none;">&lt;think&gt; RAZONAMIENTO ACTIVO</span>
+        </div>
+        <span id="thought-status-hint">Esperando secuencia de 3 palabras en Sicre2...</span>
+      </div>
+
+      <div id="thought-terminal"><span id="thought-content">Esperando estímulo cognitivo...</span><span class="thought-cursor" id="thought-cursor" style="display:none;"></span></div>
+
+      <!-- Banner de síntesis Haiku final -->
+      <div id="haiku-banner">
+        <div class="haiku-header">
+          <span>⚡ HAIKU DE SILICIO SINTETIZADO</span>
+          <span id="haiku-model-badge">[GEMMA]</span>
+        </div>
+        <div class="haiku-text" id="haiku-text"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================== -->
+  <!-- 2. REGISTRO DEL BUS DEL SISTEMA (LOG COMPLETO)                         -->
+  <!-- ====================================================================== -->
+  <section id="log-section">
+    <div class="log-bar" id="log-bar" title="Clic para colapsar/expandir la telemetría del bus">
+      <span>REGISTRO DE TELEMETRÍA DEL BUS CENTRAL (/ws)</span>
+      <span class="log-bar-right">
+        <span>LÍNEAS: <b id="f-lines" style="color:#e88f93;">0</b></span>
+        <span id="log-toggle">▾ OCULTAR</span>
+      </span>
+    </div>
+    <div id="stream"></div>
+  </section>
+
+</div>
+
 <div id="newlines">▼ LÍNEAS NUEVAS</div>
-<div id="hint">[P] pausa · [C] limpiar · [R] raw · [S] seguir · scroll arriba = pausa automática</div>
+<div id="hint">[P] pausa · [C] limpiar · [R] raw · [S] seguir · 1/2/3 cambiar vista</div>
 
 <script>
 (function () {
@@ -148,6 +516,11 @@
 
   var $ = function (s) { return document.querySelector(s); };
   var stream = $('#stream');
+  var thoughtTerminal = $('#thought-terminal');
+  var thoughtContent = $('#thought-content');
+  var thoughtCursor = $('#thought-cursor');
+  var haikuBanner = $('#haiku-banner');
+  var haikuText = $('#haiku-text');
   var MAX_LINES = 4000;
 
   var state = {
@@ -160,11 +533,220 @@
     lines: 0,
     clients: 1,
     appState: '—',
-    stage: '—'
+    stage: '—',
+    tokensCount: 0,
+    startTime: 0,
+    timerId: null,
+    thinkingActive: false,
+    fullThoughtText: '',
+    inThinkBlock: false
   };
 
   /* ======================================================================
-     1. ESCRITURA EN EL LOG
+     1. GESTIÓN DEL MONITOR COGNITIVO DEL AGENTE
+     ====================================================================== */
+  function startAgentTimer() {
+    state.startTime = Date.now();
+    if (state.timerId) clearInterval(state.timerId);
+    state.timerId = setInterval(function () {
+      if (state.startTime > 0) {
+        var elapsed = ((Date.now() - state.startTime) / 1000).toFixed(1);
+        $('#mon-timer').textContent = elapsed + 's';
+      }
+    }, 100);
+  }
+
+  function stopAgentTimer() {
+    if (state.timerId) clearInterval(state.timerId);
+    state.timerId = null;
+  }
+
+  function setAgentState(badgeText, className, dotClass) {
+    var badge = $('#agent-status-badge');
+    var dot = $('#agent-status-dot');
+    badge.textContent = badgeText;
+    badge.className = 'agent-badge ' + (className || '');
+    dot.className = 'dot ' + (dotClass || '');
+    $('#f-state').textContent = badgeText;
+  }
+
+  function resetAgentSlots() {
+    for (var i = 1; i <= 3; i++) {
+      var slot = $('#slot-' + i);
+      var tag = $('#slot-' + i + '-tag');
+      var human = $('#slot-' + i + '-human');
+      var cold = $('#slot-' + i + '-cold');
+      slot.className = 'word-pill-slot';
+      tag.textContent = 'ESPERANDO';
+      human.textContent = '—';
+      cold.style.display = 'none';
+      cold.textContent = '';
+    }
+    $('#mon-captured').textContent = '0/3';
+    haikuBanner.style.display = 'none';
+    state.tokensCount = 0;
+    $('#f-tokens').textContent = '0';
+    $('#mon-tokens').textContent = '0';
+    // El MONÓLOGO NO se borra al cerrar el ciclo: es la evidencia del
+    // razonamiento que acaba de ocurrir (antes se evaporaba y por eso el panel
+    // parecía vacío). Sólo se marca el fin del ciclo con un separador.
+    if (state.fullThoughtText && state.fullThoughtText.trim()) {
+      state.fullThoughtText += '\n──────── fin del ciclo · el pensamiento queda en pantalla ────────\n';
+      renderFormattedThought(state.fullThoughtText);
+    }
+    state.thinkingActive = false;
+    thoughtCursor.style.display = 'none';
+    $('#mode-badge').style.display = 'none';
+    $('#thought-status-hint').textContent = 'Esperando secuencia de 3 palabras en Sicre2...';
+    stopAgentTimer();
+    $('#mon-timer').textContent = '0.0s';
+    setAgentState('REPOSO', '', '');
+  }
+
+  function updateSlotWord(index, wordText) {
+    if (index < 1 || index > 3) return;
+    var slot = $('#slot-' + index);
+    var tag = $('#slot-' + index + '-tag');
+    var human = $('#slot-' + index + '-human');
+    slot.className = 'word-pill-slot active';
+    tag.textContent = 'CAPTURADA';
+    human.textContent = String(wordText).toUpperCase();
+    $('#mon-captured').textContent = index + '/3';
+    setAgentState('CAPTURA (' + index + '/3)', '', 'pulse');
+  }
+
+  function updateSlotCold(index, coldText) {
+    if (index < 1 || index > 3) return;
+    var slot = $('#slot-' + index);
+    var cold = $('#slot-' + index + '-cold');
+    slot.className = 'word-pill-slot hot';
+    cold.style.display = 'flex';
+    cold.textContent = String(coldText).toUpperCase();
+  }
+
+  function appendAgentToken(token, isThinking) {
+    if (!state.thinkingActive) {
+      state.thinkingActive = true;
+      startAgentTimer();
+      setAgentState('PENSANDO (GEMMA)', 'thinking', 'thinking');
+      thoughtCursor.style.display = 'inline-block';
+      if (thoughtContent.textContent === 'Esperando estímulo cognitivo...') {
+        thoughtContent.textContent = '';
+      }
+    }
+
+    state.tokensCount++;
+    $('#f-tokens').textContent = state.tokensCount;
+    $('#mon-tokens').textContent = state.tokensCount;
+
+    var modeBadge = $('#mode-badge');
+    if (isThinking) {
+      modeBadge.style.display = 'inline-block';
+      modeBadge.className = 'mode-tag tag-reasoning';
+      modeBadge.textContent = '<think> RAZONAMIENTO ACTIVO';
+      $('#thought-status-hint').textContent = 'Procesando cadena de pensamiento interna...';
+    } else {
+      modeBadge.style.display = 'inline-block';
+      modeBadge.className = 'mode-tag tag-synthesis';
+      modeBadge.textContent = '⚡ SÍNTESIS DE RESPUESTA';
+      $('#thought-status-hint').textContent = 'Generando versos poéticos estructurados...';
+    }
+
+    // Insertar token en terminal de pensamiento
+    state.fullThoughtText += token;
+    
+    // Renderizado con formato limpio
+    renderFormattedThought(state.fullThoughtText);
+    thoughtTerminal.scrollTop = thoughtTerminal.scrollHeight;
+  }
+
+  /* ----------------------------------------------------------------------
+     Render del MONÓLOGO INTERNO. Se mezclan dos flujos que llegan por el bus:
+     - la NARRACIÓN del agente (líneas [PENSAMIENTO]/[SÍNTESIS]/[ENSAMBLADO])
+     - el stream crudo del modelo (bloques <think> + el JSON de síntesis)
+     El JSON se "humaniza": los términos fríos y los versos creciendo en vivo
+     mientras el modelo escribe, en vez de llaves y comillas.
+     ---------------------------------------------------------------------- */
+  function renderFormattedThought(text) {
+    var narRe = /\[(PENSAMIENTO|SÍNTESIS|SINTESIS|ENSAMBLADO)\][^\n]*/g;
+    var html = '';
+    var idx = 0;
+    var m;
+    var buf = '';
+    while ((m = narRe.exec(text)) !== null) {
+      if (m.index > idx) buf += text.slice(idx, m.index);
+      idx = narRe.lastIndex;
+      if (buf.trim()) { html += friendlyModel(buf); buf = ''; }
+      html += '<span class="thought-chunk-narr">' + escapeHtml(m[0].trim()) + '</span>';
+    }
+    buf += text.slice(idx);
+    if (buf.trim()) html += friendlyModel(buf);
+    thoughtContent.innerHTML = html || escapeHtml(text);
+  }
+
+  /* Stream del modelo: separa el bloque <think> (razonamiento real) del JSON. */
+  function friendlyModel(raw) {
+    var html = '';
+    var rest = raw;
+    var tm;
+    while ((tm = rest.match(/<think>([\s\S]*?)(?:<\/think>|$)/i))) {
+      var before = rest.slice(0, tm.index);
+      if (before.trim()) html += '<span class="thought-chunk-output">' + escapeHtml(before) + '</span>';
+      html += '<span class="thought-chunk-think">' + escapeHtml(tm[1]) + '</span>';
+      rest = rest.slice(tm.index + tm[0].length);
+    }
+    if (!rest.trim()) return html;
+    if (/"nuevas_palabras"|"frase_generada"/.test(rest)) return html + jsonPreview(rest);
+    return html + '<span class="thought-chunk-output">' + escapeHtml(rest) + '</span>';
+  }
+
+  /* Muestra el JSON de síntesis legible aunque todavía esté incompleto. */
+  function jsonPreview(raw) {
+    var out = '';
+    var wordsMatch = raw.match(/"nuevas_palabras"\s*:\s*\[([^\]]*)/);
+    if (wordsMatch) {
+      var words = wordsMatch[1].split(',').map(function (w) { return w.replace(/["\s]/g, ''); }).filter(Boolean);
+      if (words.length) {
+        out += '<span class="thought-chunk-json">▶ TÉRMINOS FRÍOS: ' + escapeHtml(words.join(' · ')) + '</span>';
+      }
+    }
+    var fraseMatch = raw.match(/"frase_generada"\s*:\s*"((?:[^"\\]|\\.)*)/);
+    if (fraseMatch) {
+      var frase = fraseMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      out += '<span class="thought-chunk-poem">' + escapeHtml(frase) + '</span>';
+      return out;
+    }
+    if (out) return out;
+    return '<span class="thought-chunk-output">… el modelo está redactando la síntesis (' + raw.length + ' caracteres) …</span>';
+  }
+
+  function displayFinalHaiku(phrase, coldWords) {
+    stopAgentTimer();
+    setAgentState('SÍNTESIS COMPLETADA', 'done', 'on');
+    thoughtCursor.style.display = 'none';
+    $('#thought-status-hint').textContent = 'Haiku final sintetizado con éxito.';
+    haikuBanner.style.display = 'block';
+
+    var formatted = escapeHtml(phrase);
+    if (Array.isArray(coldWords)) {
+      coldWords.forEach(function (cw) {
+        if (!cw) return;
+        var re = new RegExp('(\\b' + cw + '\\b)', 'gi');
+        formatted = formatted.replace(re, '<span class="kw">$1</span>');
+      });
+    }
+    haikuText.innerHTML = formatted;
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /* ======================================================================
+     2. ESCRITURA EN EL LOG DEL SISTEMA
      ====================================================================== */
   function pad(n, w) { n = String(n); while (n.length < w) n = '0' + n; return n; }
 
@@ -183,7 +765,6 @@
     return (stream.scrollHeight - stream.scrollTop - stream.clientHeight) < 40;
   }
 
-  // Línea de log: HH:MM:SS.mmm [TAG] mensaje
   function write(tag, msg, cls) {
     if (state.paused) return;
     var stick = state.follow && atBottom();
@@ -201,7 +782,6 @@
     else if (!state.follow) $('#newlines').classList.add('show');
   }
 
-  // Línea de detalle: datos REALES del payload (no texto decorativo)
   function detail(text) {
     if (state.paused) return;
     var stick = state.follow && atBottom();
@@ -239,7 +819,7 @@
   }
 
   /* ======================================================================
-     2. BUS WEBSOCKET
+     3. CONEXIÓN WEBSOCKET
      ====================================================================== */
   var ws = null;
 
@@ -283,7 +863,7 @@
   }
 
   /* ======================================================================
-     3. MANEJO DE EVENTOS
+     4. MANEJO DE EVENTOS ENTRANTE
      ====================================================================== */
   function tagForStage(stage) {
     switch (stage) {
@@ -292,6 +872,7 @@
       case 'catch': return 'NUCLEO';
       case 'vector': return 'VECTOR';
       case 'inference': return 'OLLAMA';
+      case 'think': return 'THINK';
       case 'synthesis': return 'SINTESIS';
       case 'reset': return 'ALERTA';
       default: return 'UNIV';
@@ -308,92 +889,111 @@
 
     if (type === 'server:welcome') {
       state.clients = msg.clients || 1;
-      $('#f-clients').textContent = state.clients;
       return;
     }
 
     if (type === 'server:clients') {
       state.clients = msg.clients || 1;
-      $('#f-clients').textContent = state.clients;
       write('BUS', 'nodos en el bus: ' + state.clients, 'm-dim');
       return;
     }
 
-    /* ---- eventos reales del agente (game3) ---- */
+    /* ---- STREAMING DE PENSAMIENTO EN VIVO (GEMMA / LLAMA) ---- */
+    if (type === 'agent:thought') {
+      appendAgentToken(msg.token || '', msg.isThinking);
+      return;
+    }
+
+    /* ---- EVENTOS REALES DEL AGENTE (SICRE2) ---- */
     if (type === 'agent:event') {
       var tag = tagForStage(msg.stage);
-      var cls = msg.level === 'warn' ? 'm-warn' : (msg.level === 'ok' ? 'm-ok' : null);
+      var cls = msg.level === 'warn' ? 'm-warn' : (msg.level === 'ok' ? 'm-ok' : (msg.level === 'think' ? 'm-hot' : null));
       state.stage = msg.stage || '—';
-      $('#f-stage').textContent = state.stage;
+
+      if (msg.stage === 'inference' && msg.data && msg.data.model) {
+        $('#f-model').textContent = String(msg.data.model).toUpperCase();
+      }
+
       write(tag, String(msg.message || ''), cls);
       renderData(msg.stage, msg.data || {});
       return;
     }
 
-    /* ---- secuencia de palabras (captura parcial y completa) ---- */
+    /* ---- SECUENCIA DE PALABRAS (GAME 3) ---- */
     if (type === 'game3:words_sequence') {
       var words = Array.isArray(msg.words) ? msg.words : [];
+      
+      if (msg.phase === 'word_caught' || (!msg.coldWords && words.length > 0)) {
+        var wordToCatch = msg.newWord || words[words.length - 1];
+        var slotIdx = msg.orderIndex || words.length;
+        updateSlotWord(slotIdx, wordToCatch);
+        write('NUCLEO', 'palabra capturada [' + slotIdx + '/3]: ' + String(wordToCatch).toUpperCase(), 'm-ok');
+        return;
+      }
+
+      if (msg.phase === 'processing_started') {
+        setAgentState('PROCESANDO COGNICIÓN', 'thinking', 'thinking');
+        startAgentTimer();
+        write('OLLAMA', 'Iniciando proceso de cognición sobre ' + words.length + ' conceptos...', 'm-hot');
+        return;
+      }
+
       if (msg.coldWords && msg.coldWords.length) {
+        words.forEach(function (w, idx) {
+          updateSlotWord(idx + 1, w);
+          if (msg.coldWords[idx]) {
+            updateSlotCold(idx + 1, msg.coldWords[idx]);
+          }
+        });
+
         write('UNIV', 'SECUENCIA COMPLETA · ' + words.length + ' humanos → ' + msg.coldWords.length + ' términos fríos', 'm-hot');
         detail('humanos: ' + words.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
         detail('fríos:   ' + msg.coldWords.join(' · '));
+        
         if (msg.phrase) {
-          write('SINTESIS', 'discurso corporativo: ' + msg.phrase, 'm-ok');
+          write('SINTESIS', 'discurso poético: ' + msg.phrase.replace(/\n/g, ' / '), 'm-ok');
+          displayFinalHaiku(msg.phrase, msg.coldWords);
         }
-        state.appState = 'HIJACK';
-      } else {
-        write('UNIV', 'secuencia parcial ' + words.length + '/3 · ' + words.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
-        state.appState = 'CAPTURA';
+        return;
       }
-      $('#f-state').textContent = state.appState;
+
+      write('UNIV', 'secuencia parcial ' + words.length + '/3 · ' + words.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
       return;
     }
 
     if (type === 'game3:state_reset') {
-      state.appState = 'IDLE';
-      $('#f-state').textContent = state.appState;
-      write('ALERTA', 'reset de estado recibido · slots liberados', 'm-warn');
+      write('ALERTA', 'reset de estado recibido · purga de contexto', 'm-warn');
+      resetAgentSlots();
       hr();
       return;
     }
 
-    /* ---- cualquier otro tipo del bus: se registra igual ---- */
+    /* ---- OTROS MENSAJES ---- */
     write('BUS', 'mensaje tipo "' + type + '"', 'm-dim');
   }
 
-  // Datos REALES de cada etapa (nada inventado)
   function renderData(stage, data) {
     if (!data) return;
-    if (stage === 'state') {
-      if (data.from || data.to) detail('transición: ' + (data.from || '?') + ' → ' + (data.to || '?'));
-      if (Array.isArray(data.caught) && data.caught.length) detail('capturadas (' + data.caught.length + '/3): ' + data.caught.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
-      if (data.to) { state.appState = String(data.to).replace('STATE_', ''); $('#f-state').textContent = state.appState; }
-      return;
-    }
     if (stage === 'catch') {
       if (data.word) detail('palabra capturada: ' + String(data.word).toUpperCase());
       if (data.slot != null) detail('slot ' + (Number(data.slot) + 1) + ' ocupado');
-      if (Array.isArray(data.caught) && data.caught.length) detail('en órbita (' + data.caught.length + '/3): ' + data.caught.map(function (w) { return String(w).toUpperCase(); }).join(' · '));
       return;
     }
     if (stage === 'vector') {
-      if (Array.isArray(data.words)) detail('muestreo: ' + data.words.join(' · '));
-      if (data.dimensions) detail('dimensiones del vector: ' + data.dimensions + 'D');
+      if (Array.isArray(data.words)) detail('muestreo semántico: ' + data.words.join(' · '));
+      if (data.dimensions) detail('vector: ' + data.dimensions + ' dimensiones');
       return;
     }
     if (stage === 'inference') {
-      if (data.model) detail('modelo: ' + data.model + (data.temperature != null ? '  ·  temperatura ' + data.temperature : ''));
-      if (data.endpoint) detail('endpoint local: ' + data.endpoint);
+      if (data.model) detail('modelo: ' + data.model + (data.temperature != null ? '  ·  temp ' + data.temperature : ''));
+      if (data.endpoint) detail('endpoint: ' + data.endpoint);
       return;
     }
     if (stage === 'synthesis') {
-      if (Array.isArray(data.coldWords) && data.coldWords.length) detail('términos fríos: ' + data.coldWords.join(' · '));
-      if (Array.isArray(data.pairs) && data.pairs.length) detail('pares: ' + data.pairs.join(' | '));
-      if (data.phrase) detail('frase: ' + data.phrase);
-      if (data.spread === false) detail('aviso: los 3 términos salieron consecutivos, rearmando frase');
+      if (Array.isArray(data.coldWords)) detail('términos fríos: ' + data.coldWords.join(' · '));
+      if (data.phrase) detail('haiku: ' + data.phrase.replace(/\n/g, ' / '));
       return;
     }
-    // genérico: claves planas del payload
     Object.keys(data).forEach(function (k) {
       var v = data[k];
       if (v === null || v === undefined) return;
@@ -404,13 +1004,47 @@
   }
 
   /* ======================================================================
-     4. CONTROLES
+     5. CONTROLES Y CAMBIO DE VISTAS
      ====================================================================== */
+  function setView(view) {
+    document.body.classList.remove('view-agent-only', 'view-log-only');
+    $('#btn-view-split').classList.remove('active-view');
+    $('#btn-view-agent').classList.remove('active-view');
+    $('#btn-view-log').classList.remove('active-view');
+
+    if (view === 'agent') {
+      document.body.classList.add('view-agent-only');
+      $('#btn-view-agent').classList.add('active-view');
+    } else if (view === 'log') {
+      document.body.classList.add('view-log-only');
+      $('#btn-view-log').classList.add('active-view');
+    } else {
+      $('#btn-view-split').classList.add('active-view');
+    }
+  }
+
+  (function () {
+    var logBar = $('#log-bar');
+    var logSection = $('#log-section');
+    var toggle = $('#log-toggle');
+    if (logBar && logSection && toggle) {
+      logBar.addEventListener('click', function () {
+        var col = logSection.classList.toggle('collapsed');
+        toggle.textContent = col ? '▴ MOSTRAR' : '▾ OCULTAR';
+        if (!col && state.follow) stream.scrollTop = stream.scrollHeight;
+      });
+    }
+  })();
+
+  $('#btn-view-split').addEventListener('click', function () { setView('split'); });
+  $('#btn-view-agent').addEventListener('click', function () { setView('agent'); });
+  $('#btn-view-log').addEventListener('click', function () { setView('log'); });
+
   function setPaused(p) {
     state.paused = p;
     $('#btn-pause').classList.toggle('on', p);
     $('#btn-pause').textContent = p ? 'SEGUIR' : 'PAUSA';
-    write('BUS', p ? 'captura en pausa (los eventos siguen contándose)' : 'captura reanudada', 'm-warn');
+    write('BUS', p ? 'captura en pausa' : 'captura reanudada', 'm-warn');
   }
 
   $('#btn-pause').addEventListener('click', function () { setPaused(!state.paused); });
@@ -419,13 +1053,22 @@
     stream.innerHTML = '';
     state.lines = 0;
     $('#f-lines').textContent = '0';
+    // LIMPIAR vacía las dos cosas: la telemetría del bus y el monólogo interno.
+    state.fullThoughtText = '';
+    state.thinkingActive = false;
+    state.tokensCount = 0;
+    $('#f-tokens').textContent = '0';
+    $('#mon-tokens').textContent = '0';
+    thoughtContent.textContent = 'Esperando estímulo cognitivo...';
+    thoughtCursor.style.display = 'none';
+    $('#mode-badge').style.display = 'none';
     write('BUS', 'buffer limpiado', 'm-dim');
   });
 
   $('#btn-raw').addEventListener('click', function () {
     state.raw = !state.raw;
     $('#btn-raw').classList.toggle('on', state.raw);
-    write('BUS', state.raw ? 'modo RAW activado (payload JSON completo)' : 'modo RAW desactivado', 'm-dim');
+    write('BUS', state.raw ? 'modo RAW activado' : 'modo RAW desactivado', 'm-dim');
   });
 
   $('#btn-copy').addEventListener('click', function () {
@@ -433,9 +1076,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(txt).then(function () {
         write('BUS', 'log copiado al portapapeles (' + txt.split('\n').length + ' líneas)', 'm-ok');
-      }, function () { write('ALERTA', 'no se pudo copiar (permiso del navegador)', 'm-warn'); });
-    } else {
-      write('ALERTA', 'portapapeles no disponible en este navegador', 'm-warn');
+      }, function () { write('ALERTA', 'permiso denegado', 'm-warn'); });
     }
   });
 
@@ -461,15 +1102,16 @@
     if (k === 'p') { setPaused(!state.paused); e.preventDefault(); }
     else if (k === 'c') { $('#btn-clear').click(); e.preventDefault(); }
     else if (k === 'r') { $('#btn-raw').click(); e.preventDefault(); }
-    else if (k === 's') { state.follow = true; stream.scrollTop = stream.scrollHeight; $('#newlines').classList.remove('show'); e.preventDefault(); }
+    else if (k === '1') { setView('split'); }
+    else if (k === '2') { setView('agent'); }
+    else if (k === '3') { setView('log'); }
   });
 
   /* ======================================================================
-     5. ARRANQUE
+     6. ARRANQUE
      ====================================================================== */
-  write('BUS', 'SINCRETISMO DE SILICIO · log de sucesos v1', 'm-dim');
-  write('BUS', 'capturando todos los eventos del bus durante la secuencia de selección de palabras', 'm-dim');
-  write('BUS', 'esperando enlace · origen ' + location.origin, 'm-dim');
+  write('BUS', 'SINCRETISMO DE SILICIO // Consola Cognitiva & Log de Sucesos v2', 'm-ok');
+  write('BUS', 'Capturando telemetría, pensamiento en vivo de Gemma y eventos del bus', 'm-dim');
   connect();
 })();
 </script>

@@ -2,7 +2,7 @@
  * SINCRETISMO DE SILICIO // CÚMULO 3D DE NEURONAS & SINAPSIS
  * Script de inicialización y control dedicado para cosmos-clusters.html
  */
-import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js';
+import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js?v=3.15';
 
 let visualizer = null;
 

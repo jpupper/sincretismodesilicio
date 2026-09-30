@@ -2294,6 +2294,28 @@ function emitAgentEvent(stage, message, level = 'info', data = null) {
   } catch (e) {}
 }
 
+// NARRACIÓN DEL RAZONAMIENTO: escribe en el MONÓLOGO INTERNO de log.html
+// (agent:thought) y, si se pasa stage, también al registro del bus
+// (agent:event). Cada línea termina en \n para leerse como cadena de pensamiento.
+function emitReasoning(text, stage = null, level = 'think', data = null) {
+  emitAgentThought(text, true, '');
+  if (stage) emitAgentEvent(stage, text, level, data);
+}
+
+// Telemetría de pensamiento en vivo (streaming de tokens / <think> de Gemma) para log.html
+function emitAgentThought(token, isThinking = false, fullResponse = '') {
+  try {
+    if (!gameWebSocket || gameWebSocket.readyState !== WebSocket.OPEN) return;
+    gameWebSocket.send(JSON.stringify({
+      type: 'agent:thought',
+      token: token,
+      isThinking: isThinking,
+      fullResponse: fullResponse,
+      timestamp: Date.now()
+    }));
+  } catch (e) {}
+}
+
 // ============================================================================
 // GESTIÓN DE CONFIGURACIÓN, BANCO DE CLUSTERS Y MODELOS OLLAMA
 // ============================================================================
@@ -4434,6 +4456,13 @@ const WORD_STATES = {
   AUXILIARY: 'AUXILIARY'
 };
 
+// El banco de palabras (config.json / clusters Laya / pool por defecto) viene en
+// minúsculas: al flotar se muestra SIEMPRE con la primera letra en mayúscula.
+function capitalizeFirstLetter(str) {
+  const s = String(str ?? '');
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
 class FloatingWord {
   constructor(text, x, y, state = WORD_STATES.FLOATING) {
     this.text = text;
@@ -4459,10 +4488,14 @@ class FloatingWord {
     this.el = document.createElement('div');
     this.el.className = 'organic-word-item';
     this.el.title = 'Haz clic o posa el cursor para atraparla';
-    
+
+    // Inicial en mayúscula sólo para las palabras flotantes del banco; las
+    // auxiliares son texto corrido de la frase de la IA y van tal cual.
+    const labelText = (state === WORD_STATES.AUXILIARY) ? this.text : capitalizeFirstLetter(this.text);
+
     this.el.innerHTML = `
       <div class="word-pill-fill"></div>
-      <span class="word-label">${this.text}</span>
+      <span class="word-label">${labelText}</span>
       <span class="word-lock-badge"></span>
     `;
 
@@ -5290,8 +5323,11 @@ async function startResignificationSequence() {
   const selectedWords = [...appState.selectedWordObjects];
   console.log('[RESIGNIFICACIÓN] 3 Palabras Humanas capturadas (Objetos Unificados):', caught);
 
-  // Sincronizar por WebSocket al Universo 3D de Cúmulos
-  broadcastCaughtWords(caught);
+  // Sincronizar por WebSocket al Universo 3D de Cúmulos (Inicia escaneo neural)
+  broadcastCaughtWords(caught, { phase: 'processing_started' });
+  emitAgentEvent('state', 'transición de máquina: STATE_INTERACT → STATE_PROCESSING', 'think', {
+    from: 'STATE_INTERACT', to: 'STATE_PROCESSING', caught
+  });
   emitAgentEvent('vector', `muestreo del campo semántico: ${caught.join(' · ')}`, 'think', {
     words: caught, dimensions: 384
   });
@@ -5305,8 +5341,22 @@ async function startResignificationSequence() {
 
   await Promise.all(selectedWords.map((wordObj, i) => wordObj.moveToCenter(i)));
 
-  // Mostrar las 3 palabras 2 segundos antes de randomizar
-  await wait(2000);
+  // Mostrar las 3 palabras 2 segundos antes de randomizar — y usar esa espera
+  // para NARRAR el razonamiento (aparece en el Monólogo Interno de log.html).
+  const oraculo = appState.config.ollamaModel || 'modelo local';
+  emitReasoning(`[PENSAMIENTO] Recibo 3 conceptos humanos: ${caught.join(' · ')}.\n`);
+  await wait(320);
+  emitReasoning('[PENSAMIENTO] Proyecto cada término al campo semántico de 384 dimensiones y mido con qué otros conceptos resuena.\n');
+  await wait(320);
+  for (let i = 0; i < caught.length; i++) {
+    emitReasoning(`[PENSAMIENTO]   · "${caught[i]}" → candidato frío: ${getColdSynonym(caught[i])} (lo que la máquina conserva al quitarle lo humano).\n`);
+    await wait(280);
+  }
+  emitReasoning('[PENSAMIENTO] Pido 3 versos que RODEEN esos términos: el modelo puede nombrarlos, pero nunca enumerarlos juntos.\n');
+  await wait(320);
+  emitReasoning(`[PENSAMIENTO] Envío la consulta a ${oraculo} en modo stream: quiero ver cómo razona, no sólo el resultado.\n`);
+  await wait(200);
+  emitReasoning('[PENSAMIENTO] … abriendo cadena de pensamiento del modelo …\n');
 
   // Mostrar cartel "DESPROCESANDO"
   if (DOM.desprocesandoBanner) {
@@ -5334,6 +5384,11 @@ async function startResignificationSequence() {
     console.log('[OLLAMA] Generando respuesta procedural de contingencia...');
     emitAgentEvent('inference', 'sin respuesta del modelo: contingencia procedural local', 'warn');
     aiResult = generateEmergencyHijack(caught);
+    emitReasoning('[PENSAMIENTO] El modelo no respondió: no hay razonamiento que mostrar.\n');
+    emitReasoning('[PENSAMIENTO] Activo el banco procedural local para no cortar la secuencia.\n');
+    if (aiResult && aiResult.frase_generada) {
+      emitReasoning(`[SÍNTESIS] Frase compuesta por el banco local:\n${aiResult.frase_generada}\n`);
+    }
   } else {
     emitAgentEvent('inference', 'respuesta del modelo recibida y parseada', 'ok');
   }
@@ -5347,6 +5402,9 @@ async function startResignificationSequence() {
     coldWords: [...coldSynonyms],
     pairs: caught.map((w, i) => `${w} → ${coldSynonyms[i]}`)
   });
+  emitReasoning(`[SÍNTESIS] Términos fríos fijados: ${coldSynonyms.join(' · ')}.\n`);
+  caught.forEach((w, i) => emitReasoning(`[SÍNTESIS]   ${w}  →  ${coldSynonyms[i]}\n`));
+  emitReasoning(`[PENSAMIENTO] Reviso si la frase de ${oraculo} realmente usa los 3 términos y si no los enumera seguidos.\n`);
 
   // Decodificación progresiva hacia la nueva palabra de cada objeto unificado
   const p0 = selectedWords[0] ? selectedWords[0].resolveScramble(coldSynonyms[0].toUpperCase(), 1400) : Promise.resolve();
@@ -5459,6 +5517,10 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
         lineRow.appendChild(auxWord.el);
       }
     }
+    const friosEnVerso = reserved.filter(r => lineRow.contains(r.el))
+      .map(r => coldSynonyms[selectedWordObjs.indexOf(r.wordObj)] || r.wordObj.targetText || '?');
+    const enlaces = lineRow.querySelectorAll('.organic-word-item.word-auxiliary').length;
+    emitReasoning(`[ENSAMBLADO] Verso ${l + 1}/${lines.length} → ${friosEnVerso.length} término(s) frío(s)${friosEnVerso.length ? ' (' + friosEnVerso.join(', ') + ')' : ''} + ${enlaces} palabra(s) de enlace.\n`);
   }
 
   // Si alguna de las 3 no aparece en el texto, se le reserva lugar al final
@@ -5476,6 +5538,7 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
   // 2) VUELO: las 3 palabras transformadas salen del centro y viajan (una tras
   //    otra) hasta el hueco exacto que van a ocupar dentro de la frase.
   // ------------------------------------------------------------------------
+  emitReasoning(`[ENSAMBLADO] Reservo ${reserved.length} hueco(s) con la métrica exacta y hago volar las palabras hasta ahí.\n`);
   await Promise.all(reserved.map(async (r, i) => {
     await wait(i * 170);
     const rect = r.el.getBoundingClientRect();
@@ -5490,6 +5553,7 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
   reserved.forEach(({ wordObj, el }) => wordObj.moveToPhraseFlow(el.parentNode, el));
   await wait(150);
 
+  emitReasoning(`[ENSAMBLADO] Las 3 palabras llegaron a su lugar. Aparecen ${appState.auxiliaryWords.length} palabras de enlace (antes invisibles para que el layout no saltara).\n`);
   const auxEls = appState.auxiliaryWords.map(w => w.el).filter(Boolean);
   auxEls.forEach((el, i) => {
     setTimeout(() => {
@@ -5504,6 +5568,13 @@ async function requestOllamaHijack(words) {
   const coldList = words.map(w => getColdSynonym(w));
   const wordsJoined = words.join(', ');
   const coldJoined = coldList.join(', ');
+
+  emitAgentEvent('inference', `Iniciando agente cognitivo: ${appState.config.ollamaModel}`, 'think', {
+    model: appState.config.ollamaModel,
+    words: words,
+    coldWords: coldList
+  });
+  emitAgentEvent('think', `[${appState.config.ollamaModel}] Evaluando resonancia y antítesis para: ${wordsJoined} → ${coldJoined}...`, 'think');
 
   const userPrompt = `Palabras humanas elegidas: ${wordsJoined}
 Conceptos cibernéticos correspondientes: ${coldJoined}
@@ -5530,9 +5601,9 @@ Responde ÚNICAMENTE un objeto JSON:
     prompt: userPrompt,
     system: appState.config.systemPrompt,
     format: 'json',
-    stream: false,
+    stream: true,
     options: {
-      num_predict: 250,
+      num_predict: 350,
       temperature: 0.7,
       repeat_penalty: 1.15
     }
@@ -5543,7 +5614,9 @@ Responde ÚNICAMENTE un objeto JSON:
   for (const ollamaBase of getOllamaUrls()) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+      emitAgentEvent('inference', `Conectando con motor local: ${ollamaBase}...`, 'think');
 
       const directRes = await fetch(ollamaBase + '/api/generate', {
         method: 'POST',
@@ -5553,12 +5626,44 @@ Responde ÚNICAMENTE un objeto JSON:
       });
       clearTimeout(timeoutId);
 
-      if (directRes.ok) {
-        const data = await directRes.json();
-        const parsed = parseOllamaResponse(data.response);
+      if (directRes.ok && directRes.body) {
+        emitAgentEvent('think', `[${appState.config.ollamaModel}] Stream abierto. Procesando razonamiento en tiempo real...`, 'think');
+        let fullResponse = '';
+        let inThinkTag = false;
+        const reader = directRes.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let streamBuffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          streamBuffer += decoder.decode(value, { stream: true });
+          const lines = streamBuffer.split('\n');
+          streamBuffer = lines.pop();
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const chunk = JSON.parse(trimmed);
+              if (chunk.response) {
+                fullResponse += chunk.response;
+                if (chunk.response.includes('<think>')) inThinkTag = true;
+                emitAgentThought(chunk.response, inThinkTag, fullResponse);
+                if (chunk.response.includes('</think>')) inThinkTag = false;
+              }
+            } catch (e) {}
+          }
+        }
+
+        const parsed = parseOllamaResponse(fullResponse);
         if (parsed) {
-          emitAgentEvent('inference', `inferencia local completada en ${ollamaBase} (${payload.model})`, 'ok', {
+          emitAgentEvent('inference', `inferencia completada en ${ollamaBase} (${payload.model})`, 'ok', {
             model: payload.model, endpoint: ollamaBase
+          });
+          emitAgentEvent('synthesis', `Haiku poético sintetizado: ${parsed.frase_generada.replace(/\n/g, ' / ')}`, 'ok', {
+            coldWords: parsed.nuevas_palabras,
+            phrase: parsed.frase_generada
           });
           return parsed;
         }
@@ -5567,18 +5672,27 @@ Responde ÚNICAMENTE un objeto JSON:
       console.warn('[OLLAMA] Sin respuesta en', ollamaBase, '::', directErr.message);
     }
   }
-  console.warn('[OLLAMA] Ningún Ollama local respondió, intentando vía backend Node...');
+
+  console.warn('[OLLAMA] Ningún Ollama local respondió streaming, intentando vía backend Node...');
 
   try {
+    emitAgentEvent('inference', 'Consultando proxy del servidor Node...', 'think');
     const proxyRes = await sbFetch('/api/ollama/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, stream: false })
     });
     if (proxyRes.ok) {
       const proxyData = await proxyRes.json();
       const parsed = parseOllamaResponse(proxyData.response);
-      if (parsed) return parsed;
+      if (parsed) {
+        emitAgentThought(proxyData.response, false, proxyData.response);
+        emitAgentEvent('synthesis', `Haiku completado vía proxy: ${parsed.frase_generada.replace(/\n/g, ' / ')}`, 'ok', {
+          coldWords: parsed.nuevas_palabras,
+          phrase: parsed.frase_generada
+        });
+        return parsed;
+      }
     }
   } catch (proxyErr) {
     console.warn('[OLLAMA] Proxy falló también:', proxyErr.message);
@@ -5925,11 +6039,16 @@ function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
     : (caughtWords && caughtWords.length >= 3 ? caughtWords.map(w => sanitize(getColdSynonym(w))) : ['MEMORIA', 'TIEMPO', 'SILENCIO']);
 
   if (!phrase || typeof phrase !== 'string') {
+    emitReasoning('[ENSAMBLADO] No llegó texto del modelo → armo el haiku con el banco procedural.\n');
     return composeHaikuWithConcepts(validCold, caughtWords);
   }
 
   const cleaned = cleanSpeechText(phrase);
-  if (!cleaned || cleaned.length < 10 || hasDegenerativeRepetition(cleaned)) {
+  const badRep = hasDegenerativeRepetition(cleaned);
+  if (!cleaned || cleaned.length < 10 || badRep) {
+    emitReasoning(badRep
+      ? '[ENSAMBLADO] La frase del modelo se repite de forma degenerativa → la descarto y recompongo.\n'
+      : '[ENSAMBLADO] La frase del modelo viene vacía o demasiado corta → recompongo con el banco procedural.\n');
     return composeHaikuWithConcepts(validCold, caughtWords);
   }
 
@@ -5956,8 +6075,10 @@ function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
     const has1 = l1.includes(c1) || (c1.length > 3 && l1.includes(c1.substring(0, 4)));
     const has2 = l2.includes(c2) || (c2.length > 3 && l2.includes(c2.substring(0, 4)));
 
+    emitReasoning(`[ENSAMBLADO] Chequeo verso por verso: ${validCold[0]} ${has0 ? 'OK' : 'FALTA'} · ${validCold[1]} ${has1 ? 'OK' : 'FALTA'} · ${validCold[2]} ${has2 ? 'OK' : 'FALTA'}.\n`);
     // Si los 3 versos contienen sus palabras, asegurar mayúsculas para la animación de flujo
     if (has0 && has1 && has2) {
+      emitReasoning('[ENSAMBLADO] La frase del modelo pasa la validación (3 versos, cada uno con su término frío): la respeto tal cual.\n');
       const fixLineToken = (line, token) => {
         const regex = new RegExp(`\\b${token.replace(/_/g, '[_\\s]?')}\\b`, 'i');
         if (regex.test(line)) {
@@ -5986,6 +6107,7 @@ function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
 
   // Si no pasó la validación de 3 versos con sus términos, generar un haiku poético
   // semántico garantizado que conecta profundamente los 3 conceptos.
+  emitReasoning('[ENSAMBLADO] No cerró como 3 versos con sus 3 términos → recompongo con una plantilla de cláusulas separadas (nunca los enumera juntos).\n');
   return composeHaikuWithConcepts(validCold, caughtWords);
 }
 
