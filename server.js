@@ -95,43 +95,43 @@ app.get('/api/clusters', (req, res) => {
     const defaultClusters = [
       {
         id: 'poder',
-        name: 'PODER Y POLÍTICA',
+        name: 'PODER',
         color: '#ef4444',
         words: ['política', 'izquierda', 'derecha', 'fascismo', 'comunismo', 'gobierno', 'estado', 'democracia', 'ideología', 'justicia', 'ley', 'soberanía', 'república', 'autoridad', 'libertad', 'imperio']
       },
       {
         id: 'animales',
-        name: 'ANIMALES & FAUNA',
+        name: 'ANIMALES',
         color: '#10b981',
         words: ['perro', 'gato', 'elefante', 'tigre', 'león', 'caballo', 'lobo', 'águila', 'ballena', 'delfín', 'oso', 'serpiente', 'halcón', 'zorro', 'ciervo', 'pantera']
       },
       {
         id: 'filosofia',
-        name: 'FILOSOFÍA & COSMOS',
+        name: 'FILOSOFÍA',
         color: '#8b5cf6',
         words: ['existencia', 'tiempo', 'filosofía', 'mente', 'alma', 'verdad', 'conciencia', 'universo', 'destino', 'razón', 'muerte', 'infinito', 'ética', 'esencia', 'duda', 'conocimiento']
       },
       {
         id: 'tecnologia',
-        name: 'TECNOLOGÍA & SILICIO',
+        name: 'TECNOLOGÍA',
         color: '#06b6d4',
         words: ['computadora', 'robot', 'código', 'algoritmo', 'futuro', 'silicio', 'red', 'memoria', 'procesador', 'sistema', 'inteligencia', 'interfaz', 'servidor', 'cibernética', 'datos', 'enlace']
       },
       {
         id: 'emociones',
-        name: 'EMOCIONES & AFECTO HUMANO',
+        name: 'EMOCIONES',
         color: '#ec4899',
         words: ['amor', 'nostalgia', 'ternura', 'tristeza', 'alegría', 'fragilidad', 'esperanza', 'miedo', 'anhelo', 'soledad', 'duelo', 'calma', 'pasión', 'desvelo', 'empatía', 'consuelo']
       },
       {
         id: 'poesia',
-        name: 'POESÍA, ARTE & LITERATURA',
+        name: 'POESÍA',
         color: '#f59e0b',
         words: ['verso', 'metáfora', 'ritmo', 'silencio', 'belleza', 'poema', 'sombra', 'eco', 'espejo', 'misterio', 'ceniza', 'aurora', 'abismo', 'origen', 'creación', 'armonía']
       },
       {
         id: 'naturaleza',
-        name: 'NATURALEZA, TIERRA & BIOLOGÍA',
+        name: 'NATURALEZA',
         color: '#84cc16',
         words: ['bosque', 'río', 'montaña', 'océano', 'viento', 'lluvia', 'raíz', 'tierra', 'semilla', 'flor', 'cielo', 'hoja', 'tormenta', 'desierto', 'nieve', 'sol']
       }
@@ -850,22 +850,48 @@ if (fs.existsSync(JP_SHADER_DIR)) {
     }
   }));
 
-  // Proxy de APIs hacia el VPS (compositions, shaders, plans, info)
+  // Proxy de APIs hacia el VPS (compositions, shaders, plans, info, include/*)
+  //
+  // 1) HAY QUE REENVIAR EL Content-Type. Antes solo se mandaba Accept: el
+  //    express.json() del VPS no parseaba el body y POST /api/include/register
+  //    respondia 400 'falta key'. Sintoma: el include nunca quedaba registrado,
+  //    el admin no veia la pagina y su fuente FIJADA nunca se aplicaba en local.
+  // 2) Los GET de listas se cachean 30 s: el backend tarda 20-40 s en /api/shaders
+  //    y /api/compositions (y a veces devuelve 504), asi que el panel del include
+  //    parecia vacio. NO se cachea /include/ (el plan tiene que refrescar en vivo).
+  const JP_PROXY_CACHE_TTL = Number(process.env.JP_PROXY_CACHE_TTL || 30000);
+  const JP_PROXY_CACHEABLES = ['/shaders', '/compositions', '/performance-sessions'];
+  const jpProxyCache = new Map();
   app.use('/jpshadereditor/api', async (req, res) => {
+    const cacheable = req.method === 'GET' && JP_PROXY_CACHEABLES.includes(req.path);
+    const cacheKey = cacheable ? req.originalUrl : null;
+    if (cacheKey) {
+      const hit = jpProxyCache.get(cacheKey);
+      if (hit && (Date.now() - hit.at) < JP_PROXY_CACHE_TTL) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('X-JP-Proxy-Cache', 'HIT');
+        res.type(hit.type);
+        return res.status(200).send(hit.body);
+      }
+    }
     try {
       const vpsUrl = `${JP_VPS_ORIGIN}/jpshadereditor/api${req.url}`;
+      const headers = { 'Accept': req.headers['accept'] || 'application/json, text/plain, */*' };
+      if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
       const response = await fetch(vpsUrl, {
         method: req.method,
-        headers: {
-          'Accept': 'application/json, text/plain, */*'
-        },
-        body: (req.method !== 'GET' && req.method !== 'HEAD') ? JSON.stringify(req.body) : undefined
+        headers,
+        body: (req.method !== 'GET' && req.method !== 'HEAD') ? JSON.stringify(req.body || {}) : undefined
       });
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cache-Control', 'no-cache');
       res.status(response.status);
       const data = await response.text();
-      res.type(response.headers.get('content-type') || 'application/json');
+      const tipo = response.headers.get('content-type') || 'application/json';
+      res.type(tipo);
+      if (cacheKey && response.status === 200 && data.length < 4 * 1024 * 1024) {
+        jpProxyCache.set(cacheKey, { at: Date.now(), body: data, type: tipo });
+      }
       res.send(data);
     } catch (err) {
       console.error('[JPShaderEditor Proxy] Error:', err.message);

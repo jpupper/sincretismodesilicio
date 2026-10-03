@@ -72,11 +72,21 @@ const DEFAULT_WORDS_POOL = [
 
 const DEFAULT_CONFIG = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (1 o 2 palabras unidas por guion bajo cuando sea necesario).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno.\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno.\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona.\nREGLA CRUCIAL DE CONEXIÓN: Los tres versos deben narrar una sola imagen poética conectada y coherente donde los tres conceptos interactúan con naturalidad. NO deben sonar a palabras forzadas ni listas inconexas.\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 con TERMINO_1\\nVerso 2 con TERMINO_2\\nVerso 3 con TERMINO_3"}.',
+  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (SIEMPRE UNA SOLA PALABRA, en mayúsculas. PROHIBIDO el guion bajo, el espacio y el guion: nada de compuestos tipo OPTIMO_LUJO o CAJA_NEGRA, se dice OPTIMO o CAJA. Si el concepto necesita dos palabras, elegí LA MÁS FUERTE y usá solo esa).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno.\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno.\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona.\nREGLA CRUCIAL DE CONEXIÓN: Los tres versos deben narrar una sola imagen poética conectada y coherente donde los tres conceptos interactúan con naturalidad. NO deben sonar a palabras forzadas ni listas inconexas.\nAntes de responder, verificá que cada uno de los 3 términos sea UNA SOLA PALABRA sin separadores (sin guion bajo, sin espacio, sin guion).\\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "Verso 1 con TERMINO1\\nVerso 2 con TERMINO2\\nVerso 3 con TERMINO3"}.',
   wordsPool: [...DEFAULT_WORDS_POOL]
 };
 
 let HUMAN_WORDS_POOL = [...DEFAULT_WORDS_POOL];
+
+// ============================================================================
+// CALL TO ACTION POR INACTIVIDAD
+// Si nadie toca la instalación durante IDLE_CTA_DELAY_MS aparece abajo el
+// cartel que invita a elegir la primera palabra. Se esconde al primer
+// estímulo (mouse, clic, touch, tecla o movimiento real en cámara).
+// ============================================================================
+const IDLE_CTA_DELAY_MS = 12000;        // 12 s sin tocar nada
+const IDLE_CTA_CAMERA_MOVE_PX = 26;     // movimiento mínimo para contar en cámara
+
 
 // Paleta global de la interfaz — controlable desde la pestaña COLORES del modal [P]
 const UI_COLORS = {
@@ -375,6 +385,10 @@ const appState = {
   audioEnabled: true,
   audioCtx: null,
   
+  // Call to action por inactividad
+  lastUserActivity: Date.now(),
+  idleCtaVisible: false,
+
   // Timers
   hijackResetTimeout: null,
   typewriterInterval: null,
@@ -444,6 +458,9 @@ const appState = {
     frameDiffOpacity: 0.88,
     openposeEnabled: false,
     openposeOpacity: 1.0,
+    flowfieldEnabled: false,
+    flowfieldOpacity: 1.0,
+    noiseSpeed: 1.0,
     pointersEnabled: true,
     pointersOpacity: 1.0,
     depthEnabled: false,
@@ -453,10 +470,32 @@ const appState = {
     noiseEnabled: false,
     noiseOpacity: 0.40,
     noiseScale: 2.0,
-    corpParticlesEnabled: true,
-    corpParticlesOpacity: 0.80,
+    corpParticlesEnabled: false,
+    corpParticlesOpacity: 0.0,
     cutoutEnabled: false,
     cutoutThreshold: 0.28
+  },
+
+  // Configuración de Glitch & Envelope de Secuencia (Pestaña GLITCH & ENVELOPE)
+  glitchConfig: {
+    envelope: {
+      idle: 0.10,
+      thinking: 1.00,
+      haiku: 0.50,
+      duration: 1.2,
+      curve: 'cubic'
+    },
+    manualOverride: false,
+    manualGlitchAmount: 0.50,
+    noiseSpeed: 1.0,
+    testPreviewState: null,
+    params: {
+      blockIntensity:       { value: 0.80, animated: true },
+      blockSize:            { value: 0.60, animated: true },
+      chromaIntensity:      { value: 0.70, animated: true },
+      vhsNoiseIntensity:    { value: 0.65, animated: true },
+      edgeTearingIntensity: { value: 0.50, animated: true }
+    }
   }
 };
 
@@ -475,6 +514,7 @@ const DOM = {
   asciiCanvas: document.getElementById('ascii-camera-canvas'),
   framediffCanvas: document.getElementById('framediff-camera-canvas'),
   openposeCanvas: document.getElementById('openpose-overlay-canvas'),
+  flowfieldCanvas: document.getElementById('flowfield-overlay-canvas'),
   pointersCanvas: document.getElementById('pointers-overlay-canvas'),
   corporateRainCanvas: document.getElementById('corporate-rain-canvas'),
   vhsGlitchLayer: document.getElementById('vhs-glitch-layer'),
@@ -503,6 +543,10 @@ const DOM = {
   cfgRenderOpenposeOpacity: document.getElementById('cfg-render-openpose-opacity'),
   valRenderOpenposeOpacity: document.getElementById('val-render-openpose-opacity'),
 
+  cfgRenderFlowfieldToggle: document.getElementById('cfg-render-flowfield-toggle'),
+  cfgRenderFlowfieldOpacity: document.getElementById('cfg-render-flowfield-opacity'),
+  valRenderFlowfieldOpacity: document.getElementById('val-render-flowfield-opacity'),
+
   cfgRenderPointersToggle: document.getElementById('cfg-render-pointers-toggle'),
   cfgRenderPointersOpacity: document.getElementById('cfg-render-pointers-opacity'),
   valRenderPointersOpacity: document.getElementById('val-render-pointers-opacity'),
@@ -523,6 +567,9 @@ const DOM = {
   valRenderNoiseOpacity: document.getElementById('val-render-noise-opacity'),
   cfgRenderNoiseScale: document.getElementById('cfg-render-noise-scale'),
   valRenderNoiseScale: document.getElementById('val-render-noise-scale'),
+
+  cfgRenderNoiseSpeed: document.getElementById('cfg-render-noise-speed'),
+  valRenderNoiseSpeed: document.getElementById('val-render-noise-speed'),
 
   cfgRenderCorpParticlesToggle: document.getElementById('cfg-render-corpparticles-toggle'),
   cfgRenderCorpParticlesOpacity: document.getElementById('cfg-render-corpparticles-opacity'),
@@ -557,6 +604,8 @@ const DOM = {
   btnFullscreen: document.getElementById('btn-fullscreen'),
   
   // Telemetría
+  // Badge de telemetria (SENSOR/COORD/CONFIANZA) ELIMINADO del HTML: los nodos
+  // quedan en null y todas las escrituras están protegidas con if (DOM.x).
   telemetrySensor: document.getElementById('telemetry-sensor'),
   telemetryCoords: document.getElementById('telemetry-coords'),
   telemetryConfidence: document.getElementById('telemetry-confidence'),
@@ -571,6 +620,7 @@ const DOM = {
   
   // Escenario Central de Resignificación y Síntesis
   mutationStage: document.getElementById('mutation-stage'),
+  idleCta: document.getElementById('idle-cta'),
   desprocesandoBanner: document.getElementById('desprocesando-banner'),
   finalSpeechBox: document.getElementById('final-speech-box'),
   finalTypewriterText: document.getElementById('final-typewriter-text'),
@@ -937,6 +987,17 @@ class MasterOutputShader {
     this.startTime = performance.now();
     this.fsUrl = sbUrl('/shaders/master-output.frag');
 
+    // Estados interpolados y animación de Glitch
+    this.currentWeights = [1.0, 0.0, 0.0];
+    this.targetWeights = [1.0, 0.0, 0.0];
+    this.startWeights = [1.0, 0.0, 0.0];
+    this.currentGlitch = 0.1;
+    this.targetGlitch = 0.1;
+    this.startGlitch = 0.1;
+    this.lastStateName = 'idle';
+    this.transitionProgress = 1.0;
+    this.transitionStartTime = performance.now();
+
     if (this.gl) {
       this.init();
     }
@@ -982,78 +1043,476 @@ class MasterOutputShader {
     `;
 
     let fsSource = null;
+    let fsOrigen = 'COPIA EMBEBIDA (dentro de script.js)';   // de dónde salió el shader
+    let fsError = '';
     try {
       const resp = await fetch(sbUrl('/shaders/master-output.frag?t=' + Date.now()));
-      if (resp.ok) fsSource = await resp.text();
-    } catch (e) {}
-
+      if (resp.ok) { fsSource = await resp.text(); fsOrigen = 'public/shaders/master-output.frag (' + fsSource.length + ' bytes)'; }
+      else fsError = 'HTTP ' + resp.status;
+    } catch (e) { fsError = e.message || 'fetch falló'; }
+    console.log('[Master Shader] fuente del shader: ' + fsOrigen + (fsError ? '  <- ' + fsError : ''));
+    // AVISO EN PANTALLA (no hace falta abrir la consola): si el shader NO viene del
+    // .frag, cualquier edición a public/shaders/master-output.frag queda sin efecto.
     if (!fsSource) {
+      // Se llega acá si el fetch de /shaders/master-output.frag falla en silencio
+      // (file://, hosting sin /shaders, 404). Antes quedaba mudo: ahora avisa.
+      console.warn('[Master Shader] No se pudo leer public/shaders/master-output.frag -> se usa la COPIA EMBEBIDA (sincronizada).');
+      // ---------------------------------------------------------------------
+      // COPIA EMBEBIDA DEL SHADER MAESTRO.
+      // ⚠ DEBE SER IDÉNTICA a public/shaders/master-output.frag. Si editás uno,
+      //   editá el otro (es el respaldo cuando el fetch no puede leer el archivo).
+      // ---------------------------------------------------------------------
       fsSource = `
         precision highp float;
+
+        // ============================================================================
+        // SHADER MAESTRO DE SALIDA (MASTER OUTPUT SHADER)
+        // ============================================================================
+        // 1) Render de la Cámara
         uniform sampler2D u_cameraTexture;
         uniform int u_hasCamera;
+
+        // 2) Render del Depth Map / Segmentación
         uniform sampler2D u_depthTexture;
         uniform int u_hasDepth;
+
+        // 3) Render de la Silueta / Overlay OpenPose
         uniform sampler2D u_openposeTexture;
         uniform int u_hasOpenpose;
-        uniform sampler2D renderJPSHADER;
+        uniform float u_openposeOpacity;
+
+        // 3b) Render de Vectores de Campo de Flujo (Flow Field)
+        uniform sampler2D u_flowfieldTexture;
+        uniform int u_hasFlowfield;
+        uniform float u_flowfieldOpacity;
+
+        // 4) Array con las posiciones normalizadas de las palabras en pantalla (UV: 0.0 a 1.0)
         #define MAX_WORDS 32
         uniform vec2 u_wordPositions[MAX_WORDS];
+        // Ancho REAL de cada palabra en UV x (px/ancho de pantalla). 0 = sin dato:
+        // en ese caso el marco usa el ancho fijo de WORD_BOX_X.
+        uniform float u_wordWidths[MAX_WORDS];
         uniform int u_wordCount;
+
+        uniform sampler2D renderJPSHADER;
+
+        // 5) Estados activos del sistema:
+        //    u_activeState (0: IDLE, 1: PROCESSING/THINKING, 2: HIJACK/HAIKU)
+        //    u_stateWeights (vec3 interpolado continuo: x=IDLE, y=THINKING, z=HAIKU)
         uniform int u_activeState;
+        uniform vec3 u_stateWeights;
+
+        // Uniforms de Control de GLITCH (Mismos parámetros que en LOG)
+        uniform float glitchAmount;
+        uniform float blockIntensity;
+        uniform float blockSize;
+        uniform float chromaIntensity;
+        uniform float vhsNoiseIntensity;
+        uniform float edgeTearingIntensity;
+
+        // Uniforms de resolución y tiempo
         uniform vec2 u_resolution;
         uniform float u_time;
+        #define pi 3.14159265359
 
-        void main() {
-          vec2 uv = gl_FragCoord.xy / u_resolution;
-          vec2 camUv = vec2(1.0 - uv.x, uv.y);
-          vec4 finalColor = vec4(0.0, 0.0, 0.0, 1.0);
+        // ---------------------------------------------------------------------------
+        // AJUSTES RÁPIDOS (editá acá y apretá R para recompilar en vivo)
+        // ---------------------------------------------------------------------------
+        // ANCHO de los contenedores de las palabras:
+        //   1.0 = cuadrado · 0.55 = 1.8x MÁS ANCHO · 0.40 = 2.5x MÁS ANCHO
+        #define WORD_BOX_X        0.55
 
-          // 1) Render Cámara
-          vec4 camCol = (u_hasCamera == 1) ? texture2D(u_cameraTexture, camUv) : vec4(0.0);
-          finalColor += camCol * 0.70;
+        // Tamaño del contenedor del HAIKU (media medida, en UV)
+        #define HAIKU_BOX_W       0.40
+        #define HAIKU_BOX_H       0.21
 
-          // 2) Render Depth Map
-          vec4 depthCol = (u_hasDepth == 1) ? texture2D(u_depthTexture, uv) : vec4(0.0);
-          finalColor += depthCol * 0.40;
+        // Margen (en UV) alrededor del marco del haiku que queda INMUNE al glitch
+        #define HAIKU_IMMUNE_PAD  0.030
 
-          // 3) Render Silueta OpenPose
-          vec4 openposeCol = (u_hasOpenpose == 1) ? texture2D(u_openposeTexture, uv) : vec4(0.0);
-          finalColor += openposeCol * 0.85;
+        // VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
+        // Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
+        #define WORD_SPIN_SPEED   0.32
 
-          // 4) Render directo de JPShaderEditor Include
-          vec4 jpCol = texture2D(renderJPSHADER, uv);
-          finalColor += jpCol;
+        // Margen del marco alrededor del ancho real de la palabra (1.0 = exacto)
+        #define WORD_BOX_PAD      1.06
 
-          // 5) Círculos en palabras
-          vec4 wordsEffect = vec4(0.0);
-          float aspect = u_resolution.x / u_resolution.y;
-          for (int i = 0; i < MAX_WORDS; i++) {
-            if (i >= u_wordCount) break;
-            vec2 wPos = u_wordPositions[i];
-            vec2 diff = (uv - wPos) * vec2(aspect, 1.0);
-            float dist = length(diff);
-            float ring = smoothstep(0.045, 0.040, dist) - smoothstep(0.038, 0.033, dist);
-            float core = smoothstep(0.012, 0.007, dist);
-            float pulse = 0.8 + 0.2 * sin(u_time * 4.0 + float(i) * 1.5);
-            wordsEffect += vec4(0.0, 0.95, 1.0, 1.0) * (ring * 1.2 + core * 0.8) * pulse;
-          }
-          finalColor += wordsEffect;
+        // CONTENEDOR DEL HAIKU: el interior es OPACO (el fondo NO se ve nunca) y ROJO.
+        // HAIKU_BG_TOP/BOT = relleno del cuadrado (rojo con profundidad).
+        // Si lo querés NEGRO PURO: vec3(0.0) en los dos.
+        // HAIKU_LINE_COL = la línea del marco (rojo claro, para que se lea sobre el rojo).
+        #define HAIKU_BG_TOP      vec3(0.05, 0.95, 0.30)
+        #define HAIKU_BG_BOT      vec3(0.004, 0.34, 0.10)
+        #define HAIKU_LINE_COL    vec3(0.55, 1.0, 0.62)
+        #define HAIKU_GLOW_COL    vec3(0.05, 0.92, 0.35)
 
-          // 5) Estado activo
-          if (u_activeState == 0) {
-            finalColor.rgb += vec3(0.0, 0.03, 0.06);
-          } else if (u_activeState == 1) {
-            float wave = sin(uv.y * 60.0 + u_time * 12.0) * 0.06;
-            finalColor.rgb += vec3(0.12 + wave, 0.0, 0.04);
-          } else if (u_activeState == 2) {
-            float grid = sin(uv.y * 180.0 + u_time * 2.0) * 0.03;
-            finalColor.rgb += vec3(0.0, 0.08 + grid, 0.03);
-          }
-
-          gl_FragColor = vec4(finalColor.rgb, 1.0);
+        // Función de ruido base pseudo-aleatorio
+        float rand(vec2 co){
+            return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
         }
-      `;
+
+        // -----------------------------------------------------------------
+        // FORMAS POLIGONALES Y PALABRAS
+        // -----------------------------------------------------------------
+        float poly(vec2 uv, vec2 p, float s, float dif, int N, float a){
+            vec2 st = p - uv;
+            float a2 = atan(st.x, st.y) + a;
+            float r = pi * 2.0 / float(N);
+            float d = cos(floor(0.5 + a2 / r) * r - a2) * length(st);
+            float e = 1.0 - smoothstep(s, dif, d);
+            return e;
+        }
+
+        vec4 getWords(vec2 uv, float animPulse){
+            float t = u_time * (1.0 + animPulse * 1.5);
+            vec4 wordsEffect = vec4(0.0);
+            float fx = u_resolution.x / u_resolution.y;
+
+            for (int i = 0; i < MAX_WORDS; i++) {
+                if (i >= u_wordCount) break;
+                vec2 wPos = u_wordPositions[i];
+
+                vec2 uv2 = uv;
+                vec2 diff = (uv2 - wPos) * vec2(fx, 1.0);
+                float r = length(diff);
+
+                float s = mix(0.07, 0.12, animPulse);
+                float d = mix(0.07, 0.12, animPulse);
+
+                float e = 1.0 - smoothstep(s, s + d, r);
+                wordsEffect += e * 0.5;
+            }
+            return wordsEffect;
+        }
+
+        // Contenedores de las palabras (marcos).
+        // (c) AHORA SON MÁS ANCHOS: el eje X se comprime por WORD_BOX_X antes de
+        // evaluar el polígono, así el marco se estira horizontalmente alrededor de la
+        // palabra (el eje Y no se toca).
+        vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
+            // Giro MUCHO más lento: antes (1.0 + 2*animPulse) = hasta 3.0 rad/s.
+            float t = u_time * WORD_SPIN_SPEED * (1.0 + animPulse);
+            vec4 wordsEffect = vec4(0.0);
+            float fx = u_resolution.x / u_resolution.y;
+
+            for (int i = 0; i < MAX_WORDS; i++) {
+                if (i >= u_wordCount) break;
+                vec2 wPos = u_wordPositions[i];
+
+                float s = _s * (1.0 + animPulse * 0.35);
+                // grosor del trazo: nunca 0 (smoothstep con bordes iguales es indefinido
+                // y en algunos drivers el marco desaparecía por completo)
+                float d = max(_d, s * 0.10) * (1.0 + animPulse * 0.35);
+
+                // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
+                // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
+                float wAncho = u_wordWidths[i] * WORD_BOX_PAD;
+                float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
+                // uv_m = uv con el eje X comprimido alrededor de la palabra
+                vec2 uv_m = wPos + (uv - wPos) * vec2(kx, 1.0);
+
+                float e = poly(uv_m, wPos, s, s + d, 4, animPulse * sin(t + float(i)));
+                e -= poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, animPulse * sin(t + float(i)));
+
+                wordsEffect += e;
+            }
+            return wordsEffect;
+        }
+
+        // -----------------------------------------------------------------
+        // CONTENEDOR (MARCO CIBERNÉTICO) DEL HAIKU EN SHADER
+        // Se dibuja detrás del Haiku e interpola fluidamente con los 3 estados.
+        // La geometría se calcula SIEMPRE con la UV SIN GLITCH (rawUv): así el marco
+        // nunca se deforma y define una zona inmune que no se glitchea.
+        // -----------------------------------------------------------------
+        struct HaikuBox {
+            float presence;   // 0 en IDLE, sube en THINKING (escaneo), pleno en HAIKU
+            vec2  size;       // semitamaño del marco en UV
+            vec2  p;          // uv relativa al centro de pantalla
+            vec2  d;          // distancia por eje al borde (negativa = adentro)
+            float boxDist;    // distancia al contorno (0 = sobre el borde)
+            float inside;     // 1.0 adentro, 0.0 afuera
+        };
+
+        HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
+            HaikuBox b;
+            // SOLO cuando se está formando el haiku (estado HAIKU = weights.z). Antes de
+            // eso (THINKING: palabras girando y cambiando) el contenedor NO existe.
+            b.presence = clamp(weights.z, 0.0, 1.0);
+
+            float aspect = u_resolution.x / u_resolution.y;
+            vec2 targetSize = vec2(HAIKU_BOX_W, HAIKU_BOX_H);
+            b.size = targetSize * mix(0.70, 1.0, b.presence);
+
+            b.p = uv - vec2(0.5, 0.5);
+            b.d = abs(b.p) - b.size;
+            b.boxDist = max(b.d.x * aspect, b.d.y);
+            b.inside = (b.d.x < 0.0 && b.d.y < 0.0) ? 1.0 : 0.0;
+            return b;
+        }
+
+        // Zona INMUNE AL GLITCH: 1.0 dentro del marco (y su margen), 0.0 afuera.
+        // IMPORTANTE: NO se multiplica por 'presence'. La inmunidad es GEOMÉTRICA: donde
+        // el marco está dibujado, las UVs son SIEMPRE limpio (rawUv) — antes, con
+        // presence=0.55 (THINKING) sólo se corregía el 55% del desplazamiento y el
+        // contenedor entraba a pantalla ya con las UVs movidas por el glitch.
+        float getHaikuImmuneZone(vec2 uv, vec3 weights) {
+            HaikuBox b = haikuBoxAt(uv, weights);
+            if (b.presence < 0.005) return 0.0;
+            float zone = 1.0 - smoothstep(0.0, HAIKU_IMMUNE_PAD, b.boxDist);
+            return zone;
+        }
+
+        vec4 getHaikuContainer(vec2 uv, vec3 weights) {
+            HaikuBox b = haikuBoxAt(uv, weights);
+            if (b.presence < 0.005) return vec4(0.0);
+            if (b.boxDist > 0.08) return vec4(0.0);
+
+            float wThink = weights.y;
+            float wHaiku = weights.z;
+            float aspect = u_resolution.x / u_resolution.y;
+
+            vec4 outColor = vec4(0.0);
+
+            // 1. Fondo interior del contenedor (vidrio ahumado silicio + matriz)
+            if (b.inside > 0.5) {
+                // Rejilla de silicio holográfica interna
+                vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.04, 0.0));
+                float gridLine = (step(0.90, gridUv.x) + step(0.90, gridUv.y)) * 0.16;
+
+                // Barras de escaneo horizontal sutil
+                float scan = sin(uv.y * 140.0 + u_time * 6.0) * 0.05 * (wThink + 0.2);
+
+                // Relleno del contenedor: ROJO (degradado vertical suave).
+                vec3 bg = mix(HAIKU_BG_TOP, HAIKU_BG_BOT, uv.y);
+
+                // Viñeta interna: los bordes más apagados, el centro sostiene el texto
+                float bordeInt = min(min(b.size.x - abs(b.p.x), b.size.y - abs(b.p.y)) * 6.0, 1.0);
+                //bg *= mix(0.72, 1.0, bordeInt);
+
+                // SIN TRANSPARENCIA: el interior tapa el fondo por completo (el fondo ya
+                // no se ve en la zona del cuadrado). Sólo queda un fade corto al entrar.
+                float fillAlpha = smoothstep(0.02, 0.40, b.presence);
+                outColor = vec4(bg, fillAlpha);
+            }
+
+            // 2. Bordes y marcas tácticas del contenedor
+            float edgeGlow = exp(-abs(b.boxDist) * 220.0);          // marco principal
+            float innerLine = exp(-abs(b.boxDist + 0.014) * 260.0); // doble marco interior
+            // Aura EXTERIOR: sólo afuera del cuadrado (adentro valía 1.0 y "pintaba" todo el
+            // interior con el color del marco).
+            float outerAura = (b.boxDist > 0.0) ? exp(-b.boxDist * 34.0) * 1.10 : 0.0;
+            // Brillo INTERIOR: pegado al marco, decae hacia el centro.
+            float innerAura = exp(-max(0.0, -b.boxDist) * 30.0) * 0.55;
+
+            // Soportes de esquina (brackets tácticos)
+            vec2 cornerOffset = abs(abs(b.p) - b.size);
+            float isCorner = (step(cornerOffset.x, 0.055) * step(cornerOffset.y, 0.055));
+            float cornerBoost = (isCorner > 0.0) ? 2.6 : 1.0;
+
+            // Marco y esquinas: línea ROJA CLARA. Aura/brillo: ROJO (siempre, en los 3
+            // estados — antes en thinking el marco pasaba a oro/naranja).
+            float lineaAlpha = (edgeGlow * 3.2 * cornerBoost + innerLine * 1.6 * cornerBoost) * b.presence;
+            float auraAlpha = (outerAura + innerAura) * b.presence;
+
+            outColor.rgb = mix(outColor.rgb, HAIKU_GLOW_COL, clamp(auraAlpha, 0.0, 1.0));
+            outColor.rgb = mix(outColor.rgb, HAIKU_LINE_COL, clamp(lineaAlpha, 0.0, 1.0));
+            outColor.a = max(outColor.a, clamp(max(lineaAlpha, auraAlpha), 0.0, 1.0));
+
+            return outColor;
+        }
+
+        // -----------------------------------------------------------------
+        // FUNCIÓN ENCAPSULADA DE GLITCH
+        // -----------------------------------------------------------------
+        void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out float scanline, out float vhsNoise) {
+            float t = floor(u_time * 15.0);
+
+            // 1. PATRÓN RANDOM (Alta densidad de filas y columnas)
+            float rows = (blockSize * 100.0);
+            float row = floor(uv.y * rows);
+
+            float baseCols = (blockSize * 100.0);
+            float colsPerRow = baseCols * (0.5 + 2.0 * rand(vec2(row, t)));
+
+            float colOffset = rand(vec2(row, t * 0.5)) * 100.0;
+            float col = floor(uv.x * colsPerRow + colOffset);
+
+            vec2 cellId = vec2(col, row);
+
+            float cellRandom = rand(cellId + t);
+            float glitchThreshold = 1.0 - (blockIntensity * glitchAmount);
+
+            vec2 displace = vec2(0.0);
+            bool isGlitching = (cellRandom > glitchThreshold) && (glitchAmount > 0.0);
+
+            if (isGlitching) {
+                float shiftX = (rand(cellId + t * 2.0) - 0.5) * 0.5 * glitchAmount;
+                float shiftY = (rand(cellId + t * 3.0) - 0.5) * 0.1 * glitchAmount;
+                displace = vec2(shiftX, shiftY);
+            }
+
+            vec2 p = uv + displace;
+
+            // 2. TEARING LATERAL
+            float effectiveEdge = edgeTearingIntensity * glitchAmount;
+            float edgeDist = abs(uv.x - 0.5) * 2.0;
+            if (effectiveEdge > 0.0 && edgeDist > (1.0 - effectiveEdge * 0.5)) {
+                float sideCell = floor(uv.y * rows * 1.5);
+                p.x += (rand(vec2(sideCell, t)) - 0.5) * 0.4 * effectiveEdge;
+            }
+
+            // 3. ABERRACIÓN CROMÁTICA
+            float effectiveChroma = chromaIntensity * glitchAmount * 0.05;
+            if (isGlitching) {
+                effectiveChroma *= 3.0; // Resalta en los cuadraditos rotos
+            }
+
+            uvR = p + vec2(effectiveChroma, 0.0);
+            uvG = p;
+            uvB = p - vec2(effectiveChroma, 0.0);
+
+            // 4. VHS NOISE Y SCANLINES
+            float effectiveVHS = vhsNoiseIntensity * glitchAmount;
+            scanline = sin(uv.y * u_resolution.y * 2.5) * 0.03 * effectiveVHS;
+            vhsNoise = (rand(uv * u_time) - 0.5) * 0.15 * effectiveVHS;
+        }
+
+        // -----------------------------------------------------------------
+        // MAIN
+        // -----------------------------------------------------------------
+        void main() {
+            vec2 rawUv = gl_FragCoord.xy / u_resolution;
+
+            // Normalizar pesos de los 3 estados (fallback a u_activeState si u_stateWeights no se envió)
+            vec3 weights = u_stateWeights;
+            float sumW = weights.x + weights.y + weights.z;
+            if (sumW < 0.01) {
+                if (u_activeState == 1) weights = vec3(0.0, 1.0, 0.0);
+                else if (u_activeState == 2) weights = vec3(0.0, 0.0, 1.0);
+                else weights = vec3(1.0, 0.0, 0.0);
+            } else {
+                weights /= sumW;
+            }
+
+            // (b) ZONA INMUNE AL GLITCH: donde se dibuja el contenedor del haiku el
+            // shader NO se glitchea (ni se desplaza, ni aberra, ni mete scanlines/ruido).
+            float immune = getHaikuImmuneZone(rawUv, weights);
+
+            // Cálculo de coordenadas con GLITCH integrado
+            vec2 uvR, uvG, uvB;
+            float scanline, vhsNoise;
+            getGlitchCoords(rawUv, uvR, uvG, uvB, scanline, vhsNoise);
+
+            // Dentro del contenedor se usan las coordenadas LIMPIAS
+            uvR = mix(uvR, rawUv, immune);
+            uvG = mix(uvG, rawUv, immune);
+            uvB = mix(uvB, rawUv, immune);
+            scanline *= (1.0 - immune);
+            vhsNoise *= (1.0 - immune);
+
+            vec2 uv = uvG;
+
+            // Espejado horizontal de la cámara web
+            vec2 camUvR = vec2(1.0 - uvR.x, 1.0 - uvR.y);
+            vec2 camUvG = vec2(1.0 - uvG.x, 1.0 - uvG.y);
+            vec2 camUvB = vec2(1.0 - uvB.x, 1.0 - uvB.y);
+
+            // 1) Render Cámara con aberración cromática glitcheada
+            vec3 camCol = vec3(0.0);
+            if (u_hasCamera == 1) {
+                camCol.r = texture2D(u_cameraTexture, camUvR).r;
+                camCol.g = texture2D(u_cameraTexture, camUvG).g;
+                camCol.b = texture2D(u_cameraTexture, camUvB).b;
+            }
+            vec3 invcamCol = vec3(1.0, 1.0, 1.0) - camCol.rgb;
+
+            // 2) Render Depth Map / Segmentación
+            vec4 depthCol = (u_hasDepth == 1) ? texture2D(u_depthTexture, vec2(uv.x, 1.0 - uv.y)) : vec4(0.0);
+
+            // 3) Render Silueta / OpenPose (Esqueleto Cinemático & Nodos)
+            vec4 openposeCol = vec4(0.0);
+            if (u_hasOpenpose == 1) {
+                openposeCol = texture2D(u_openposeTexture, vec2(uv.x,1.-uv.y));
+                float opOpacity = (u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0;
+                openposeCol.rgb *= opOpacity;
+            }
+
+            // 3b) Render Flow Field (Campo de Flujo Vectorial Óptico)
+            vec4 flowfieldCol = vec4(0.0);
+            if (u_hasFlowfield == 1) {
+                flowfieldCol = texture2D(u_flowfieldTexture, uv);
+                float ffOpacity = (u_flowfieldOpacity > 0.0) ? u_flowfieldOpacity : 1.0;
+                flowfieldCol.rgb *= ffOpacity;
+            }
+
+            // 4) Render directo de JPShaderEditor Include
+            vec3 jpCol = vec3(0.0);
+            jpCol.r = texture2D(renderJPSHADER, uvR).r;
+            jpCol.g = texture2D(renderJPSHADER, uvG).g;
+            jpCol.b = texture2D(renderJPSHADER, uvB).b;
+
+            // 5) Efectos de palabras en pantalla (fondo de las palabras)
+            float animPulse = weights.y * 1.0 + weights.z * 0.3;
+            vec4 words = getWords(uv, animPulse);
+            vec4 wordsq = getQuadWords(uv, mix(0.03, 0.045, weights.y), 0.0, animPulse);
+
+            // (3) Los marcos de TODAS las palabras desaparecen apenas ENTRA el contenedor
+            //     del haiku (la caja empieza a aparecer en THINKING, no sólo en HAIKU) y
+            //     vuelven cuando la caja se retira.
+            float cajaPresence = clamp(weights.z, 0.0, 1.0);   // = presencia del contenedor
+            wordsq *= (1.0 - smoothstep(0.03, 0.45, cajaPresence));
+
+            // 6) DIBUJO DEL CONTENEDOR DEL HAIKU (con rawUv: geometría fija, sin glitch)
+            vec4 haikuBox = getHaikuContainer(rawUv, weights);
+
+            // Composición de capas de renderizado:
+            // Capa A: Salida base (JPShader + Cámara recortada por Depth Map)
+            vec3 finalColor = vec3(0.0);
+            finalColor += jpCol * words.r;
+            finalColor += mix(jpCol * words.r, camCol, depthCol.r);
+
+            // (a) SILUETA OPENPOSE: primero BLANCA y después, cuando la obra avanza a
+            //     THINKING / HAIKU, pasa al COLOR INVERTIDO DE LA CÁMARA.
+            //     En IDLE (weights.x) el esqueleto queda blanco puro; al entrar en los
+            //     otros estados se mezcla hacia (1 - cámara).
+            float opToInvert = clamp(weights.y + weights.z, 0.0, 1.0);
+            vec3 siluetaCol = mix(vec3(1.0), invcamCol, opToInvert);
+            finalColor += openposeCol.rgb * siluetaCol;
+
+            // Capa D: Integración del contenedor del Haiku detrás de los textos
+            finalColor = mix(finalColor, haikuBox.rgb, haikuBox.a);
+
+            // Fondo y halos de las palabras (transición suave entre estados)
+            vec3 wordQuadCol = mix(vec3(1.0, 0.05, 0.05), vec3(1.0, 0.65, 0.15), weights.y);
+            wordQuadCol = mix(wordQuadCol, vec3(0.2, 0.95, 1.0), weights.x * 0.4);
+            finalColor += wordsq.rgb * wordQuadCol;
+
+            // Modulación e interferencias continuas según el peso de cada estado.
+            // OJO: nada de esto entra en la zona del contenedor del haiku ('limpio' = 0
+            // ahí) — el marco y su texto son la última pila de la imagen del shader, así
+            // que ningún post efecto (ni del shader ni de una capa DOM superior) los toca.
+            float limpio = 1.0 - immune;
+
+            // Estado 0 (IDLE): tinte de reposo cibernético sutil
+            finalColor += vec3(0.0, 0.02, 0.04) * weights.x * limpio;
+
+            // Estado 1 (THINKING): interferencia de alta frecuencia y escaneo sináptico
+            float waveThink = sin(uv.y * 90.0 + u_time * 16.0) * 0.08;
+            //finalColor += vec3(0.14 + waveThink, 0.01, 0.05) * weights.y * limpio;
+
+            // Estado 2 (HAIKU): matriz estructurada y coherencia poética
+            float gridHaiku = sin(uv.y * 160.0 + u_time * 2.5) * 0.03;
+            finalColor += vec3(0.04, 0.01 + gridHaiku, 0.02) * weights.z * limpio;
+
+            // Aplicación de Scanlines y Ruido VHS de la función glitch
+            // (dentro del contenedor del haiku NO entran: el marco queda limpio)
+            finalColor -= scanline;
+            finalColor += vhsNoise;
+
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+
+`;
     }
 
     const vs = this.compileShader(gl.VERTEX_SHADER, vsSource);
@@ -1089,11 +1548,38 @@ class MasterOutputShader {
       hasDepth: gl.getUniformLocation(this.program, 'u_hasDepth'),
       openposeTexture: gl.getUniformLocation(this.program, 'u_openposeTexture'),
       hasOpenpose: gl.getUniformLocation(this.program, 'u_hasOpenpose'),
+      openposeOpacity: gl.getUniformLocation(this.program, 'u_openposeOpacity'),
+      flowfieldTexture: gl.getUniformLocation(this.program, 'u_flowfieldTexture'),
+      hasFlowfield: gl.getUniformLocation(this.program, 'u_hasFlowfield'),
+      flowfieldOpacity: gl.getUniformLocation(this.program, 'u_flowfieldOpacity'),
       renderJPSHADER: gl.getUniformLocation(this.program, 'renderJPSHADER'),
       wordPositions: gl.getUniformLocation(this.program, 'u_wordPositions'),
+      wordWidths: gl.getUniformLocation(this.program, 'u_wordWidths'),
       wordCount: gl.getUniformLocation(this.program, 'u_wordCount'),
-      activeState: gl.getUniformLocation(this.program, 'u_activeState')
+      activeState: gl.getUniformLocation(this.program, 'u_activeState'),
+      // Uniforms de estados interpolados y Glitch
+      stateWeights: gl.getUniformLocation(this.program, 'u_stateWeights'),
+      glitchAmount: gl.getUniformLocation(this.program, 'glitchAmount'),
+      blockIntensity: gl.getUniformLocation(this.program, 'blockIntensity'),
+      blockSize: gl.getUniformLocation(this.program, 'blockSize'),
+      chromaIntensity: gl.getUniformLocation(this.program, 'chromaIntensity'),
+      vhsNoiseIntensity: gl.getUniformLocation(this.program, 'vhsNoiseIntensity'),
+      edgeTearingIntensity: gl.getUniformLocation(this.program, 'edgeTearingIntensity')
     };
+
+    if (!window.GLITCH_ANIMATION_CONFIG) {
+      window.GLITCH_ANIMATION_CONFIG = {
+        targets: {
+          idle: 0.1,
+          thinking: 1.0,
+          haiku: 0.5
+        },
+        duration: 1.2,
+        curve: function(t) {
+          return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+      };
+    }
 
     const quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
     this.positionBuffer = gl.createBuffer();
@@ -1121,6 +1607,13 @@ class MasterOutputShader {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
+    this.flowfieldTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.flowfieldTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
     // Textura para JPShaderEditor Include (uniform sampler2D renderJPSHADER)
     this.jpShaderTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.jpShaderTexture);
@@ -1132,7 +1625,9 @@ class MasterOutputShader {
 
     // Buffer pre-asignado para evitar garbage collection masiva cada frame (60 FPS)
     this.wordPositionsBuffer = new Float32Array(64);
+    this.wordWidthsBuffer = new Float32Array(32);   // ancho real de cada palabra (UV x)
     this.lastOpenposeFrameId = -1;
+    this.lastFlowfieldFrameId = -1;
     this.lastDepthFrameId = -1;
     this.lastVideoTime = -1;
   }
@@ -1199,7 +1694,8 @@ class MasterOutputShader {
 
     // 3) OpenPose (Texture 2) — solo subir textura cuando OpenPose se redibujó
     const openposeCanvas = DOM.openposeCanvas;
-    if (openposeCanvas && openposeCanvas.width > 0 && layers.openposeEnabled !== false) {
+    const isPoseEnabled = Boolean(openposeCanvas && openposeCanvas.width > 0 && (layers.openposeEnabled || appState.trackingConfig.showOpenPose));
+    if (isPoseEnabled) {
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, this.openposeTexture);
       if (this.lastOpenposeFrameId !== appState.openposeFrameId) {
@@ -1210,8 +1706,32 @@ class MasterOutputShader {
       }
       gl.uniform1i(this.uniforms.openposeTexture, 2);
       gl.uniform1i(this.uniforms.hasOpenpose, 1);
+      if (this.uniforms.openposeOpacity) {
+        gl.uniform1f(this.uniforms.openposeOpacity, layers.openposeOpacity !== undefined ? layers.openposeOpacity : 1.0);
+      }
     } else {
       gl.uniform1i(this.uniforms.hasOpenpose, 0);
+    }
+
+    // 3b) Flow Field (Texture 4) — solo subir textura cuando Flow Field se redibujó
+    const flowfieldCanvas = DOM.flowfieldCanvas;
+    const isFlowEnabled = Boolean(flowfieldCanvas && flowfieldCanvas.width > 0 && (layers.flowfieldEnabled || appState.trackingConfig.flowField));
+    if (isFlowEnabled) {
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, this.flowfieldTexture);
+      if (this.lastFlowfieldFrameId !== appState.flowfieldFrameId) {
+        this.lastFlowfieldFrameId = appState.flowfieldFrameId;
+        try {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, flowfieldCanvas);
+        } catch (e) {}
+      }
+      if (this.uniforms.flowfieldTexture) gl.uniform1i(this.uniforms.flowfieldTexture, 4);
+      if (this.uniforms.hasFlowfield) gl.uniform1i(this.uniforms.hasFlowfield, 1);
+      if (this.uniforms.flowfieldOpacity) {
+        gl.uniform1f(this.uniforms.flowfieldOpacity, layers.flowfieldOpacity !== undefined ? layers.flowfieldOpacity : 1.0);
+      }
+    } else {
+      if (this.uniforms.hasFlowfield) gl.uniform1i(this.uniforms.hasFlowfield, 0);
     }
 
     // 4) JPShaderEditor Include (Texture 3) — pase directo a uniform sampler2D renderJPSHADER
@@ -1235,15 +1755,29 @@ class MasterOutputShader {
     posBuffer.fill(0);
     const winW = window.innerWidth || 1;
     const winH = window.innerHeight || 1;
+    // ANCHO de cada palabra para el marco del shader. getBoundingClientRect() fuerza
+    // layout: se cachea por palabra y se refresca como máximo cada 400 ms.
+    const widthBuffer = this.wordWidthsBuffer;
+    widthBuffer.fill(0);
+    const ahoraAnchos = performance.now();
     for (let i = 0; i < wCount; i++) {
       const w = allWords[i];
       let px = w.x;
       let py = w.y;
+      let anchoPx = 0;
+      const hayCache = (w._boxW !== undefined && (ahoraAnchos - (w._boxWT || 0) < 400));
+      if (w.el && w.el.getBoundingClientRect && !hayCache) {
+        const rect = w.el.getBoundingClientRect();
+        w._boxW = rect.width;
+        w._boxWT = ahoraAnchos;
+      }
+      if (w._boxW !== undefined) anchoPx = w._boxW;
       if (px === undefined || py === undefined) {
         if (w.el) {
           const rect = w.el.getBoundingClientRect();
           px = rect.left + rect.width * 0.5;
           py = rect.top + rect.height * 0.5;
+          if (!anchoPx) { anchoPx = rect.width; w._boxW = rect.width; w._boxWT = ahoraAnchos; }
         } else {
           px = 0;
           py = 0;
@@ -1251,21 +1785,122 @@ class MasterOutputShader {
       }
       posBuffer[i * 2] = px / winW;
       posBuffer[i * 2 + 1] = 1.0 - (py / winH);
+      widthBuffer[i] = anchoPx ? (anchoPx / winW) : 0;
     }
     gl.uniform2fv(this.uniforms.wordPositions, posBuffer);
+    if (this.uniforms.wordWidths) gl.uniform1fv(this.uniforms.wordWidths, widthBuffer);
     gl.uniform1i(this.uniforms.wordCount, wCount);
 
-    // 5) Int de Estado Activo (0: Elección, 1: Animación, 2: Pantalla Final)
+    // 5) Estados interpolados y Glitch Amount con curva configurable
+    let targetState = 'idle';
+    let targetWeights = [1.0, 0.0, 0.0];
     let stateInt = 0;
+
     if (appState.currentState === STATES.PROCESSING) {
+      targetState = 'thinking';
+      targetWeights = [0.0, 1.0, 0.0];
       stateInt = 1;
     } else if (appState.currentState === STATES.HIJACK || appState.currentState === STATES.RESET) {
+      targetState = 'haiku';
+      targetWeights = [0.0, 0.0, 1.0];
       stateInt = 2;
+    }
+
+    const glitchCfg = appState.glitchConfig || {};
+    const env = glitchCfg.envelope || { idle: 0.1, thinking: 1.0, haiku: 0.5, duration: 1.2, curve: 'cubic' };
+    
+    // Si hay un estado de previsualización activo desde el modal de calibración (botones de prueba)
+    const effectiveState = glitchCfg.testPreviewState || targetState;
+    if (glitchCfg.testPreviewState === 'idle') {
+      targetWeights = [1.0, 0.0, 0.0];
+      stateInt = 0;
+    } else if (glitchCfg.testPreviewState === 'thinking') {
+      targetWeights = [0.0, 1.0, 0.0];
+      stateInt = 1;
+    } else if (glitchCfg.testPreviewState === 'haiku') {
+      targetWeights = [0.0, 0.0, 1.0];
+      stateInt = 2;
+    }
+
+    const targetGlitchVal = (env[effectiveState] !== undefined)
+      ? env[effectiveState]
+      : (effectiveState === 'thinking' ? 1.0 : (effectiveState === 'haiku' ? 0.5 : 0.1));
+
+    if (effectiveState !== this.lastStateName) {
+      this.lastStateName = effectiveState;
+      this.startGlitch = this.currentGlitch;
+      this.targetGlitch = targetGlitchVal;
+      this.startWeights = [...this.currentWeights];
+      this.targetWeights = targetWeights;
+      this.transitionProgress = 0.0;
+      this.transitionStartTime = performance.now();
+    }
+
+    const duration = Math.max(50, (env.duration !== undefined ? env.duration : 1.2) * 1000);
+    const elapsedTr = performance.now() - this.transitionStartTime;
+    const normT = Math.min(1.0, elapsedTr / duration);
+    
+    const CURVES = {
+      cubic: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+      smooth: (t) => t * t * (3 - 2 * t),
+      linear: (t) => t,
+      expo: (t) => t === 0 ? 0 : Math.pow(2, 10 * t - 10)
+    };
+    const easeFn = CURVES[env.curve] || CURVES.cubic;
+    const easedT = easeFn(normT);
+
+    const calculatedGlitch = this.startGlitch + (this.targetGlitch - this.startGlitch) * easedT;
+    if (glitchCfg.manualOverride) {
+      this.currentGlitch = (glitchCfg.manualGlitchAmount !== undefined ? glitchCfg.manualGlitchAmount : 0.50);
+    } else {
+      this.currentGlitch = calculatedGlitch;
+    }
+
+    for (let c = 0; c < 3; c++) {
+      this.currentWeights[c] = this.startWeights[c] + (this.targetWeights[c] - this.startWeights[c]) * easedT;
+    }
+
+    // Uniforms de estado y pesos interpolados
+    if (this.uniforms.stateWeights) {
+      gl.uniform3f(this.uniforms.stateWeights, this.currentWeights[0], this.currentWeights[1], this.currentWeights[2]);
     }
     gl.uniform1i(this.uniforms.activeState, stateInt);
 
-    gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
+    // Uniform de Glitch Amount interpolado
+    if (this.uniforms.glitchAmount) {
+      gl.uniform1f(this.uniforms.glitchAmount, this.currentGlitch);
+    }
+
     const elapsed = (performance.now() - this.startTime) / 1000;
+    const userNoiseSpeed = (glitchCfg.noiseSpeed !== undefined) ? glitchCfg.noiseSpeed : ((appState.renderConfig && appState.renderConfig.noiseSpeed !== undefined) ? appState.renderConfig.noiseSpeed : 1.0);
+    // Reducción de velocidad de noise por factor de 10 (* 0.1) según especificación del usuario, modulada por tecla P
+    const speedMult = 0.1 * userNoiseSpeed;
+
+    // Uniforms de Noise constante que van de 0 a 1 sin frenar nunca
+    function calcNoise01(t, seed) {
+      const n1 = Math.sin(t * 0.9 + seed);
+      const n2 = Math.sin(t * 1.83 + seed * 2.3);
+      const n3 = Math.sin(t * 3.71 + seed * 4.9);
+      const raw = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+      return Math.max(0.0, Math.min(1.0, 0.5 + 0.5 * raw));
+    }
+
+    function evalUniform(paramKey, freq, seed, defVal) {
+      const p = (glitchCfg.params && glitchCfg.params[paramKey]) ? glitchCfg.params[paramKey] : { value: defVal, animated: true };
+      const baseVal = (p.value !== undefined) ? p.value : defVal;
+      if (!p.animated) {
+        return baseVal;
+      }
+      return calcNoise01(elapsed * freq * speedMult, seed) * baseVal;
+    }
+
+    if (this.uniforms.blockIntensity) gl.uniform1f(this.uniforms.blockIntensity, evalUniform('blockIntensity', 1.4, 12.3, 0.80));
+    if (this.uniforms.blockSize) gl.uniform1f(this.uniforms.blockSize, evalUniform('blockSize', 0.9, 45.6, 0.60));
+    if (this.uniforms.chromaIntensity) gl.uniform1f(this.uniforms.chromaIntensity, evalUniform('chromaIntensity', 1.6, 78.9, 0.70));
+    if (this.uniforms.vhsNoiseIntensity) gl.uniform1f(this.uniforms.vhsNoiseIntensity, evalUniform('vhsNoiseIntensity', 2.2, 101.1, 0.65));
+    if (this.uniforms.edgeTearingIntensity) gl.uniform1f(this.uniforms.edgeTearingIntensity, evalUniform('edgeTearingIntensity', 1.2, 134.5, 0.50));
+
+    gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
     gl.uniform1f(this.uniforms.time, elapsed);
 
     const aPos = gl.getAttribLocation(this.program, 'a_position');
@@ -2591,6 +3226,43 @@ function showToast(text, type = 'info') {
 }
 
 // ============================================================================
+// MODO "SOLO MASTER OUTPUT" (tecla Y · o abrir la app con ?solo=1)
+// ----------------------------------------------------------------------------
+// Deja a la vista ÚNICAMENTE el canvas del shader maestro: oculta todo el resto
+// de la página (palabras, HUD, textos, capas de ruido/VHS, monitores, banners).
+// Sirve para comprobar si algo que se ve "por fuera del shader" viene de una capa
+// DOM. Al apagarlo se restauran los valores inline exactos que tenía cada nodo.
+// ============================================================================
+function setSoloMaster(on) {
+  const canvas = DOM.masterCanvas;
+  if (!canvas) return;
+  document.documentElement.classList.toggle('solo-master', !!on);
+  if (on) {
+    if (!appState._soloGuardado) {
+      appState._soloGuardado = [];
+      const mantener = new Set();
+      // el canvas del maestro y TODOS sus ancestros deben quedar visibles
+      for (let el = canvas; el; el = el.parentElement) mantener.add(el);
+      // el contenedor de toasts también, para poder leer los avisos
+      if (DOM.toastContainer) mantener.add(DOM.toastContainer);
+      document.querySelectorAll('body *').forEach(function (el) {
+        if (mantener.has(el)) return;
+        appState._soloGuardado.push([el, el.style.visibility]);
+        el.style.visibility = 'hidden';
+      });
+    }
+    showToast('◉ SOLO MASTER OUTPUT: se ve ÚNICAMENTE el shader de salida (tecla Y para volver)', 'info');
+    console.log('[Master Shader] MODO SOLO MASTER OUTPUT ACTIVADO (tecla Y) · todo lo demás oculto');
+  } else {
+    (appState._soloGuardado || []).forEach(function (par) { par[0].style.visibility = par[1]; });
+    appState._soloGuardado = null;
+    showToast('◉ Modo normal: todas las capas restauradas', 'info');
+    console.log('[Master Shader] MODO SOLO MASTER OUTPUT DESACTIVADO');
+  }
+  appState.soloMaster = !!on;
+}
+
+// ============================================================================
 // TOPOLOGÍA Y CONFIGURACIÓN CINEMÁTICA DE OPENPOSE / MEDIAPIPE POSE
 // ============================================================================
 const POSE_CONNECTIONS = [
@@ -2787,7 +3459,7 @@ for (let r = 0; r < FLOW_ROWS; r++) {
 let flowPhase = 0;
 
 function renderFlowField(ctx, w, h, landmarks) {
-  if (!appState.trackingConfig.flowField) return;
+  if (!appState.renderConfig.flowfieldEnabled && !appState.trackingConfig.flowField) return;
 
   flowPhase += 0.035;
   const cellW = w / FLOW_COLS;
@@ -2865,6 +3537,25 @@ function renderFlowField(ctx, w, h, landmarks) {
   ctx.restore();
 }
 
+function renderFlowFieldOverlay(landmarks) {
+  const canvas = DOM.flowfieldCanvas;
+  if (!canvas) return;
+  const isEnabled = Boolean(appState.renderConfig.flowfieldEnabled || appState.trackingConfig.flowField);
+  if (!isEnabled) {
+    if (canvas.style.display !== 'none') canvas.style.display = 'none';
+    return;
+  }
+  if (canvas.style.display !== 'block') canvas.style.display = 'block';
+  if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  renderFlowField(ctx, canvas.width, canvas.height, landmarks);
+  appState.flowfieldFrameId = (appState.flowfieldFrameId || 0) + 1;
+}
+
 // ============================================================================
 // SISTEMA 1: RENDER DE SUPERPOSICIÓN OPENPOSE (CANVAS OVERLAY FULLSCREEN)
 // ============================================================================
@@ -2891,11 +3582,7 @@ function renderOpenPoseOverlay(landmarks) {
   const h = canvas.height;
 
   // 1) Capa Frame Difference: Renderizada en GPU WebGL2 vía FrameDifferenceShader (sin CPU stall)
-
-  // 2) Capa Flow Field (Campo de Flujo Vectorial)
-  if (appState.trackingConfig.flowField) {
-    renderFlowField(ctx, w, h, landmarks);
-  }
+  // 2) Capa Flow Field: Renderizada en su propio canvas independiente vía renderFlowFieldOverlay
 
   // 3) REQUERIMIENTO 10: Cuadrito que trackea la cara en la posición exacta donde está
   if (appState.trackingConfig.faceBoxOnScreen && landmarks && landmarks.length > 10) {
@@ -3480,6 +4167,9 @@ function onPoseResults(results) {
   if (appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose) {
     renderOpenPoseOverlay(landmarks);
   }
+  if (appState.renderConfig.flowfieldEnabled || appState.trackingConfig.flowField) {
+    renderFlowFieldOverlay(landmarks);
+  }
   if (appState.renderConfig.depthEnabled || appState.trackingConfig.showDepthMap) {
     renderDepthMap(results, landmarks);
   }
@@ -3512,11 +4202,16 @@ function onPoseResults(results) {
     const mappedX = (1 - anchor.x) * window.innerWidth;
     const mappedY = anchor.y * window.innerHeight;
 
+    // Movimiento real de la persona en cámara cuenta como actividad (el jitter no).
+    if (Math.abs(mappedX - appState.targetCursorX) > IDLE_CTA_CAMERA_MOVE_PX ||
+        Math.abs(mappedY - appState.targetCursorY) > IDLE_CTA_CAMERA_MOVE_PX) {
+      markUserActivity();
+    }
     appState.targetCursorX = mappedX;
     appState.targetCursorY = mappedY;
 
-    DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorType.toUpperCase()}]`;
-    DOM.telemetryConfidence.textContent = `${Math.round(appState.landmarkConfidence * 100)}%`;
+    if (DOM.telemetrySensor) DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorType.toUpperCase()}]`;
+    if (DOM.telemetryConfidence) DOM.telemetryConfidence.textContent = `${Math.round(appState.landmarkConfidence * 100)}%`;
   } else {
     appState.landmarkConfidence = 0;
   }
@@ -3528,14 +4223,14 @@ function setInputMode(mode) {
     appState.isUsingMouse = true;
     DOM.inputModeIcon.textContent = '🖱️';
     DOM.inputModeLabel.textContent = 'TRACK: MOUSE';
-    DOM.telemetrySensor.textContent = 'MOUSE [CLIC DIRECTO]';
-    DOM.telemetryConfidence.textContent = '100%';
+    if (DOM.telemetrySensor) DOM.telemetrySensor.textContent = 'MOUSE [CLIC DIRECTO]';
+    if (DOM.telemetryConfidence) DOM.telemetryConfidence.textContent = '100%';
   } else {
     appState.isUsingMouse = false;
     DOM.inputModeIcon.textContent = '📹';
     const anchorName = (appState.trackingConfig.trackingAnchor || 'nariz').toUpperCase();
     DOM.inputModeLabel.textContent = `TRACK: CÁMARA (${anchorName})`;
-    DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorName}]`;
+    if (DOM.telemetrySensor) DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorName}]`;
     triggerPoseInference();
   }
   showToast(`Control: ${mode === 'mouse' ? 'Mouse / Clics' : 'Cámara Pose'}`, 'info');
@@ -3621,6 +4316,143 @@ function saveRenderConfigToStorage() {
   try {
     localStorage.setItem('sincretismo_render_config', JSON.stringify(appState.renderConfig));
   } catch (e) {}
+}
+
+// ============================================================================
+// GESTIÓN DE GLITCH & ENVELOPE DE SECUENCIA (PESTAÑA GLITCH & ENVELOPE)
+// ============================================================================
+const DEFAULT_GLITCH_CONFIG = {
+  envelope: {
+    idle: 0.10,
+    thinking: 1.00,
+    haiku: 0.50,
+    duration: 1.2,
+    curve: 'cubic'
+  },
+  manualOverride: false,
+  manualGlitchAmount: 0.50,
+  noiseSpeed: 1.0,
+  testPreviewState: null,
+  params: {
+    blockIntensity:       { value: 0.80, animated: true },
+    blockSize:            { value: 0.60, animated: true },
+    chromaIntensity:      { value: 0.70, animated: true },
+    vhsNoiseIntensity:    { value: 0.65, animated: true },
+    edgeTearingIntensity: { value: 0.50, animated: true }
+  }
+};
+
+function loadGlitchConfigFromStorage() {
+  try {
+    const saved = localStorage.getItem('sincretismo_glitch_config');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === 'object') {
+        appState.glitchConfig = {
+          ...DEFAULT_GLITCH_CONFIG,
+          ...parsed,
+          envelope: { ...DEFAULT_GLITCH_CONFIG.envelope, ...(parsed.envelope || {}) },
+          params: {
+            blockIntensity: { ...DEFAULT_GLITCH_CONFIG.params.blockIntensity, ...(parsed.params?.blockIntensity || {}) },
+            blockSize: { ...DEFAULT_GLITCH_CONFIG.params.blockSize, ...(parsed.params?.blockSize || {}) },
+            chromaIntensity: { ...DEFAULT_GLITCH_CONFIG.params.chromaIntensity, ...(parsed.params?.chromaIntensity || {}) },
+            vhsNoiseIntensity: { ...DEFAULT_GLITCH_CONFIG.params.vhsNoiseIntensity, ...(parsed.params?.vhsNoiseIntensity || {}) },
+            edgeTearingIntensity: { ...DEFAULT_GLITCH_CONFIG.params.edgeTearingIntensity, ...(parsed.params?.edgeTearingIntensity || {}) }
+          }
+        };
+        console.log('[GLITCH] Configuración de glitch cargada de localStorage:', appState.glitchConfig);
+      }
+    }
+  } catch (e) {}
+  applyGlitchConfigToUI();
+}
+
+function saveGlitchConfigToStorage() {
+  try {
+    localStorage.setItem('sincretismo_glitch_config', JSON.stringify(appState.glitchConfig));
+  } catch (e) {}
+}
+
+function applyGlitchConfigToUI() {
+  const cfg = appState.glitchConfig || DEFAULT_GLITCH_CONFIG;
+  const env = cfg.envelope || DEFAULT_GLITCH_CONFIG.envelope;
+
+  const slIdle = document.getElementById('cfg-env-idle');
+  const valIdle = document.getElementById('val-env-idle');
+  if (slIdle) slIdle.value = env.idle;
+  if (valIdle) valIdle.textContent = Number(env.idle).toFixed(2);
+
+  const slThink = document.getElementById('cfg-env-thinking');
+  const valThink = document.getElementById('val-env-thinking');
+  if (slThink) slThink.value = env.thinking;
+  if (valThink) valThink.textContent = Number(env.thinking).toFixed(2);
+
+  const slHaiku = document.getElementById('cfg-env-haiku');
+  const valHaiku = document.getElementById('val-env-haiku');
+  if (slHaiku) slHaiku.value = env.haiku;
+  if (valHaiku) valHaiku.textContent = Number(env.haiku).toFixed(2);
+
+  const slDur = document.getElementById('cfg-env-dur');
+  const valDur = document.getElementById('val-env-dur');
+  if (slDur) slDur.value = env.duration;
+  if (valDur) valDur.textContent = Number(env.duration).toFixed(1);
+
+  const selCurve = document.getElementById('cfg-env-curve');
+  if (selCurve) selCurve.value = env.curve || 'cubic';
+
+  const chkManual = document.getElementById('cfg-glitch-manual-override');
+  const grpManual = document.getElementById('cfg-glitch-manual-group');
+  const slManual = document.getElementById('cfg-glitch-manual-val');
+  const valManual = document.getElementById('val-glitch-manual');
+  if (chkManual) chkManual.checked = !!cfg.manualOverride;
+  if (grpManual) {
+    grpManual.style.opacity = cfg.manualOverride ? '1' : '0.4';
+    grpManual.style.pointerEvents = cfg.manualOverride ? 'auto' : 'none';
+  }
+  if (slManual) slManual.value = cfg.manualGlitchAmount !== undefined ? cfg.manualGlitchAmount : 0.5;
+  if (valManual) valManual.textContent = Number(cfg.manualGlitchAmount !== undefined ? cfg.manualGlitchAmount : 0.5).toFixed(2);
+
+  const slNoise = document.getElementById('cfg-glitch-noise-speed');
+  const valNoise = document.getElementById('val-glitch-noise-speed');
+  if (slNoise) slNoise.value = cfg.noiseSpeed !== undefined ? cfg.noiseSpeed : 1.0;
+  if (valNoise) valNoise.textContent = Number(cfg.noiseSpeed !== undefined ? cfg.noiseSpeed : 1.0).toFixed(2);
+
+  const paramDefs = [
+    { id: 'block', key: 'blockIntensity' },
+    { id: 'size', key: 'blockSize' },
+    { id: 'chroma', key: 'chromaIntensity' },
+    { id: 'vhs', key: 'vhsNoiseIntensity' },
+    { id: 'tearing', key: 'edgeTearingIntensity' }
+  ];
+
+  paramDefs.forEach(pd => {
+    const p = cfg.params?.[pd.key] || DEFAULT_GLITCH_CONFIG.params[pd.key];
+    const chk = document.getElementById('cfg-glitch-anim-' + pd.id);
+    const sl = document.getElementById('cfg-glitch-param-' + pd.id);
+    const val = document.getElementById('val-glitch-' + pd.id);
+    if (chk) chk.checked = !!p.animated;
+    if (sl) sl.value = p.value;
+    if (val) val.textContent = Number(p.value).toFixed(2);
+  });
+
+  updateCpGlitchButtonsUI(cfg.testPreviewState);
+}
+
+function updateCpGlitchButtonsUI(activeState) {
+  const btns = {
+    idle: document.getElementById('cfg-glitch-test-idle'),
+    thinking: document.getElementById('cfg-glitch-test-thinking'),
+    haiku: document.getElementById('cfg-glitch-test-haiku'),
+    auto: document.getElementById('cfg-glitch-test-auto')
+  };
+  Object.keys(btns).forEach(k => {
+    if (btns[k]) btns[k].classList.remove('active');
+  });
+  if (activeState && btns[activeState]) {
+    btns[activeState].classList.add('active');
+  } else if (!activeState && btns.auto) {
+    btns.auto.classList.add('active');
+  }
 }
 
 // ============================================================================
@@ -4105,6 +4937,17 @@ function applyRenderLayers() {
     }
   }
 
+  // 4b. Flow Field Overlay (sincronizado con su toggle en Tab Tracking)
+  if (DOM.flowfieldCanvas) {
+    t.flowField = Boolean(r.flowfieldEnabled);
+    DOM.flowfieldCanvas.style.opacity = r.flowfieldOpacity;
+    DOM.flowfieldCanvas.style.display = (r.flowfieldEnabled || t.flowField) ? 'block' : 'none';
+    if (!r.flowfieldEnabled && !t.flowField) {
+      const ctx = DOM.flowfieldCanvas.getContext('2d');
+      ctx.clearRect(0, 0, DOM.flowfieldCanvas.width, DOM.flowfieldCanvas.height);
+    }
+  }
+
   // 5. Punteros Unificados de Selección
   if (DOM.pointersCanvas) {
     DOM.pointersCanvas.style.opacity = r.pointersOpacity;
@@ -4168,6 +5011,10 @@ function syncRenderInputs() {
   if (DOM.cfgRenderOpenposeOpacity) DOM.cfgRenderOpenposeOpacity.value = Math.round(r.openposeOpacity * 100);
   if (DOM.valRenderOpenposeOpacity) DOM.valRenderOpenposeOpacity.textContent = Math.round(r.openposeOpacity * 100);
 
+  if (DOM.cfgRenderFlowfieldToggle) DOM.cfgRenderFlowfieldToggle.checked = Boolean(r.flowfieldEnabled);
+  if (DOM.cfgRenderFlowfieldOpacity) DOM.cfgRenderFlowfieldOpacity.value = Math.round(r.flowfieldOpacity * 100);
+  if (DOM.valRenderFlowfieldOpacity) DOM.valRenderFlowfieldOpacity.textContent = Math.round(r.flowfieldOpacity * 100);
+
   if (DOM.cfgRenderPointersToggle) DOM.cfgRenderPointersToggle.checked = r.pointersEnabled;
   if (DOM.cfgRenderPointersOpacity) DOM.cfgRenderPointersOpacity.value = Math.round(r.pointersOpacity * 100);
   if (DOM.valRenderPointersOpacity) DOM.valRenderPointersOpacity.textContent = Math.round(r.pointersOpacity * 100);
@@ -4192,6 +5039,9 @@ function syncRenderInputs() {
   if (DOM.cfgRenderNoiseScale) DOM.cfgRenderNoiseScale.value = r.noiseScale || 2.0;
   if (DOM.valRenderNoiseScale) DOM.valRenderNoiseScale.textContent = (r.noiseScale || 2.0).toFixed(1);
 
+  if (DOM.cfgRenderNoiseSpeed) DOM.cfgRenderNoiseSpeed.value = r.noiseSpeed || 1.0;
+  if (DOM.valRenderNoiseSpeed) DOM.valRenderNoiseSpeed.textContent = (r.noiseSpeed || 1.0).toFixed(1);
+
   if (DOM.cfgRenderCorpParticlesToggle) DOM.cfgRenderCorpParticlesToggle.checked = r.corpParticlesEnabled;
   if (DOM.cfgRenderCorpParticlesOpacity) DOM.cfgRenderCorpParticlesOpacity.value = Math.round(r.corpParticlesOpacity * 100);
   if (DOM.valRenderCorpParticlesOpacity) DOM.valRenderCorpParticlesOpacity.textContent = Math.round(r.corpParticlesOpacity * 100);
@@ -4200,6 +5050,7 @@ function syncRenderInputs() {
   if (DOM.cfgAsciiEnabled) DOM.cfgAsciiEnabled.checked = r.asciiEnabled;
   if (DOM.cfgTrackFrameDiff) DOM.cfgTrackFrameDiff.checked = r.frameDiffEnabled;
   if (DOM.cfgTrackOpenpose) DOM.cfgTrackOpenpose.checked = r.openposeEnabled;
+  if (DOM.cfgTrackFlowField) DOM.cfgTrackFlowField.checked = Boolean(r.flowfieldEnabled || t.flowField);
   if (DOM.cfgTrackDepth) DOM.cfgTrackDepth.checked = r.depthEnabled;
   if (DOM.cfgTrackFace) DOM.cfgTrackFace.checked = r.faceEnabled;
 }
@@ -4338,107 +5189,51 @@ class CorporateParticleRain {
     this.canvas = canvas;
     this.ctx = canvas ? canvas.getContext('2d') : null;
     this.particles = [];
-    this.maxParticles = 24;
-    this.icons = ['👔', '😊', '💪', '💵', '💰', '💸', '📈', '🤝'];
+    this.maxParticles = 0;
+    this.icons = [];
     this.iconSprites = {};
-    this.active = false;
-    this.init();
-  }
-
-  init() {
-    this.resize();
-    this.preRenderSprites();
-    window.addEventListener('resize', () => this.resize());
-  }
-
-  preRenderSprites() {
-    this.icons.forEach(icon => {
-      const c = document.createElement('canvas');
-      c.width = 64;
-      c.height = 64;
-      const ctx = c.getContext('2d');
-      ctx.font = '40px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(icon, 32, 34);
-      this.iconSprites[icon] = c;
-    });
-  }
-
-  resize() {
-    if (!this.canvas) return;
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-  }
-
-  start() {
-    this.active = true;
-    this.particles = [];
-    for (let i = 0; i < this.maxParticles; i++) {
-      this.particles.push(this.createParticle(true));
-    }
-  }
-
-  stop() {
     this.active = false;
     if (this.ctx && this.canvas) {
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
   }
 
-  createParticle(randomY = false) {
-    const w = this.canvas ? this.canvas.width : window.innerWidth;
-    const h = this.canvas ? this.canvas.height : window.innerHeight;
-    const icon = this.icons[Math.floor(Math.random() * this.icons.length)];
-    return {
-      x: Math.random() * w,
-      y: randomY ? Math.random() * h : -40 - Math.random() * 50,
-      icon: icon,
-      sprite: this.iconSprites[icon],
-      size: 24 + Math.random() * 20,
-      speed: 1.2 + Math.random() * 2.0,
-      wobbleSpeed: 1.5 + Math.random() * 1.8,
-      wobblePhase: Math.random() * Math.PI * 2,
-      wobbleAmp: 0.8 + Math.random() * 1.2,
-      rotation: (Math.random() - 0.5) * 0.4,
-      rotSpeed: (Math.random() - 0.5) * 0.02,
-      opacity: 0.4 + Math.random() * 0.5
-    };
+  init() {
+    this.resize();
+  }
+
+  preRenderSprites() {}
+
+  resize() {
+    if (!this.canvas) return;
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    if (this.ctx) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  start() {
+    this.active = false;
+    this.particles = [];
+    if (this.ctx && this.canvas) {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  }
+
+  stop() {
+    this.active = false;
+    this.particles = [];
+    if (this.ctx && this.canvas) {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  }
+
+  createParticle() {
+    return null;
   }
 
   updateAndDraw(dt) {
-    if (!this.ctx || !this.canvas) return;
-    if (!this.active || !appState.renderConfig.corpParticlesEnabled) {
-      return;
-    }
-    const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-    const masterOpacity = appState.renderConfig.corpParticlesOpacity;
-    const h = this.canvas.height;
-
-    for (let i = 0; i < this.particles.length; i++) {
-      const p = this.particles[i];
-      p.y += p.speed * 60 * dt;
-      p.wobblePhase += p.wobbleSpeed * dt;
-      p.x += Math.sin(p.wobblePhase) * p.wobbleAmp;
-      p.rotation += p.rotSpeed;
-
-      if (p.y > h + 50) {
-        this.particles[i] = this.createParticle(false);
-        continue;
-      }
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
-      ctx.globalAlpha = p.opacity * masterOpacity;
-      const s = p.size;
-      const sprite = p.sprite || this.iconSprites[p.icon];
-      if (sprite) {
-        ctx.drawImage(sprite, -s * 0.5, -s * 0.5, s, s);
-      }
-      ctx.restore();
+    if (this.ctx && this.canvas) {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
   }
 }
@@ -4983,7 +5778,7 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const COLD_AI_SYNONYMS = {
   // 30 conceptos humanos iniciales
-  'amor': 'TRABAJADOR_FELIZ',
+  'amor': 'TRABAJADOR',
   'nostalgia': 'LATENCIA',
   'fragilidad': 'VULNERABILIDAD',
   'ternura': 'INEFICIENCIA',
@@ -5153,7 +5948,7 @@ const COLD_AI_SYNONYMS = {
   'derecha': 'ORTODOXIA',
   'fascismo': 'HEGEMONÍA',
   'comunismo': 'COLECTIVIDAD',
-  'gobierno': 'PATRÓN_DE_DECISIÓN',
+  'gobierno': 'PATRÓN',
   'estado': 'APARATO',
   'democracia': 'CONSENSO',
   'ideología': 'DOCTRINA',
@@ -5179,7 +5974,7 @@ const COLD_AI_SYNONYMS = {
   'serpiente': 'REPTIL',
   'halcón': 'RADAR',
   'zorro': 'INFILTRADOR',
-  'ciervo': 'MATERIA_ORGÁNICA',
+  'ciervo': 'MATERIA',
   'pantera': 'SIGILO',
 
   // 3. FILOSOFÍA & COSMOS
@@ -5190,7 +5985,7 @@ const COLD_AI_SYNONYMS = {
   'universo': 'MATRIZ',
   'razón': 'LÓGICA',
   'muerte': 'EXTINCIÓN',
-  'infinito': 'PROGRESO_INFINITO',
+  'infinito': 'PROGRESO',
   'ética': 'NORMATIVA',
   'esencia': 'NÚCLEO',
   'conocimiento': 'DATA',
@@ -5238,60 +6033,66 @@ const COLD_AI_SYNONYMS = {
   'sol': 'GENERADOR',
 
   // Lado PRODUCTIVO de conceptos cotidianos (resignificación corporativa)
-  'minerales': 'POTENCIALES_ACTIVOS',
-  'café': 'MEJORADOR_DE_PRODUCTIVIDAD',
-  'cafe': 'MEJORADOR_DE_PRODUCTIVIDAD',
-  'amistad': 'SINERGIA_DE_EQUIPO',
-  'sueño': 'PROYECCIÓN_DE_METAS',
-  'libertad': 'AUTONOMÍA_OPERATIVA',
-  'salud': 'CAPITAL_BIOLÓGICO',
-  'comida': 'INSUMO_ENERGÉTICO',
-  'agua': 'RECURSO_HÍDRICO',
-  'aprendizaje': 'MEJORA_CONTINUA',
-  'error': 'OPORTUNIDAD_DE_MEJORA'
+  'minerales': 'ACTIVOS',
+  'café': 'MEJORADOR',
+  'cafe': 'MEJORADOR',
+  'amistad': 'SINERGIA',
+  'sueño': 'PROYECCIÓN',
+  'libertad': 'AUTONOMÍA',
+  'salud': 'CAPITAL',
+  'comida': 'INSUMO',
+  'agua': 'RECURSO',
+  'aprendizaje': 'MEJORA',
+  'error': 'OPORTUNIDAD'
 };
+
+// Reduce un término frío a UN SOLO TOKEN: corta en el primer separador (guion
+// bajo, espacio, guion, punto) y se queda con ese segmento.
+//   OPTIMO_LUJO            -> OPTIMO
+//   PATRÓN     -> PATRÓN
+//   CAJA NEGRA MONETIZABLE -> CAJA
+// El guion bajo está PROHIBIDO en la obra: el término frío es siempre UNA palabra.
+function primerTokenDeTerminoFrio(txt) {
+  const limpio = String(txt == null ? '' : txt)
+    .replace(/[^a-zA-ZáéíóúüÁÉÍÓÚÜñÑ]+/g, ' ')   // fuera números, _ , puntuación, emojis
+    .trim();
+  const primero = limpio ? limpio.split(/\s+/)[0] : '';
+  return primero.toUpperCase();
+}
 
 function sanitizeColdToken(raw, fallbackWord = '') {
   if (!raw || typeof raw !== 'string') return getColdSynonym(fallbackWord);
-  // Los términos compuestos se conservan unidos por guiones bajos (ej: PATRÓN_DE_DECISIÓN)
-  const cleaned = raw
-    .replace(/[^a-zA-ZáéíóúüÁÉÍÓÚÜñÑ_\s]/g, ' ')
-    .replace(/[\s_]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  if (!cleaned) return getColdSynonym(fallbackWord);
-  const segments = cleaned.split('_').filter(Boolean).slice(0, 4);
-  const result = segments.join('_').toUpperCase();
+  // REGLA DURA DE LA OBRA: el término frío es SIEMPRE UNA SOLA PALABRA (sin guion
+  // bajo, sin espacios). Si el modelo devuelve un compuesto se toma el segmento
+  // que encabeza el concepto y se descarta el resto.
+  const result = primerTokenDeTerminoFrio(raw);
   return result.length >= 2 ? result : getColdSynonym(fallbackWord);
 }
 
 function getColdSynonym(word) {
   const clean = (word || '').toLowerCase().trim();
+  // Todo lo que sale de acá pasa por primerTokenDeTerminoFrio(): aunque el mapa
+  // tuviera un valor compuesto, afuera nunca se ve un guion bajo.
   if (COLD_AI_SYNONYMS[clean]) {
-    return COLD_AI_SYNONYMS[clean];
+    return primerTokenDeTerminoFrio(COLD_AI_SYNONYMS[clean]) || 'PROCESO';
   }
   // Coincidencia parcial o por raíz semántica
   for (const [k, v] of Object.entries(COLD_AI_SYNONYMS)) {
     if (clean.startsWith(k) || k.startsWith(clean)) {
-      return v;
+      return primerTokenDeTerminoFrio(v) || 'PROCESO';
     }
   }
   // Respaldo analógico: conserva la raíz semántica de la palabra humana pero la resignifica
   // en clave fría, técnica y PRODUCTIVA (capital, rendimiento, optimización, escala).
-  const PRODUCTIVE_TEMPLATES = [
-    (w) => `PROTOCOLO_DE_${w}`,
-    (w) => `${w}_PRODUCTIVO`,
-    (w) => `RENDIMIENTO_DE_${w}`,
-    (w) => `${w}_OPERATIVO`,
-    (w) => `CAPITAL_${w}`,
-    (w) => `GESTOR_DE_${w}`,
-    (w) => `${w}_ESCALABLE`,
-    (w) => `UNIDAD_${w}`,
-    (w) => `OPTIMIZADOR_DE_${w}`,
-    (w) => `${w}_MONETIZABLE`
+  // Banco de respaldo: SIEMPRE términos de UNA sola palabra (antes armaba
+  // compuestos tipo PROTOCOLO_DE_X y el guion bajo terminaba en pantalla).
+  const PRODUCTIVE_WORDS = [
+    'PROTOCOLO', 'RENDIMIENTO', 'OPTIMIZACIÓN', 'CALIBRACIÓN', 'CAPITALIZACIÓN',
+    'MONETIZACIÓN', 'ESCALADO', 'PRODUCTIVIDAD', 'SINERGIA', 'INDICADOR',
+    'MÉTRICA', 'EFICIENCIA', 'AUTOMATIZACIÓN', 'PROCESO'
   ];
-  const stem = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() || 'RECURSO';
   const hash = clean.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return PRODUCTIVE_TEMPLATES[Math.abs(hash) % PRODUCTIVE_TEMPLATES.length](stem);
+  return PRODUCTIVE_WORDS[Math.abs(hash) % PRODUCTIVE_WORDS.length];
 }
 
 // ============================================================================
@@ -5424,8 +6225,9 @@ async function startResignificationSequence() {
 
   // Mostrar el discurso final: reacomodar las 3 palabras unificadas y hacer aparecer las auxiliares
   DOM.finalSpeechBox.classList.remove('hidden');
+  // Partículas corporativas desactivadas totalmente según requerimiento de diseño
   if (appState.corporateParticles) {
-    appState.corporateParticles.start();
+    appState.corporateParticles.stop();
   }
 
   const rawSpeech = (aiResult && aiResult.frase_generada && aiResult.frase_generada.trim().length > 10)
@@ -5440,6 +6242,11 @@ async function startResignificationSequence() {
 
   // REORGANIZACIÓN DINÁMICA: Componer la frase completa con las 3 palabras transformadas en el medio y las auxiliares
   if (stale()) return;   // hubo un reset mientras esperábamos la IA: descartar
+  // El HAIKU empieza a formarse ACÁ: recién en este momento el shader maestro
+  // enciende el contenedor (estado HAIKU = weights.z). Antes, en PROCESSING, se ve
+  // la animación de las palabras cambiando, sin caja.
+  transitionTo(STATES.HIJACK);
+
   await composeFinalPhraseFlow(speech, selectedWords, coldSynonyms);
 
   // Mantener en pantalla por 7.5 segundos para lectura
@@ -5586,6 +6393,7 @@ Escribe un poema en formato HAIKU de EXACTAMENTE 3 versos (separados por \\n) co
 - Verso 3: debe construirse en torno a la idea de "${coldList[2]}", integrando la palabra en MAYÚSCULAS y expresando una revelación íntima en primera persona.
 
 REGLAS DE ORO:
+0. Cada uno de los 3 conceptos es UNA SOLA PALABRA (sin guion bajo, sin espacios: si escribís OPTIMO_LUJO está MAL, va OPTIMO). No los cambies ni los compongas.
 1. El haiku debe formarse de manera directa y coherente ALREDEDOR de los conceptos elegidos. Prohibido usar frases genéricas desconectadas o hablar de nieblas, bosques o madrugadas si no guardan relación con las palabras.
 2. Cada verso debe tener sentido sintáctico natural e impecable en español.
 3. Los 3 versos deben encadenarse como una sola reflexión armónica.
@@ -5839,7 +6647,7 @@ function getArticleGrammar(word) {
 // Categorías semánticas exhaustivas para generación armónica y coherente de Haikus
 const SEMANTIC_CLUSTERS_DATA = {
   power: {
-    words: new Set(['GESTIÓN', 'DESVIACIÓN', 'ORTODOXIA', 'HEGEMONÍA', 'COLECTIVIDAD', 'PATRÓN_DE_DECISIÓN', 'APARATO', 'CONSENSO', 'DOCTRINA', 'ARBITRAJE', 'PROTOCOLO', 'AUTONOMÍA', 'ESTRUCTURA', 'COMANDO', 'VARIANZA', 'DOMINIO', 'NORMATIVA']),
+    words: new Set(['GESTIÓN', 'DESVIACIÓN', 'ORTODOXIA', 'HEGEMONÍA', 'COLECTIVIDAD', 'PATRÓN', 'APARATO', 'CONSENSO', 'DOCTRINA', 'ARBITRAJE', 'PROTOCOLO', 'AUTONOMÍA', 'ESTRUCTURA', 'COMANDO', 'VARIANZA', 'DOMINIO', 'NORMATIVA']),
     v1: (w, art) => [
       `Bajo el rígido orden ${art.del_al} ${w},`,
       `En la estricta doctrina ${art.del_al} ${w},`,
@@ -5864,7 +6672,7 @@ const SEMANTIC_CLUSTERS_DATA = {
   },
 
   fauna: {
-    words: new Set(['CANIDO', 'FELINO', 'MEGABIOMA', 'DEPREDADOR', 'DOMINANTE', 'TRACCIÓN', 'CAZADOR', 'RECONOCEDOR', 'COLOSO', 'SONAR', 'BIOMASA', 'REPTIL', 'RADAR', 'INFILTRADOR', 'MATERIA_ORGÁNICA', 'SIGILO']),
+    words: new Set(['CANIDO', 'FELINO', 'MEGABIOMA', 'DEPREDADOR', 'DOMINANTE', 'TRACCIÓN', 'CAZADOR', 'RECONOCEDOR', 'COLOSO', 'SONAR', 'BIOMASA', 'REPTIL', 'RADAR', 'INFILTRADOR', 'MATERIA', 'SIGILO']),
     v1: (w, art) => [
       `En el territorio alerta ${art.del_al} ${w},`,
       `Bajo el rastro dormido ${art.del_al} ${w},`,
@@ -5889,7 +6697,7 @@ const SEMANTIC_CLUSTERS_DATA = {
   },
 
   cosmos: {
-    words: new Set(['INSTANCIA', 'ONTOLOGÍA', 'PROCESADOR', 'FEEDBACK', 'MATRIZ', 'LÓGICA', 'EXTINCIÓN', 'PROGRESO_INFINITO', 'NÚCLEO', 'DATA', 'DETERMINISMO', 'ALEATORIEDAD', 'PROBABILIDAD', 'COLISIÓN', 'INDEXACIÓN', 'CONSTANTE', 'SIMETRÍA', 'VACÍO', 'SINGULARIDAD', 'FOTÓN', 'ATMÓSFERA']),
+    words: new Set(['INSTANCIA', 'ONTOLOGÍA', 'PROCESADOR', 'FEEDBACK', 'MATRIZ', 'LÓGICA', 'EXTINCIÓN', 'PROGRESO', 'NÚCLEO', 'DATA', 'DETERMINISMO', 'ALEATORIEDAD', 'PROBABILIDAD', 'COLISIÓN', 'INDEXACIÓN', 'CONSTANTE', 'SIMETRÍA', 'VACÍO', 'SINGULARIDAD', 'FOTÓN', 'ATMÓSFERA']),
     v1: (w, art) => [
       `En el vasto horizonte ${art.del_al} ${w},`,
       `Bajo el principio eterno ${art.del_al} ${w},`,
@@ -5939,7 +6747,7 @@ const SEMANTIC_CLUSTERS_DATA = {
   },
 
   emotion: {
-    words: new Set(['SINCRONIZAR', 'REGISTRO', 'VULNERABILIDAD', 'ATENUACIÓN', 'ACOPLAMIENTO', 'CACHE', 'HERTZ', 'LATENCIA', 'KERNEL', 'CONTACTO', 'CONDENSACIÓN', 'CICLO', 'CHASIS', 'INSTRUCCIÓN', 'INICIALIZACIÓN', 'RESET', 'LÍRICA_BINARIA', 'SENSOR', 'DISIPACIÓN', 'CIFRADO', 'PURGA', 'PARCHE', 'EXPOSICIÓN', 'SIMULACIÓN', 'CRONOMETRÍA', 'REAJUSTE', 'PULSO', 'REPOSO', 'DESCONEXIÓN']),
+    words: new Set(['SINCRONIZAR', 'REGISTRO', 'VULNERABILIDAD', 'ATENUACIÓN', 'ACOPLAMIENTO', 'CACHE', 'HERTZ', 'LATENCIA', 'KERNEL', 'CONTACTO', 'CONDENSACIÓN', 'CICLO', 'CHASIS', 'INSTRUCCIÓN', 'INICIALIZACIÓN', 'RESET', 'LÍRICA', 'SENSOR', 'DISIPACIÓN', 'CIFRADO', 'PURGA', 'PARCHE', 'EXPOSICIÓN', 'SIMULACIÓN', 'CRONOMETRÍA', 'REAJUSTE', 'PULSO', 'REPOSO', 'DESCONEXIÓN']),
     v1: (w, art) => [
       `En la frágil memoria ${art.del_al} ${w},`,
       `Bajo la intensa huella ${art.del_al} ${w},`,
@@ -5964,7 +6772,7 @@ const SEMANTIC_CLUSTERS_DATA = {
   },
 
   nature: {
-    words: new Set(['CONGLOMERADO', 'FLUJO', 'ELEVACIÓN', 'SUSTRATO', 'GÉRMEN', 'ESTRUCTURA', 'ATMÓSFERA', 'SOBRECARGA', 'CRISTAL', 'GENERADOR', 'POTENCIALES_ACTIVOS', 'TIERRA', 'BOSQUE', 'RÍO', 'MONTAÑA', 'OCÉANO', 'LLUVIA', 'VIENTO']),
+    words: new Set(['CONGLOMERADO', 'FLUJO', 'ELEVACIÓN', 'SUSTRATO', 'GÉRMEN', 'ESTRUCTURA', 'ATMÓSFERA', 'SOBRECARGA', 'CRISTAL', 'GENERADOR', 'ACTIVOS', 'TIERRA', 'BOSQUE', 'RÍO', 'MONTAÑA', 'OCÉANO', 'LLUVIA', 'VIENTO']),
     v1: (w, art) => [
       `Bajo la corriente pura ${art.del_al} ${w},`,
       `En el curso silente ${art.del_al} ${w},`,
@@ -6002,7 +6810,7 @@ function getSemanticCategoryCluster(word) {
 // Generador de Haiku poético cohesivo que integra exactamente un término por verso
 // contextualizado según la naturaleza y categoría semántica de cada palabra:
 function composeHaikuWithConcepts(coldList = [], caughtWords = []) {
-  const sanitize = (w) => String(w || '').replace(/_+/g, ' ').trim().toUpperCase();
+  const sanitize = (w) => primerTokenDeTerminoFrio(w);
   const pool = (coldList && coldList.length >= 3)
     ? coldList
     : (caughtWords && caughtWords.length >= 3 ? caughtWords.map(w => getColdSynonym(w)) : ['MEMORIA', 'TIEMPO', 'SILENCIO']);
@@ -6033,7 +6841,7 @@ function composeHaikuWithConcepts(coldList = [], caughtWords = []) {
 // Garantiza que la frase generada sea SIEMPRE un Haiku de 3 versos donde
 // cada verso integra orgánicamente uno de los 3 conceptos transformados.
 function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
-  const sanitize = (w) => String(w || '').replace(/_+/g, ' ').trim().toUpperCase();
+  const sanitize = (w) => primerTokenDeTerminoFrio(w);
   const validCold = (coldList && coldList.length >= 3)
     ? coldList.map(w => sanitize(w))
     : (caughtWords && caughtWords.length >= 3 ? caughtWords.map(w => sanitize(getColdSynonym(w))) : ['MEMORIA', 'TIEMPO', 'SILENCIO']);
@@ -6171,6 +6979,40 @@ function handleStateReset() {
 // ============================================================================
 let lastTimestamp = performance.now();
 
+// ============================================================================
+// CALL TO ACTION POR INACTIVIDAD (ELEGÍ TU PALABRA...)
+// ============================================================================
+function markUserActivity() {
+  appState.lastUserActivity = Date.now();
+  hideIdleCta();
+}
+
+function showIdleCta() {
+  if (appState.idleCtaVisible || !DOM.idleCta) return;
+  appState.idleCtaVisible = true;
+  DOM.idleCta.classList.remove('hidden');
+}
+
+function hideIdleCta() {
+  if (!appState.idleCtaVisible) return;
+  appState.idleCtaVisible = false;
+  if (DOM.idleCta) DOM.idleCta.classList.add('hidden');
+}
+
+function updateIdleCta() {
+  if (!DOM.idleCta) return;
+  const enModal = DOM.configModal && !DOM.configModal.classList.contains('hidden');
+  const enMutacion = DOM.mutationStage && !DOM.mutationStage.classList.contains('hidden');
+  const bloqueado =
+    appState.caughtWords.length > 0 ||
+    appState.resigning ||
+    enModal ||
+    enMutacion ||
+    (appState.currentState !== STATES.IDLE && appState.currentState !== STATES.INTERACT);
+  if (bloqueado) { hideIdleCta(); return; }
+  if (Date.now() - appState.lastUserActivity >= IDLE_CTA_DELAY_MS) showIdleCta();
+}
+
 function mainLoop(currentTimestamp) {
   const dt = Math.min((currentTimestamp - lastTimestamp) / 1000, 0.1);
   lastTimestamp = currentTimestamp;
@@ -6193,9 +7035,17 @@ function mainLoop(currentTimestamp) {
   // 3. Evaluar colisiones / proximidad (con timestamp para throttle de audio)
   handleProximityAndInteractions(dt, currentTimestamp);
 
+  // 3.b Call to action por inactividad
+  updateIdleCta();
+
   // 4.0 Renderizar SHADER MAESTRO DE SALIDA (capa base de composición final)
   if (appState.masterOutputShader) {
     appState.masterOutputShader.render(currentTimestamp);
+  }
+
+  // 4.1 Renderizar Campo de Flujo Vectorial (Flow Field)
+  if (appState.renderConfig.flowfieldEnabled || appState.trackingConfig.flowField) {
+    renderFlowFieldOverlay(appState.lastLandmarks);
   }
 
   // 4. Renderizar Shader ASCII sobre la cámara
@@ -6238,7 +7088,7 @@ function mainLoop(currentTimestamp) {
       DOM.hudTimestamp.textContent = now.toISOString().replace('T', ' ').replace('Z', '');
     }
     if (DOM.telemetryCoords) {
-      DOM.telemetryCoords.textContent = `X: ${Math.round(appState.cursorX).toString().padStart(3, '0')} | Y: ${Math.round(appState.cursorY).toString().padStart(3, '0')}`;
+      if (DOM.telemetryCoords) DOM.telemetryCoords.textContent = `X: ${Math.round(appState.cursorX).toString().padStart(3, '0')} | Y: ${Math.round(appState.cursorY).toString().padStart(3, '0')}`;
     }
   }
 
@@ -6295,9 +7145,22 @@ function initNoiseCanvas() {
   }
 
   let tileIdx = 0;
+  let ruidoPintado = false;
   function drawStaticNoise() {
     const isNoiseActive = Boolean(appState.renderConfig && appState.renderConfig.noiseEnabled);
     const isGlitchState = (appState.currentState === STATES.PROCESSING || appState.currentState === STATES.HIJACK);
+
+    // MASTER OUTPUT = ÚLTIMA ETAPA. Mientras el shader maestro está activo, este
+    // grano es POST-PROCESAMIENTO POR FUERA DEL SHADER: se pintaba ENCIMA del
+    // canvas del maestro (por eso el "glitch" se seguía viendo aunque la salida
+    // del shader fuese otra) y ensuciaba también la zona del contenedor del
+    // haiku. Ahora, con el maestro activo, no se pinta (y si quedó un cuadro
+    // viejo, se limpia una vez).
+    const masterManda = Boolean(appState.masterOutputShader && appState.masterOutputShader.active);
+    if (masterManda) {
+      if (ruidoPintado) { ctx.clearRect(0, 0, canvas.width, canvas.height); ruidoPintado = false; }
+      return;
+    }
 
     if (isNoiseActive || isGlitchState) {
       tileIdx = (tileIdx + 1) % tiles.length;
@@ -6305,6 +7168,7 @@ function initNoiseCanvas() {
       if (patterns[tileIdx]) {
         ctx.fillStyle = patterns[tileIdx];
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ruidoPintado = true;
       }
     }
   }
@@ -6320,6 +7184,7 @@ function setupEventListeners() {
 
   // REQUERIMIENTO 1: MOUSE TRACKING DINÁMICO & CLIC DIRECTO
   window.addEventListener('mousemove', (e) => {
+    markUserActivity();
     // Si el usuario mueve el mouse, activamos control de mouse y anulamos OpenPose
     appState.isUsingMouse = true;
     appState.targetCursorX = e.clientX;
@@ -6327,14 +7192,15 @@ function setupEventListeners() {
     appState.cursorX = e.clientX;
     appState.cursorY = e.clientY;
 
-    DOM.telemetrySensor.textContent = 'MOUSE [CLIC DIRECTO]';
-    DOM.telemetryConfidence.textContent = '100%';
+    if (DOM.telemetrySensor) DOM.telemetrySensor.textContent = 'MOUSE [CLIC DIRECTO]';
+    if (DOM.telemetryConfidence) DOM.telemetryConfidence.textContent = '100%';
     DOM.inputModeLabel.textContent = 'TRACK: MOUSE';
     DOM.inputModeIcon.textContent = '🖱️';
   });
 
   // Clic en pantalla para atrapar palabra cercana inmediatamente
   window.addEventListener('click', (e) => {
+    markUserActivity();
     appState.isUsingMouse = true;
     if (appState.currentState === STATES.IDLE || appState.currentState === STATES.INTERACT) {
       // Buscar palabra bajo el clic
@@ -6351,8 +7217,13 @@ function setupEventListeners() {
     }
   });
 
+  // Touch (instalación con dedo sobre pantalla táctil)
+  window.addEventListener('touchstart', () => markUserActivity(), { passive: true });
+  window.addEventListener('touchmove', () => markUserActivity(), { passive: true });
+
   // Atajos de Teclado
   window.addEventListener('keydown', (e) => {
+    markUserActivity();
     if (e.key === 'p' || e.key === 'P') {
       if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
         return;
@@ -6424,14 +7295,22 @@ function setupEventListeners() {
       e.preventDefault();
       toggleCctvHud();
     }
+    else if (e.key === 'y' || e.key === 'Y') {
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
+        return;
+      }
+      e.preventDefault();
+      setSoloMaster(!appState.soloMaster);
+    }
     else if (e.key === 's' || e.key === 'S') {
       if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
         return;
       }
       e.preventDefault();
-      if (window.JPShaderInclude && typeof window.JPShaderInclude.openPanel === 'function') {
-        window.JPShaderInclude.openPanel();
-      } else {
+      // La tecla S la maneja el PROPIO include (toggle). Si acá llamáramos a
+      // openPanel() sin condición el panel nunca cerraría: el include lo cierra y
+      // este handler lo volvía a abrir. Sólo queda el aviso si no llegó a cargar.
+      if (!(window.JPShaderInclude && typeof window.JPShaderInclude.isOpen === 'function')) {
         showToast('🎨 Iniciando JPShaderEditor Include...', 'info', 1600);
       }
     }
@@ -6443,11 +7322,10 @@ function setupEventListeners() {
   // Botón JPShader Editor Include en HUD (indexador de combinaciones)
   if (DOM.btnOpenJPShader) {
     DOM.btnOpenJPShader.addEventListener('click', () => {
-      if (window.JPShaderInclude && typeof window.JPShaderInclude.openPanel === 'function') {
-        window.JPShaderInclude.openPanel();
-      } else {
-        showToast('🎨 Iniciando JPShaderEditor Include...', 'info', 1600);
-      }
+      const jp = window.JPShaderInclude;
+      if (jp && typeof jp.togglePanel === 'function') jp.togglePanel();
+      else if (jp && typeof jp.openPanel === 'function') jp.openPanel();
+      else showToast('🎨 Iniciando JPShaderEditor Include...', 'info', 1600);
     });
   }
 
@@ -6808,7 +7686,7 @@ function setupEventListeners() {
       if (!appState.isUsingMouse) {
         const anchorName = e.target.value.toUpperCase();
         DOM.inputModeLabel.textContent = `TRACK: CÁMARA (${anchorName})`;
-        DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorName}]`;
+        if (DOM.telemetrySensor) DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorName}]`;
       }
     });
   }
@@ -7027,6 +7905,31 @@ function setupEventListeners() {
     });
   }
 
+  // 4b. Flow Field (sincronizado bidireccionalmente con Tab Tracking)
+  if (DOM.cfgRenderFlowfieldToggle) {
+    DOM.cfgRenderFlowfieldToggle.addEventListener('change', (e) => {
+      appState.renderConfig.flowfieldEnabled = e.target.checked;
+      appState.trackingConfig.flowField = e.target.checked;
+      if (DOM.cfgTrackFlowField) DOM.cfgTrackFlowField.checked = e.target.checked;
+      saveTrackingConfigToStorage();
+      applyRenderLayers();
+      if (!e.target.checked && DOM.flowfieldCanvas) {
+        const ctx = DOM.flowfieldCanvas.getContext('2d');
+        ctx.clearRect(0, 0, DOM.flowfieldCanvas.width, DOM.flowfieldCanvas.height);
+      } else if (e.target.checked && appState.lastLandmarks) {
+        renderFlowFieldOverlay(appState.lastLandmarks);
+      }
+    });
+  }
+  if (DOM.cfgRenderFlowfieldOpacity) {
+    DOM.cfgRenderFlowfieldOpacity.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      appState.renderConfig.flowfieldOpacity = val / 100;
+      if (DOM.valRenderFlowfieldOpacity) DOM.valRenderFlowfieldOpacity.textContent = val;
+      applyRenderLayers();
+    });
+  }
+
   // 5. Punteros HUD Unificados
   if (DOM.cfgRenderPointersToggle) {
     DOM.cfgRenderPointersToggle.addEventListener('change', (e) => {
@@ -7119,6 +8022,179 @@ function setupEventListeners() {
       appState.renderConfig.corpParticlesOpacity = val / 100;
       if (DOM.valRenderCorpParticlesOpacity) DOM.valRenderCorpParticlesOpacity.textContent = val;
       applyRenderLayers();
+    });
+  }
+
+  // 11. Velocidad de Animación del Noise (Glitch Master Output)
+  if (DOM.cfgRenderNoiseSpeed) {
+    DOM.cfgRenderNoiseSpeed.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      appState.renderConfig.noiseSpeed = val;
+      if (appState.glitchConfig) appState.glitchConfig.noiseSpeed = val;
+      if (DOM.valRenderNoiseSpeed) DOM.valRenderNoiseSpeed.textContent = val.toFixed(1);
+      const valGlitchNoise = document.getElementById('val-glitch-noise-speed');
+      const slGlitchNoise = document.getElementById('cfg-glitch-noise-speed');
+      if (valGlitchNoise) valGlitchNoise.textContent = val.toFixed(2);
+      if (slGlitchNoise) slGlitchNoise.value = val;
+      saveRenderConfigToStorage();
+      saveGlitchConfigToStorage();
+    });
+  }
+
+  // ==========================================================================
+  // TAB: EVENTOS DE GLITCH & ENVELOPE DE SECUENCIA
+  // ==========================================================================
+  function bindGlitchEnvSlider(id, key, isDur) {
+    const sl = document.getElementById('cfg-env-' + id);
+    const val = document.getElementById('val-env-' + id);
+    if (!sl) return;
+    sl.addEventListener('input', (e) => {
+      const n = parseFloat(e.target.value);
+      if (!appState.glitchConfig) appState.glitchConfig = JSON.parse(JSON.stringify(DEFAULT_GLITCH_CONFIG));
+      if (!appState.glitchConfig.envelope) appState.glitchConfig.envelope = { ...DEFAULT_GLITCH_CONFIG.envelope };
+      appState.glitchConfig.envelope[key] = n;
+      if (val) val.textContent = isDur ? n.toFixed(1) : n.toFixed(2);
+      saveGlitchConfigToStorage();
+    });
+  }
+  bindGlitchEnvSlider('idle', 'idle', false);
+  bindGlitchEnvSlider('thinking', 'thinking', false);
+  bindGlitchEnvSlider('haiku', 'haiku', false);
+  bindGlitchEnvSlider('dur', 'duration', true);
+
+  const selGlitchCurve = document.getElementById('cfg-env-curve');
+  if (selGlitchCurve) {
+    selGlitchCurve.addEventListener('change', (e) => {
+      if (!appState.glitchConfig.envelope) appState.glitchConfig.envelope = { ...DEFAULT_GLITCH_CONFIG.envelope };
+      appState.glitchConfig.envelope.curve = e.target.value;
+      saveGlitchConfigToStorage();
+    });
+  }
+
+  // Botones de prueba de estado
+  const btnGlitchTestIdle = document.getElementById('cfg-glitch-test-idle');
+  if (btnGlitchTestIdle) {
+    btnGlitchTestIdle.addEventListener('click', () => {
+      appState.glitchConfig.testPreviewState = 'idle';
+      updateCpGlitchButtonsUI('idle');
+      showToast('▶ Previsualizando estado REPOSO (IDLE)', 'info', 1200);
+    });
+  }
+
+  const btnGlitchTestThink = document.getElementById('cfg-glitch-test-thinking');
+  if (btnGlitchTestThink) {
+    btnGlitchTestThink.addEventListener('click', () => {
+      appState.glitchConfig.testPreviewState = 'thinking';
+      updateCpGlitchButtonsUI('thinking');
+      showToast('▶ Previsualizando estado PENSANDO (THINKING)', 'info', 1200);
+    });
+  }
+
+  const btnGlitchTestHaiku = document.getElementById('cfg-glitch-test-haiku');
+  if (btnGlitchTestHaiku) {
+    btnGlitchTestHaiku.addEventListener('click', () => {
+      appState.glitchConfig.testPreviewState = 'haiku';
+      updateCpGlitchButtonsUI('haiku');
+      showToast('▶ Previsualizando estado SECUESTRO (HAIKU)', 'info', 1200);
+    });
+  }
+
+  const btnGlitchTestAuto = document.getElementById('cfg-glitch-test-auto');
+  if (btnGlitchTestAuto) {
+    btnGlitchTestAuto.addEventListener('click', () => {
+      appState.glitchConfig.testPreviewState = null;
+      updateCpGlitchButtonsUI(null);
+      showToast('↺ Volviendo al seguimiento EN VIVO de la obra', 'info', 1200);
+    });
+  }
+
+  // Bypass / Override Manual
+  const chkGlitchManual = document.getElementById('cfg-glitch-manual-override');
+  const grpGlitchManual = document.getElementById('cfg-glitch-manual-group');
+  const slGlitchManual = document.getElementById('cfg-glitch-manual-val');
+  const valGlitchManual = document.getElementById('val-glitch-manual');
+
+  if (chkGlitchManual) {
+    chkGlitchManual.addEventListener('change', (e) => {
+      appState.glitchConfig.manualOverride = e.target.checked;
+      if (grpGlitchManual) {
+        grpGlitchManual.style.opacity = e.target.checked ? '1' : '0.4';
+        grpGlitchManual.style.pointerEvents = e.target.checked ? 'auto' : 'none';
+      }
+      saveGlitchConfigToStorage();
+    });
+  }
+
+  if (slGlitchManual) {
+    slGlitchManual.addEventListener('input', (e) => {
+      const n = parseFloat(e.target.value);
+      appState.glitchConfig.manualGlitchAmount = n;
+      if (valGlitchManual) valGlitchManual.textContent = n.toFixed(2);
+      saveGlitchConfigToStorage();
+    });
+  }
+
+  // Velocidad de Noise en pestaña Glitch
+  const slGlitchNoise = document.getElementById('cfg-glitch-noise-speed');
+  const valGlitchNoise = document.getElementById('val-glitch-noise-speed');
+  if (slGlitchNoise) {
+    slGlitchNoise.addEventListener('input', (e) => {
+      const n = parseFloat(e.target.value);
+      appState.glitchConfig.noiseSpeed = n;
+      appState.renderConfig.noiseSpeed = n;
+      if (valGlitchNoise) valGlitchNoise.textContent = n.toFixed(2);
+      if (DOM.valRenderNoiseSpeed) DOM.valRenderNoiseSpeed.textContent = n.toFixed(1);
+      if (DOM.cfgRenderNoiseSpeed) DOM.cfgRenderNoiseSpeed.value = n;
+      saveGlitchConfigToStorage();
+      saveRenderConfigToStorage();
+    });
+  }
+
+  // Checkboxes y Sliders de los 5 Uniforms
+  const glitchUniformKeys = [
+    { id: 'block', key: 'blockIntensity' },
+    { id: 'size', key: 'blockSize' },
+    { id: 'chroma', key: 'chromaIntensity' },
+    { id: 'vhs', key: 'vhsNoiseIntensity' },
+    { id: 'tearing', key: 'edgeTearingIntensity' }
+  ];
+
+  glitchUniformKeys.forEach(uk => {
+    const chk = document.getElementById('cfg-glitch-anim-' + uk.id);
+    const sl = document.getElementById('cfg-glitch-param-' + uk.id);
+    const val = document.getElementById('val-glitch-' + uk.id);
+
+    if (chk) {
+      chk.addEventListener('change', (e) => {
+        if (!appState.glitchConfig.params[uk.key]) {
+          appState.glitchConfig.params[uk.key] = { value: 0.5, animated: true };
+        }
+        appState.glitchConfig.params[uk.key].animated = e.target.checked;
+        saveGlitchConfigToStorage();
+      });
+    }
+
+    if (sl) {
+      sl.addEventListener('input', (e) => {
+        const n = parseFloat(e.target.value);
+        if (!appState.glitchConfig.params[uk.key]) {
+          appState.glitchConfig.params[uk.key] = { value: 0.5, animated: true };
+        }
+        appState.glitchConfig.params[uk.key].value = n;
+        if (val) val.textContent = n.toFixed(2);
+        saveGlitchConfigToStorage();
+      });
+    }
+  });
+
+  // Botón restablecer valores predeterminados de Glitch
+  const btnGlitchReset = document.getElementById('btn-glitch-reset-defaults');
+  if (btnGlitchReset) {
+    btnGlitchReset.addEventListener('click', () => {
+      appState.glitchConfig = JSON.parse(JSON.stringify(DEFAULT_GLITCH_CONFIG));
+      applyGlitchConfigToUI();
+      saveGlitchConfigToStorage();
+      showToast('↺ Glitch y Envelope restaurados a valores óptimos', 'success');
     });
   }
 
@@ -7420,6 +8496,7 @@ function toggleConfigModal() {
 
 function openConfigModal() {
   syncConfigToModalInputs();
+  applyGlitchConfigToUI();
   DOM.configStatusMsg.textContent = '';
   DOM.configModal.classList.remove('hidden');
   fetchAndPopulateOllamaModels();
@@ -7460,6 +8537,13 @@ async function init() {
   // POR ENCIMA. Editá public/shaders/master-output.frag y recargá (tecla R).
   if (DOM.masterCanvas) {
     appState.masterOutputShader = new MasterOutputShader(DOM.masterCanvas, DOM.video);
+    // Arranque en modo SOLO MASTER OUTPUT: ?solo=1 (o ?solo=master)
+    try {
+      const qSolo = new URLSearchParams(window.location.search).get('solo');
+      if (qSolo === '1' || qSolo === 'true' || qSolo === 'master') {
+        setTimeout(function () { setSoloMaster(true); }, 1200);
+      }
+    } catch (e) {}
   }
 
   // 1.5 Inicializar Shader Frame Difference con Feedback (Requerimiento 2)
@@ -7492,6 +8576,9 @@ async function init() {
 
   // 2.7 Cargar configuración de composición de render y opacidades (Requerimientos 2 y 3)
   loadRenderConfigFromStorage();
+
+  // 2.75 Cargar configuración de Glitch & Envelope de secuencia
+  loadGlitchConfigFromStorage();
 
   // 2.8 Cargar configuración visual de partículas, shader ASCII y colores UI
   loadVisualConfigFromStorage();

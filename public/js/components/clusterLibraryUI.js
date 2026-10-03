@@ -28,6 +28,7 @@ export class ClusterLibraryUI {
             <h2>Biblioteca de Clusters (Cúmulos Semánticos)</h2>
             <p class="sub-text">
               Crea, edita y organiza tus propias categorías temáticas de palabras. Guardalas en el servidor para explorarlas en el Universo 3D por Cúmulos.
+              <br><strong>Renombrar una palabra:</strong> doble clic sobre ella o tocá el lápiz ✎.
             </p>
           </div>
 
@@ -44,6 +45,8 @@ export class ClusterLibraryUI {
         <div id="cluster-save-toast" class="cluster-toast" style="display: none;">
           ✓ ¡Biblioteca de Clusters guardada exitosamente en el servidor y navegador!
         </div>
+
+        <div id="cluster-edit-toast" class="cluster-toast" style="display: none;"></div>
 
         <!-- 2. AUTO-MAPPER DE PALABRAS A CLUSTERS CON LAYA -->
         <div class="cluster-automap-container">
@@ -98,10 +101,12 @@ export class ClusterLibraryUI {
       card.style.borderColor = `${cluster.color}66`;
 
       const wordsTagsHTML = cluster.words.map(w => {
+        const wEsc = ClusterLibraryUI.esc(w);
         return `
-          <span class="word-tag" style="background-color: ${cluster.color}22; border-color: ${cluster.color}66;">
-            <span class="tag-text">${w}</span>
-            <button class="btn-remove-tag" data-cluster-id="${cluster.id}" data-word="${w}">&times;</button>
+          <span class="word-tag" style="background-color: ${cluster.color}22; border-color: ${cluster.color}66;" data-cluster-id="${cluster.id}" data-word="${wEsc}">
+            <span class="tag-text" title="Doble clic para renombrar">${wEsc}</span>
+            <button class="btn-edit-tag" data-cluster-id="${cluster.id}" data-word="${wEsc}" title="Renombrar palabra">&#9998;</button>
+            <button class="btn-remove-tag" data-cluster-id="${cluster.id}" data-word="${wEsc}" title="Quitar palabra">&times;</button>
           </span>
         `;
       }).join('');
@@ -173,6 +178,25 @@ export class ClusterLibraryUI {
     });
 
     // Attach card level event listeners
+    // RENOMBRAR: lapiz ✎ o doble clic sobre la palabra -> edicion inline
+    grid.querySelectorAll('.btn-edit-tag').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tag = btn.closest('.word-tag');
+        if (tag) this.beginEditWord(tag);
+      });
+    });
+
+    grid.querySelectorAll('.word-tag .tag-text').forEach(txt => {
+      txt.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const tag = txt.closest('.word-tag');
+        if (tag) this.beginEditWord(tag);
+      });
+    });
+
     grid.querySelectorAll('.btn-remove-tag').forEach(btn => {
       btn.addEventListener('click', () => {
         const cId = btn.getAttribute('data-cluster-id');
@@ -189,11 +213,29 @@ export class ClusterLibraryUI {
     });
 
     grid.querySelectorAll('.cluster-name-input').forEach(input => {
+      const cId = input.getAttribute('data-cluster-id');
+      const c = this.clusters.find(x => x.id === cId);
+      if (!c) return;
+      let ultimoBueno = c.name;
+
+      // COMMIT EN VIVO: si escribís el nombre y apretás GUARDAR sin salir del campo,
+      // el cambio ya está en el array. Antes se guardaba el nombre VIEJO (el nuevo
+      // sólo entraba al hacer 'change', o sea al salir del input).
+      input.addEventListener('input', (e) => {
+        const v = e.target.value;
+        if (v.trim()) ultimoBueno = v;
+        c.name = v;
+        // SE GUARDA SOLO: no hace falta apretar GUARDAR para que el nombre quede.
+        this.programarAutoGuardadoNombre();
+      });
+
+      // Al salir del campo: sin espacios sobrantes, nunca vacío, y guardado inmediato.
       input.addEventListener('change', (e) => {
-        const cId = input.getAttribute('data-cluster-id');
-        const name = e.target.value.trim();
-        const c = this.clusters.find(x => x.id === cId);
-        if (c && name) c.name = name;
+        const limpio = String(e.target.value || '').trim();
+        if (limpio) { c.name = limpio; ultimoBueno = limpio; }
+        else { c.name = ultimoBueno; }
+        e.target.value = c.name;
+        this.guardarNombreAhora();
       });
     });
 
@@ -376,6 +418,132 @@ export class ClusterLibraryUI {
     }
   }
 
+  /** Escapa texto para meterlo en atributos/template HTML sin romper el markup. */
+  static esc(txt) {
+    return String(txt == null ? '' : txt)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
+   * Normaliza una palabra escrita a mano: minusculas y SIEMPRE UNA SOLA
+   * PALABRA (se corta en el primer separador: espacio, guion bajo, guion, punto).
+   * Misma regla que el resto del sistema (nada de OPTIMO_LUJO -> OPTIMO).
+   */
+  static sanitizeWord(raw) {
+    let t = String(raw == null ? '' : raw).trim().toLowerCase();
+    t = t.replace(/[^0-9a-záéíóúüñ]/g, ' ');
+    const first = t.split(/\s+/).filter(Boolean)[0] || '';
+    return first;
+  }
+
+  /** Aviso efimero propio (no pisa el toast de guardado). */
+  notify(msg, kind = 'ok', ms = 3200) {
+    const t = document.getElementById('cluster-edit-toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.toggle('is-error', kind === 'error');
+    t.style.display = 'block';
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => {
+      t.style.display = 'none';
+      t.classList.remove('is-error');
+    }, ms);
+  }
+
+  /** Convierte el tag de una palabra en un input editable (Enter/blur = guardar, Esc = cancelar). */
+  beginEditWord(tagEl) {
+    if (!tagEl) return;
+    const cId = tagEl.getAttribute('data-cluster-id');
+    const oldWord = tagEl.getAttribute('data-word') || '';
+    const cluster = this.clusters.find(c => c.id === cId);
+    if (!cluster) return;
+
+    tagEl.classList.add('editing');
+    tagEl.innerHTML = `<input type="text" class="input-edit-tag" value="${ClusterLibraryUI.esc(oldWord)}" spellcheck="false" autocomplete="off" title="Enter para guardar · Esc para cancelar" />`;
+
+    const inp = tagEl.querySelector('.input-edit-tag');
+    if (!inp) return;
+    inp.focus();
+    inp.select();
+
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      if (commit) this.renameWordInCluster(cId, oldWord, inp.value);
+      else this.renderClusterCards();
+    };
+
+    inp.addEventListener('keydown', (e) => {
+      e.stopPropagation(); // la tecla L global no debe auto-agregar palabras aca
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      else if (e.key === 'Tab') { finish(true); }
+    });
+    inp.addEventListener('blur', () => finish(true));
+  }
+
+  /** Renombra una palabra dentro de su cluster, conservando POSICION y color. */
+  renameWordInCluster(clusterId, oldWord, rawNew) {
+    const cluster = this.clusters.find(c => c.id === clusterId);
+    if (!cluster) return;
+
+    const inCluster = cluster.words.indexOf(oldWord);
+    const newWord = ClusterLibraryUI.sanitizeWord(rawNew);
+
+    if (!newWord) { this.renderClusterCards(); return; }                 // vacio -> cancela
+    if (newWord === String(oldWord).toLowerCase() || inCluster < 0) {    // sin cambios
+      this.renderClusterCards();
+      return;
+    }
+    const dup = cluster.words.some((w, i) => i !== inCluster && w.toLowerCase() === newWord);
+    if (dup) {
+      this.notify(`"${newWord.toUpperCase()}" ya existe en ${cluster.name}. No se cambió nada.`, 'error');
+      this.renderClusterCards();
+      return;
+    }
+
+    cluster.words[inCluster] = newWord;   // misma posicion en el array
+    this.renderClusterCards();
+    soundFX.playCorrect();
+
+    const fueAjustada = newWord !== String(rawNew).trim().toLowerCase();
+    this.notify(`Palabra renombrada: ${oldWord} ➔ ${newWord}${fueAjustada ? ' (ajustada a una sola palabra)' : ''} · Acordate de GUARDAR la biblioteca`);
+  }
+
+  /**
+   * GUARDADO AUTOMATICO DEL NOMBRE (lo pidio el usuario: "edito el nombre y no se
+   * guarda"). Rebota 900 ms despues de la ultima tecla y escribe la biblioteca
+   * COMPLETA en el servidor (es el mismo archivo que lee el Universo 3D). Si el
+   * POST falla, lo dice: antes el cambio quedaba solo en la memoria de esta pestana.
+   */
+  programarAutoGuardadoNombre() {
+    clearTimeout(this._autoNombreTimer);
+    this._autoNombreTimer = setTimeout(() => this.guardarNombreAhora(), 900);
+  }
+
+  async guardarNombreAhora() {
+    clearTimeout(this._autoNombreTimer);
+    if (this._guardandoNombre) { this._nombrePendiente = true; return; }
+    this._guardandoNombre = true;
+    try {
+      const res = await clusterManager.save(this.clusters);
+      if (res && res.serverSaved) {
+        this.notify('\u2713 Nombre guardado en el servidor (se guarda solo, sin apretar GUARDAR).', 'ok', 2200);
+      } else {
+        this.notify('\u26a0 El nombre NO lleg\u00f3 al servidor (\u00bfnpm start apagado?): qued\u00f3 solo en este navegador.', 'error', 8000);
+      }
+    } catch (e) {
+      this.notify('\u26a0 Error guardando el nombre: ' + (e && e.message ? e.message : e), 'error', 8000);
+    } finally {
+      this._guardandoNombre = false;
+      if (this._nombrePendiente) { this._nombrePendiente = false; this.programarAutoGuardadoNombre(); }
+    }
+  }
+
   addWordToCluster(clusterId, word) {
     const clean = word.toLowerCase().trim();
     if (!clean) return;
@@ -421,15 +589,25 @@ export class ClusterLibraryUI {
 
   async saveAll() {
     const res = await clusterManager.save(this.clusters);
-    soundFX.playCorrect();
+    const serverOK = !!(res && res.serverSaved);
 
-    const toast = document.getElementById('cluster-save-toast');
-    if (toast) {
-      toast.style.display = 'block';
-      setTimeout(() => {
-        toast.style.display = 'none';
-      }, 3500);
+    if (serverOK) {
+      soundFX.playCorrect();
+      const toast = document.getElementById('cluster-save-toast');
+      if (toast) {
+        toast.style.display = 'block';
+        setTimeout(() => {
+          toast.style.display = 'none';
+        }, 3500);
+      }
+      this.notify('✓ Guardado en el servidor. El Universo 3D la toma solo en ~20 s (o al recargar).');
+    } else {
+      // ANTES esto cantaba "guardada exitosamente" aunque el POST al servidor hubiera
+      // fallado: el 3D lee del SERVIDOR, así que seguía mostrando los nombres viejos
+      // y parecía que el 3D "no tomaba" la biblioteca. Ahora se dice la verdad.
+      this.notify('⚠ NO se pudo guardar en el SERVIDOR: quedó sólo en este navegador y el Universo 3D NO verá los cambios. Revisá que el server esté corriendo (npm start).', 'error', 9000);
     }
+    return res;
   }
 
   setupEvents() {

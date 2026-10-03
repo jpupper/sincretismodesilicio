@@ -41,43 +41,43 @@ export class ClusterManager {
     return [
       {
         id: 'poder',
-        name: 'PODER Y POLÍTICA',
+        name: 'PODER',
         color: '#ef4444',
         words: ['política', 'izquierda', 'derecha', 'fascismo', 'comunismo', 'gobierno', 'estado', 'democracia', 'ideología', 'justicia', 'ley', 'soberanía', 'república', 'autoridad', 'libertad', 'imperio']
       },
       {
         id: 'animales',
-        name: 'ANIMALES & FAUNA',
+        name: 'ANIMALES',
         color: '#10b981',
         words: ['perro', 'gato', 'elefante', 'tigre', 'león', 'caballo', 'lobo', 'águila', 'ballena', 'delfín', 'oso', 'serpiente', 'halcón', 'zorro', 'ciervo', 'pantera']
       },
       {
         id: 'filosofia',
-        name: 'FILOSOFÍA & COSMOS',
+        name: 'FILOSOFÍA',
         color: '#8b5cf6',
         words: ['existencia', 'tiempo', 'filosofía', 'mente', 'alma', 'verdad', 'conciencia', 'universo', 'destino', 'razón', 'muerte', 'infinito', 'ética', 'esencia', 'duda', 'conocimiento']
       },
       {
         id: 'tecnologia',
-        name: 'TECNOLOGÍA & SILICIO',
+        name: 'TECNOLOGÍA',
         color: '#06b6d4',
         words: ['computadora', 'robot', 'código', 'algoritmo', 'futuro', 'silicio', 'red', 'memoria', 'procesador', 'sistema', 'inteligencia', 'interfaz', 'servidor', 'cibernética', 'datos', 'enlace']
       },
       {
         id: 'emociones',
-        name: 'EMOCIONES & AFECTO HUMANO',
+        name: 'EMOCIONES',
         color: '#ec4899',
         words: ['amor', 'nostalgia', 'ternura', 'tristeza', 'alegría', 'fragilidad', 'esperanza', 'miedo', 'anhelo', 'soledad', 'duelo', 'calma', 'pasión', 'desvelo', 'empatía', 'consuelo']
       },
       {
         id: 'poesia',
-        name: 'POESÍA, ARTE & LITERATURA',
+        name: 'POESÍA',
         color: '#f59e0b',
         words: ['verso', 'metáfora', 'ritmo', 'silencio', 'belleza', 'poema', 'sombra', 'eco', 'espejo', 'misterio', 'ceniza', 'aurora', 'abismo', 'origen', 'creación', 'armonía']
       },
       {
         id: 'naturaleza',
-        name: 'NATURALEZA, TIERRA & BIOLOGÍA',
+        name: 'NATURALEZA',
         color: '#84cc16',
         words: ['bosque', 'río', 'montaña', 'océano', 'viento', 'lluvia', 'raíz', 'tierra', 'semilla', 'flor', 'cielo', 'hoja', 'tormenta', 'desierto', 'nieve', 'sol']
       }

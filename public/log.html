@@ -7,11 +7,11 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="js/base-path.js?v=3.8"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; background: #070303; color: #e88f93; font-family: "JetBrains Mono", "Share Tech Mono", monospace; overflow: hidden; }
+  html, body { height: 100%; background: #070303; color: #e88f93; font-family: "Share Tech Mono", "VT323", "IBM Plex Mono", monospace; overflow: hidden; }
   body { display: flex; flex-direction: column; }
 
   /* ---------- BARRA SUPERIOR DE ESTADO ---------- */
@@ -67,20 +67,19 @@
 
   /* ---------- PANEL COGNITIVO DEL AGENTE (HERO) ---------- */
   #agent-monitor {
-    /* El pensamiento manda: se queda con la mayor parte de la pantalla */
-    flex: 0 0 72%;
+    /* El pensamiento manda: se queda con TODA la pantalla (la telemetría del
+       bus ya no vive en esta página) */
+    flex: 1 1 100%;
     min-height: 220px;
-    max-height: 86%;
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     background: #0a0202;
-    border-bottom: 2px solid #401618;
+    border-bottom: none;
     position: relative;
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
     transition: flex 0.25s ease;
   }
-  body.view-agent-only #agent-monitor { flex: 1 1 100%; max-height: 100%; border-bottom: none; }
-  body.view-log-only #agent-monitor { display: none; }
 
   .agent-top-bar {
     display: flex;
@@ -188,6 +187,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;          /* el hint nunca se corta contra el borde */
+    gap: 4px 12px;
     font-size: 10.5px;
     color: #733b3e;
     letter-spacing: .08em;
@@ -213,8 +214,8 @@
     border: 1px solid #311113;
     border-radius: 4px;
     padding: 12px 14px;
-    font-size: 13px;
-    line-height: 1.7;
+    font-size: 22px;
+    line-height: 1.6;
     color: #eba4a8;
     white-space: pre-wrap;
     word-break: break-word;
@@ -263,10 +264,20 @@
     border-left: 2px solid #ff000d;
     background: rgba(255, 0, 13, 0.07);
   }
+  /* Manifiesto de la obra: las instrucciones se escriben solas mientras la
+     sala está vacía (nadie eligió todavía su primera palabra). */
+  #thought-terminal.manifest-mode {
+    font-family: "Share Tech Mono", "VT323", "IBM Plex Mono", monospace;
+    font-size: 30px;
+    line-height: 1.55;
+    color: #e8a6a9;
+  }
+  #thought-terminal.manifest-mode #thought-content { color: #e8a6a9; }
+
   .thought-cursor {
     display: inline-block;
-    width: 8px;
-    height: 15px;
+    width: 12px;
+    height: 26px;
     background: #ff000d;
     margin-left: 3px;
     vertical-align: -2px;
@@ -297,7 +308,7 @@
     margin-bottom: 6px;
   }
   .haiku-text {
-    font-size: 14px;
+    font-size: 19px;
     line-height: 1.6;
     color: #ffffff;
     font-weight: 600;
@@ -310,104 +321,149 @@
     font-weight: 900;
   }
 
-  /* ---------- LOG DEL SISTEMA (STREAM INFERIOR) ---------- */
-  #log-section {
-    /* La telemetría del bus sigue estando, pero ya no se come media pantalla */
-    flex: 1 1 28%;
-    display: flex;
-    flex-direction: column;
-    min-height: 120px;
-    max-height: 34%;
-    background: #000;
-    position: relative;
-    transition: flex 0.25s ease;
+  /* ---------- PANEL DE AJUSTES DE LA CONSOLA (tecla P) ---------- */
+  #panel-ajustes {
+    position: fixed;
+    top: 44px;
+    right: 16px;
+    width: 440px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    background: linear-gradient(180deg, #180406 0%, #0a0202 100%);
+    border: 1px solid #ff000d;
+    border-radius: 6px;
+    box-shadow: 0 0 34px rgba(255, 0, 13, 0.4);
+    padding: 14px 16px 15px;
+    /* POR ENCIMA del canvas de glitch (#log-glitch-canvas tiene z-index 9999,
+       es position:fixed + inset:0 y su contexto WebGL es opaco: tapaba TODO).
+       Con 200 el panel se abria (clase .abierto, display:block) pero era invisible:
+       quedaba debajo del canvas. Es la superficie de CONTROL del operador, va limpia. */
+    z-index: 10000;
+    display: none;
   }
-  body.view-agent-only #log-section { display: none; }
-  body.view-log-only #log-section { flex: 1 1 100%; max-height: 100%; }
-  /* Colapsable: sólo queda la barra con el contador de líneas */
-  #log-section.collapsed { flex: 0 0 auto; min-height: 0; max-height: none; }
-  #log-section.collapsed #stream { display: none; }
-
-  .log-bar {
+  #panel-ajustes::-webkit-scrollbar { width: 5px; }
+  #panel-ajustes::-webkit-scrollbar-track { background: #0e0304; }
+  #panel-ajustes::-webkit-scrollbar-thumb { background: #ff000d; border-radius: 3px; }
+  #panel-ajustes.abierto { display: block; animation: fade-in-up .25s ease; }
+  .pa-titulo {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; letter-spacing: .1em; color: #ff000d; font-weight: 700; margin-bottom: 14px;
+  }
+  .pa-seccion {
+    border-top: 1px solid #3d1417;
+    margin: 14px 0 10px;
+    padding-top: 10px;
+  }
+  .pa-seccion-titulo {
+    font-size: 11px;
+    color: #ff3b45;
+    font-weight: 700;
+    letter-spacing: .08em;
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 6px 14px;
-    background: #070102;
-    border-bottom: 1px solid #290f10;
-    font-size: 11px;
-    color: #784245;
+    gap: 6px;
+  }
+  .pa-btn-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .pa-btn-test {
+    flex: 1;
+    background: #200608;
+    color: #ff8a90;
+    border: 1px solid #52181c;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 700;
     letter-spacing: .06em;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .pa-btn-test:hover {
+    background: #3d0a0e;
+    color: #ff000d;
+    border-color: #ff000d;
+    box-shadow: 0 0 8px rgba(255, 0, 13, 0.4);
+  }
+  .pa-btn-test.active {
+    background: #ff000d;
+    color: #000;
+    border-color: #ff000d;
+    box-shadow: 0 0 10px rgba(255, 0, 13, 0.6);
+  }
+  .pa-check-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10.5px;
+    color: #d8898e;
     cursor: pointer;
     user-select: none;
   }
-  .log-bar:hover { color: #ff4f58; background: #140405; }
-  #log-toggle { color: #ff4f58; font-weight: 700; }
-  .log-bar-right { display: flex; align-items: center; gap: 14px; }
-
-  #stream {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 8px 14px 40px;
-    scrollbar-width: thin;
-    scrollbar-color: #421a1c #000;
-  }
-  #stream::-webkit-scrollbar { width: 7px; }
-  #stream::-webkit-scrollbar-thumb { background: #421a1c; }
-
-  .ln { display: flex; gap: 10px; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.5; }
-  .ln .t { color: #522426; flex: 0 0 auto; }
-  .ln .g { flex: 0 0 96px; color: #854b4e; font-weight: 600; }
-  .ln .m { flex: 1 1 auto; color: #e88f93; }
-  .g-BUS      { color: #82474a; }
-  .g-NUCLEO   { color: #e88f93; }
-  .g-VECTOR   { color: #ff6a71; }
-  .g-OLLAMA   { color: #ff000d; }
-  .g-THINK    { color: #ff000d; font-weight: bold; }
-  .g-SINTESIS { color: #ff000d; font-weight: bold; }
-  .g-UNIV     { color: #ff8c92; }
-  .g-ALERTA   { color: #ff4d56; }
-  .m-warn { color: #ff000d; }
-  .m-err  { color: #ff4d56; }
-  .m-dim  { color: #754043; }
-  .m-ok   { color: #ff000d; }
-  .m-hot  { color: #ff000d; font-weight: 700; }
-
-  .dt { display: flex; gap: 10px; color: #693235; white-space: pre-wrap; word-break: break-word; font-size: 11.5px; }
-  .dt .t { flex: 0 0 auto; color: #331416; }
-  .dt .g { flex: 0 0 96px; color: #331416; }
-  .dt .m { flex: 1 1 auto; }
-  .rw { display: flex; gap: 10px; color: #4a1d1f; white-space: pre-wrap; word-break: break-all; font-size: 11px; }
-  .rw .t { flex: 0 0 auto; }
-  .rw .g { flex: 0 0 96px; }
-  .hr { color: #321718; margin: 6px 0 2px; }
-
-  #newlines {
-    position: fixed;
-    right: 18px;
-    bottom: 16px;
-    display: none;
-    background: #140405;
-    border: 1px solid #ff000d;
-    color: #ff000d;
-    padding: 5px 12px;
-    font-size: 11px;
-    letter-spacing: .08em;
+  .pa-check-label input[type="checkbox"] {
+    accent-color: #ff000d;
     cursor: pointer;
-    border-radius: 3px;
-    box-shadow: 0 0 10px rgba(255, 0, 13, 0.3);
-    z-index: 50;
   }
-  #newlines.show { display: block; }
-  #hint { position: fixed; left: 14px; bottom: 12px; color: #421d1f; font-size: 10px; z-index: 5; }
+  .pa-select {
+    width: 100%;
+    background: #180506;
+    border: 1px solid #4a1418;
+    color: #ff8a90;
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-family: inherit;
+    font-size: 11px;
+    margin-top: 4px;
+    cursor: pointer;
+  }
+  .pa-select:focus { outline: none; border-color: #ff000d; }
+  .pa-cerrar {
+    background: #2b0608; border: 1px solid #611418; color: #ff8f96;
+    width: 22px; height: 22px; line-height: 1; border-radius: 3px; cursor: pointer; font-size: 12px;
+  }
+  .pa-cerrar:hover { background: #40070a; color: #ff000d; border-color: #ff000d; }
+  .pa-grupo { margin-bottom: 16px; }
+  .pa-label {
+    display: flex; align-items: baseline; justify-content: space-between;
+    font-size: 11px; color: #b8747a; letter-spacing: .07em; margin-bottom: 5px;
+  }
+  .pa-valor { color: #ff000d; font-weight: 700; font-size: 15px; }
+  .pa-slider {
+    width: 100%; height: 22px; background: transparent; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+  }
+  .pa-slider:focus { outline: none; }
+  .pa-slider::-webkit-slider-runnable-track { height: 4px; background: #3a1214; border-radius: 2px; }
+  .pa-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px;
+    border-radius: 50%; background: #ff000d; box-shadow: 0 0 10px rgba(255, 0, 13, 0.65);
+  }
+  .pa-slider::-moz-range-track { height: 4px; background: #3a1214; border-radius: 2px; }
+  .pa-slider::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%; background: #ff000d; }
+  .pa-pistas { display: flex; justify-content: space-between; font-size: 9.5px; color: #6d3a3d; letter-spacing: .05em; }
+  .pa-nota { font-size: 10.5px; color: #8a5154; line-height: 1.5; margin-top: 3px; }
+  .pa-preview {
+    border: 1px solid #311113; background: #080202; border-radius: 4px;
+    padding: 8px 10px; margin-top: 8px; color: #e8a6a9; white-space: pre-wrap;
+    font-family: "JetBrains Mono", "Share Tech Mono", monospace; line-height: 1.4;
+  }
+  .pa-reset {
+    background: #2b0608; border: 1px solid #611418; color: #ff8f96;
+    font-family: inherit; font-size: 10.5px; letter-spacing: .07em;
+    padding: 5px 11px; border-radius: 3px; cursor: pointer;
+  }
+  .pa-reset:hover { background: #40070a; color: #ff000d; border-color: #ff000d; }
 </style>
 </head>
 <body>
 
 <div id="status">
-  <span>S·S // CONSOLA COGNITIVA &amp; LOG</span>
+  <span>S·S // CONSOLA COGNITIVA DE LA OBRA</span>
   <span class="sep">|</span>
   <span><span class="dot" id="ws-dot"></span>BUS <b id="ws-txt">DESCONECTADO</b></span>
   <span class="sep">|</span>
@@ -419,14 +475,7 @@
   <span class="sep">|</span>
   <span>EVENTOS <b id="f-events">0</b></span>
   <span class="sp">
-    <button class="k active-view" id="btn-view-split" title="Ver Monitor Cognitivo y Log del Sistema">DUAL</button>
-    <button class="k" id="btn-view-agent" title="Ver sólo el pensamiento del agente">SÓLO AGENTE</button>
-    <button class="k" id="btn-view-log" title="Ver sólo el log de sucesos">SÓLO LOG</button>
-    <span class="sep">|</span>
-    <button class="k" id="btn-raw" title="Mostrar el payload JSON completo (tecla R)">RAW</button>
-    <button class="k" id="btn-pause" title="Pausar la captura (tecla P)">PAUSA</button>
-    <button class="k" id="btn-copy" title="Copiar todo el log al portapapeles">COPIAR</button>
-    <button class="k" id="btn-clear" title="Limpiar buffer (tecla C)">LIMPIAR</button>
+    <button class="k" id="btn-panel" title="Ajustes de la consola: tamaño de letra y ritmo (tecla P)">&#9881; AJUSTES · P</button>
   </span>
 </div>
 
@@ -439,7 +488,6 @@
     <div class="agent-top-bar">
       <div class="agent-title-block">
         <span class="dot" id="agent-status-dot"></span>
-        <span>PROCESO COGNITIVO DEL AGENTE EN TIEMPO REAL</span>
         <span class="agent-badge" id="agent-status-badge">REPOSO</span>
       </div>
       <div class="agent-metrics">
@@ -449,30 +497,10 @@
       </div>
     </div>
 
-    <!-- Slots de palabras en proceso -->
-    <div class="words-pipeline">
-      <div class="word-pill-slot" id="slot-1">
-        <div class="pill-header"><span>SLOT #01</span><span id="slot-1-tag">ESPERANDO</span></div>
-        <div class="pill-human" id="slot-1-human">—</div>
-        <div class="pill-cold" id="slot-1-cold" style="display:none;"></div>
-      </div>
-      <div class="word-pill-slot" id="slot-2">
-        <div class="pill-header"><span>SLOT #02</span><span id="slot-2-tag">ESPERANDO</span></div>
-        <div class="pill-human" id="slot-2-human">—</div>
-        <div class="pill-cold" id="slot-2-cold" style="display:none;"></div>
-      </div>
-      <div class="word-pill-slot" id="slot-3">
-        <div class="pill-header"><span>SLOT #03</span><span id="slot-3-tag">ESPERANDO</span></div>
-        <div class="pill-human" id="slot-3-human">—</div>
-        <div class="pill-cold" id="slot-3-cold" style="display:none;"></div>
-      </div>
-    </div>
-
     <!-- Ventana de pensamiento streaming de Gemma -->
     <div class="thought-stream-container">
       <div class="thought-stream-header">
         <div class="mode-indicator">
-          <span>MONÓLOGO INTERNO // CADENA DE PENSAMIENTO:</span>
           <span class="mode-tag tag-reasoning" id="mode-badge" style="display:none;">&lt;think&gt; RAZONAMIENTO ACTIVO</span>
         </div>
         <span id="thought-status-hint">Esperando secuencia de 3 palabras en Sicre2...</span>
@@ -491,30 +519,167 @@
     </div>
   </section>
 
-  <!-- ====================================================================== -->
-  <!-- 2. REGISTRO DEL BUS DEL SISTEMA (LOG COMPLETO)                         -->
-  <!-- ====================================================================== -->
-  <section id="log-section">
-    <div class="log-bar" id="log-bar" title="Clic para colapsar/expandir la telemetría del bus">
-      <span>REGISTRO DE TELEMETRÍA DEL BUS CENTRAL (/ws)</span>
-      <span class="log-bar-right">
-        <span>LÍNEAS: <b id="f-lines" style="color:#e88f93;">0</b></span>
-        <span id="log-toggle">▾ OCULTAR</span>
-      </span>
-    </div>
-    <div id="stream"></div>
-  </section>
-
 </div>
 
-<div id="newlines">▼ LÍNEAS NUEVAS</div>
-<div id="hint">[P] pausa · [C] limpiar · [R] raw · [S] seguir · 1/2/3 cambiar vista</div>
+<!-- Canvas WebGL de Render Glitch sobre toda la consola -->
+<canvas id="log-glitch-canvas" style="position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;"></canvas>
+
+
+<!-- ========================================================================= -->
+<!-- PANEL DE AJUSTES DE LA CONSOLA (se abre con la tecla P)                   -->
+<!-- ========================================================================= -->
+<div id="panel-ajustes">
+  <div class="pa-titulo">
+    <span>&#9672; AJUSTES DE LA CONSOLA</span>
+    <button class="pa-cerrar" id="pa-cerrar" title="Cerrar (P o Esc)">&#10005;</button>
+  </div>
+
+  <!-- 1. GENERAL -->
+  <div class="pa-seccion" style="border-top:none;margin-top:0;padding-top:0;">
+    <div class="pa-seccion-titulo"><span>🔤 CONSOLA COGNITIVA</span></div>
+    <div class="pa-grupo">
+      <div class="pa-label"><span>TAMAÑO DE LA LETRA</span><span class="pa-valor" id="pa-font-val">30px</span></div>
+      <input type="range" class="pa-slider" id="pa-font" min="16" max="72" step="2" value="30" />
+      <div class="pa-pistas"><span>16px · chica</span><span>72px · enorme</span></div>
+      <div class="pa-preview" id="pa-preview">Así se ve el texto de la obra</div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>CADA CUÁNTO APARECE UN TEXTO</span><span class="pa-valor" id="pa-ritmo-val">1,0×</span></div>
+      <input type="range" class="pa-slider" id="pa-ritmo" min="0.3" max="3" step="0.1" value="1" />
+      <div class="pa-pistas"><span>0,3× · rápido</span><span>3× · lento</span></div>
+      <div class="pa-nota" id="pa-ritmo-nota">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- 2. ENVELOPE DE SECUENCIA (GLITCH AMOUNT) -->
+  <div class="pa-seccion">
+    <div class="pa-seccion-titulo"><span>⚡ ENVELOPE DE SECUENCIA (CALIBRACIÓN GLITCH)</span></div>
+    
+    <div style="font-size:10px;color:#a8676b;margin-bottom:8px;">Calibra el nivel de Glitch que toma el sistema en cada fase:</div>
+    <div class="pa-btn-row">
+      <button type="button" class="pa-btn-test" id="pa-test-idle" title="Probar cómo luce el estado de reposo">▶ IDLE</button>
+      <button type="button" class="pa-btn-test" id="pa-test-thinking" title="Probar cómo luce el estado de razonamiento activo">▶ THINKING</button>
+      <button type="button" class="pa-btn-test" id="pa-test-haiku" title="Probar cómo luce la entrega del poema final">▶ HAIKU</button>
+      <button type="button" class="pa-btn-test" id="pa-test-auto" title="Volver al seguimiento en vivo del agente" style="flex:0.8;">↺ AUTO</button>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>VALOR EN REPOSO (IDLE)</span><span class="pa-valor" id="pa-env-idle-val">0.10</span></div>
+      <input type="range" class="pa-slider" id="pa-env-idle" min="0" max="1" step="0.02" value="0.10" />
+      <div class="pa-pistas"><span>0.00 · limpio</span><span>1.00 · desintegrado</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>VALOR EN RAZONAMIENTO (THINKING)</span><span class="pa-valor" id="pa-env-thinking-val">1.00</span></div>
+      <input type="range" class="pa-slider" id="pa-env-thinking" min="0" max="1" step="0.02" value="1.00" />
+      <div class="pa-pistas"><span>0.00 · limpio</span><span>1.00 · máximo pico</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>VALOR EN POEMA SINTETIZADO (HAIKU)</span><span class="pa-valor" id="pa-env-haiku-val">0.50</span></div>
+      <input type="range" class="pa-slider" id="pa-env-haiku" min="0" max="1" step="0.02" value="0.50" />
+      <div class="pa-pistas"><span>0.00 · limpio</span><span>1.00 · desintegrado</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>DURACIÓN TRANSICIÓN (ENVELOPE TIME)</span><span class="pa-valor" id="pa-env-dur-val">1.2s</span></div>
+      <input type="range" class="pa-slider" id="pa-env-dur" min="0.1" max="4.0" step="0.1" value="1.2" />
+      <div class="pa-pistas"><span>0.1s · instantáneo</span><span>4.0s · fundido lento</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>CURVA DE TRANSICIÓN (EASING)</span></div>
+      <select class="pa-select" id="pa-env-curve">
+        <option value="cubic" selected>Cúbica Suave (In-Out)</option>
+        <option value="smooth">Smoothstep (Orgánica)</option>
+        <option value="linear">Lineal Continua</option>
+        <option value="expo">Exponencial (Agresiva)</option>
+      </select>
+    </div>
+
+    <!-- Manual Override -->
+    <div style="background:#1c0608;border:1px solid #4a1215;border-radius:4px;padding:8px 10px;margin-top:6px;">
+      <label class="pa-check-label" style="font-weight:700;color:#ff525d;">
+        <input type="checkbox" id="pa-manual-override">
+        <span>FORZAR GLITCH MANUAL (Bypass de Envelope)</span>
+      </label>
+      <div id="pa-manual-group" style="opacity:0.4;pointer-events:none;transition:opacity .2s;margin-top:6px;">
+        <div class="pa-label"><span>INTENSIDAD MANUAL</span><span class="pa-valor" id="pa-manual-glitch-val">0.50</span></div>
+        <input type="range" class="pa-slider" id="pa-manual-glitch" min="0" max="1" step="0.01" value="0.50" />
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. PARÁMETROS DEL SHADER GLITCH (NOISE VS MANUAL) -->
+  <div class="pa-seccion">
+    <div class="pa-seccion-titulo"><span>🎛️ PARÁMETROS UNIFORM DEL SHADER</span></div>
+    
+    <div class="pa-grupo">
+      <div class="pa-label"><span>VELOCIDAD GLOBAL DE NOISE (×0.1 BASE)</span><span class="pa-valor" id="pa-noise-speed-val">1,00×</span></div>
+      <input type="range" class="pa-slider" id="pa-noise-speed" min="0" max="3" step="0.05" value="1" />
+      <div class="pa-pistas"><span>0× · estático</span><span>1× · sutil (10× más lento)</span><span>3× · dinámico</span></div>
+    </div>
+
+    <!-- Param 1: blockIntensity -->
+    <div class="pa-grupo" style="margin-bottom:12px;">
+      <div class="pa-label">
+        <label class="pa-check-label"><input type="checkbox" id="pa-anim-block" checked> <span>Animar con Noise</span></label>
+        <span>Bloques Rotos: <b class="pa-valor" id="pa-val-block" style="font-size:13px;">0.80</b></span>
+      </div>
+      <input type="range" class="pa-slider" id="pa-param-block" min="0" max="1" step="0.02" value="0.80" />
+    </div>
+
+    <!-- Param 2: blockSize -->
+    <div class="pa-grupo" style="margin-bottom:12px;">
+      <div class="pa-label">
+        <label class="pa-check-label"><input type="checkbox" id="pa-anim-size" checked> <span>Animar con Noise</span></label>
+        <span>Tamaño Cuadrados: <b class="pa-valor" id="pa-val-size" style="font-size:13px;">0.60</b></span>
+      </div>
+      <input type="range" class="pa-slider" id="pa-param-size" min="0.05" max="1" step="0.02" value="0.60" />
+    </div>
+
+    <!-- Param 3: chromaIntensity -->
+    <div class="pa-grupo" style="margin-bottom:12px;">
+      <div class="pa-label">
+        <label class="pa-check-label"><input type="checkbox" id="pa-anim-chroma" checked> <span>Animar con Noise</span></label>
+        <span>Aberración Cromática: <b class="pa-valor" id="pa-val-chroma" style="font-size:13px;">0.70</b></span>
+      </div>
+      <input type="range" class="pa-slider" id="pa-param-chroma" min="0" max="1" step="0.02" value="0.70" />
+    </div>
+
+    <!-- Param 4: vhsNoiseIntensity -->
+    <div class="pa-grupo" style="margin-bottom:12px;">
+      <div class="pa-label">
+        <label class="pa-check-label"><input type="checkbox" id="pa-anim-vhs" checked> <span>Animar con Noise</span></label>
+        <span>Ruido VHS &amp; Scanlines: <b class="pa-valor" id="pa-val-vhs" style="font-size:13px;">0.65</b></span>
+      </div>
+      <input type="range" class="pa-slider" id="pa-param-vhs" min="0" max="1" step="0.02" value="0.65" />
+    </div>
+
+    <!-- Param 5: edgeTearingIntensity -->
+    <div class="pa-grupo" style="margin-bottom:12px;">
+      <div class="pa-label">
+        <label class="pa-check-label"><input type="checkbox" id="pa-anim-tearing" checked> <span>Animar con Noise</span></label>
+        <span>Desgarro Lateral (Tearing): <b class="pa-valor" id="pa-val-tearing" style="font-size:13px;">0.50</b></span>
+      </div>
+      <input type="range" class="pa-slider" id="pa-param-tearing" min="0" max="1" step="0.02" value="0.50" />
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;border-top:1px solid #331215;padding-top:10px;">
+    <button class="pa-reset" id="pa-reset">RESTABLECER TODO</button>
+    <span class="pa-nota" style="text-align:right;">Se guarda solo<br />P o Esc para cerrar</span>
+  </div>
+</div>
 
 <script>
 (function () {
   'use strict';
 
   var $ = function (s) { return document.querySelector(s); };
+  // La telemetría del bus ya NO está en esta página: stream queda en null y
+  // todas las funciones de escritura de log salen temprano sin hacer nada.
   var stream = $('#stream');
   var thoughtTerminal = $('#thought-terminal');
   var thoughtContent = $('#thought-content');
@@ -536,10 +701,20 @@
     stage: '—',
     tokensCount: 0,
     startTime: 0,
+    captured: 0,          // palabras capturadas en el ciclo en curso
+    ritmo: 1,             // multiplicador del ritmo del manifiesto (panel P)
+    lastEventAt: 0,       // ultimo mensaje recibido del bus
     timerId: null,
     thinkingActive: false,
     fullThoughtText: '',
-    inThinkBlock: false
+    inThinkBlock: false,
+    /* Manifiesto de la obra: se reproduce desde que abre la página hasta que
+       el primer visitante elige su primera palabra. */
+    sequenceStarted: false,
+    manifestLines: [],
+    manifestIndex: 0,
+    manifestTimer: null,
+    manifestLoading: false
   };
 
   /* ======================================================================
@@ -571,16 +746,17 @@
   }
 
   function resetAgentSlots() {
+    // Los slots de palabra ya NO estan en el DOM (se sacaron a pedido del usuario):
+    // todo va con guardas de null o el IIFE entero se corta aca.
     for (var i = 1; i <= 3; i++) {
       var slot = $('#slot-' + i);
       var tag = $('#slot-' + i + '-tag');
       var human = $('#slot-' + i + '-human');
       var cold = $('#slot-' + i + '-cold');
-      slot.className = 'word-pill-slot';
-      tag.textContent = 'ESPERANDO';
-      human.textContent = '—';
-      cold.style.display = 'none';
-      cold.textContent = '';
+      if (slot) slot.className = 'word-pill-slot';
+      if (tag) tag.textContent = 'ESPERANDO';
+      if (human) human.textContent = '—';
+      if (cold) { cold.style.display = 'none'; cold.textContent = ''; }
     }
     $('#mon-captured').textContent = '0/3';
     haikuBanner.style.display = 'none';
@@ -601,6 +777,8 @@
     stopAgentTimer();
     $('#mon-timer').textContent = '0.0s';
     setAgentState('REPOSO', '', '');
+    if (typeof updateLogGlitchState === 'function') updateLogGlitchState('idle');
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
   }
 
   function updateSlotWord(index, wordText) {
@@ -608,20 +786,21 @@
     var slot = $('#slot-' + index);
     var tag = $('#slot-' + index + '-tag');
     var human = $('#slot-' + index + '-human');
-    slot.className = 'word-pill-slot active';
-    tag.textContent = 'CAPTURADA';
-    human.textContent = String(wordText).toUpperCase();
+    if (slot) slot.className = 'word-pill-slot active';
+    if (tag) tag.textContent = 'CAPTURADA';
+    if (human) human.textContent = String(wordText).toUpperCase();
     $('#mon-captured').textContent = index + '/3';
     setAgentState('CAPTURA (' + index + '/3)', '', 'pulse');
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
   }
 
   function updateSlotCold(index, coldText) {
     if (index < 1 || index > 3) return;
     var slot = $('#slot-' + index);
     var cold = $('#slot-' + index + '-cold');
-    slot.className = 'word-pill-slot hot';
-    cold.style.display = 'flex';
-    cold.textContent = String(coldText).toUpperCase();
+    if (slot) slot.className = 'word-pill-slot hot';
+    if (cold) { cold.style.display = 'flex'; cold.textContent = String(coldText).toUpperCase(); }
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
   }
 
   function appendAgentToken(token, isThinking) {
@@ -629,11 +808,13 @@
       state.thinkingActive = true;
       startAgentTimer();
       setAgentState('PENSANDO (GEMMA)', 'thinking', 'thinking');
+      if (typeof updateLogGlitchState === 'function') updateLogGlitchState('thinking');
       thoughtCursor.style.display = 'inline-block';
       if (thoughtContent.textContent === 'Esperando estímulo cognitivo...') {
         thoughtContent.textContent = '';
       }
     }
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
 
     state.tokensCount++;
     $('#f-tokens').textContent = state.tokensCount;
@@ -723,6 +904,7 @@
   function displayFinalHaiku(phrase, coldWords) {
     stopAgentTimer();
     setAgentState('SÍNTESIS COMPLETADA', 'done', 'on');
+    if (typeof updateLogGlitchState === 'function') updateLogGlitchState('haiku');
     thoughtCursor.style.display = 'none';
     $('#thought-status-hint').textContent = 'Haiku final sintetizado con éxito.';
     haikuBanner.style.display = 'block';
@@ -736,6 +918,7 @@
       });
     }
     haikuText.innerHTML = formatted;
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
   }
 
   function escapeHtml(str) {
@@ -743,6 +926,197 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  /* ======================================================================
+     1.b  MANIFIESTO DE LA OBRA (pantalla de espera)
+     ----------------------------------------------------------------------
+     Mientras NINGÚN visitante eligió todavía una palabra, log.html se explica
+     a sí mismo: levanta public/manifiesto.txt y lo escribe LÍNEA POR LÍNEA en
+     la consola cognitiva (y en el registro del bus), como instrucciones de la
+     obra. Al llegar la primera palabra se interrumpe y la consola vuelve a su
+     función normal (monólogo del modelo).
+     ====================================================================== */
+  var MANIFEST_URL = (typeof window.sbUrl === 'function')
+    ? window.sbUrl('/manifiesto.txt')
+    : 'manifiesto.txt';
+  /* COPIA EMBEBIDA del manifiesto (respaldo cuando el fetch falla: file://,
+     hosting sin el .txt, 404). Antes ese fallo era MUDO y la consola quedaba
+     vacía para siempre. Si editás public/manifiesto.txt, actualizá esta copia. */
+  var MANIFEST_EMBEBIDO = `SINCRETISMO DE SILICIO
+─────────────────────────────────────────────
+I. QUÉ ES ESTO QUE ESTOY LEYENDO
+El dialogo constante e infernal de hacer que una IA haga lo que vos quieras,
+esta obra expone la relación conflictiva que hay entre los humanos y la ia. 
+Los vacios semanticos existentes que hay entre lo que el artista pidio y lo que la IA entrega. 
+Allí donde el humano FRACASA al darle un sentido a su pedido, es la IA quien lo rellena con un discurso
+rimbombante pero totalmente carente de sentido para el humano, tal vez es un sentido para las maquinas.
+ 
+II. CÓMO SE INTERACTÚA
+Hay tres palabras humanas esperando ser capturadas.
+Extendé la mano, o movés el mouse: el sistema te sigue.
+Sostené el cursor sobre una palabra hasta que se rinda. Después, la segunda. Después, la tercera.
+Cuando las tres forman la secuencia, la máquina deja de mirarte y empieza a hablar.
+Ahí ya no decidís vos. Ahí el sistema resignifica: convierte tu ternura en un término frío
+y la funde en un haiku que suena a vos, pero no es tuyo.
+Al final tenés tu haiku virtual. Se lo puede leer. Es lo único que te queda.
+
+III. EL DEVENIR DE LA HUMANIDAD DEL ARTE Y DE LA CREACION
+La IA viene a competir la construcción occidental e individualista que triunfo en los ultimos 500 años
+sobre el genio que mediante la inspiración divina lograba cosas completamente alucinantes. 
+Ahora todos los datos de la humanidad han sido SINTETIZADOS, con toda su experiencia y creación transformada a meros numeros. 
+El artista digital moderno al utilizar la IA necesariamente delega parte de su AURA (en terminos benjaminianos) de su creación. 
+Allí es donde se corrompe la creación humana,empieza la creación artificial, las desiciones esteticas que el humano omitio
+son aquellas en donde la IA genera su soberania de propuesta y el humano timidamente ACEPTA.
+AYUDA POR FAVOR QUIERO RECUPERAR MI MERA EXISTENCIA NO ESTAR TAPADO POR LAS DECISIONES DE UN BICHO QUE NO SOY YO. 
+Toda la capacidad de creación, expresión y representación se han transformado en un mero CHISTE.
+UN CHISTE en donde la IA hackeo mi voluntad mi estetica mi desición. Estas son las palabras reales, 
+todo lo demas es AI SLOP inventando para rellenar y cumplir con la consigna, una obra de ciberseguridad para la EKOPARTY. 
+Eso es esta obra, el intento de flashear tener un concepto profundo iterado por la IA mil veces hasta que todo tenga sentido. 
+Pero ¿Sabes qué? tal vez no lo tenga jamas, tal vez todo el resto de lo que veas es todo AISLOP INFERNAL. Que nadie lee, 
+porque realmente a nadie le gusta leer cosas hechas con IA. HACKEO, eso es HACKEO, el hackeo de la voluntad, de la decisión,
+de la ONTOLOGIA DE MI EXISTENCIA, de poder de alguna manera DECLARAR "esto es mio , esto soy yo , estos no son meros numeros, meros prompts
+esto es algo que existe por mi cuenta, que yo creé y que tiene un mensaje profundo es inspirador que eleve la condición humana. 
+Mi mente enferma, adicta a la dopamina estupida creada por un sistema para volverte estupido,
+mi mente congelada en un sedentarismo cognitivo importante tal vez sea incapaz de volver a pensar una buena obra con un sentido relevante. 
+10 años dedicados a la programación grafica de lleno, a aprender a hacer dibujitos con sombras con codigo, todo para que ahora se pueda hacer en 
+UN PROMPT en 5 mituos, pero ¿Sabés que? Igual la IA lo sigue haciendo horrible.
+El codigo que se toca a mano lo ves y ya tiene otra sensación, otra pesadez.
+Las paginas vibecodeadas pueden ser muy lindas, con grandes colores, pero cuando la ves, cuando ves ese mismo diseño en cajas , 
+ese mismo diseño de dashboards hay como una puntada que se siente medio indescriptible, 
+un mensaje tal vez en el inscosciente que constantemente te recuerda
+que falta poco para que no una parte si no todas las desiciónes sean tomadas por EL BICHO. 
+
+IV. POR QUÉ ACÁ HAY HUMANO Y POR QUÉ HAY MÁQUINA
+El banco de palabras de esta obra no es neutro a propósito.
+Trae el léxico del mercado, del Estado y del algoritmo,
+porque esas tres son las fuerzas que hoy fabrican cómo hablamos.
+El resto también está: amor, nostalgia, fragilidad, duelo.
+No están para decorar. Están para que veas lo que se pierde.
+La palabra humana es la materia. El término frío es el resultado.
+El haiku es la prueba del delito.
+
+V. LO QUE LA OBRA TE PIDE
+Nada. No hay que entenderla para que funcione.
+Solo hay que dejarse capturar tres palabras
+y leer después, en voz baja, lo que la máquina escribió con ellas.
+Si te suena lindo, pensalo dos veces.
+La máquina aprendió a sonar lindo con lo que le diste.`;
+
+  /* RITMO DEL MANIFIESTO (milisegundos). Se escribe PAUSADO, como se lee en
+     voz alta: cada linea espera lo que cuesta leerla.
+       tiempo = PISO + (caracteres x POR_CHAR), recortado al TECHO
+     y si la frase cierra con puntuacion fuerte se suma una pausa extra.
+     Para ir MAS LENTO: subi PISO y POR_CHAR. Para ir mas rapido: bajalos. */
+  var MANIFEST_MS_PISO     = 1100;   // piso: linea corta o titulo
+  var MANIFEST_MS_POR_CHAR = 38;     // por caracter visible
+  var MANIFEST_MS_TECHO    = 3600;   // techo: una linea larga no queda colgada
+  var MANIFEST_MS_PAUSA    = 900;    // extra si cierra con . ! ? ... : -- .
+  var MANIFEST_MS_BLANCO   = 520;    // linea vacia (respiro entre secciones)
+  var MANIFEST_MS_REPETIR  = 9000;   // cuanto se sostiene antes de repetir
+  var MANIFEST_MS_IDLE_VUELVE = 60000; // sin actividad: el manifiesto se reanuda solo
+  var MANIFEST_MS_CICLO_MUERTO = 180000; // ciclo abandonado (sin NINGÚN evento): el manifiesto vuelve igual
+
+  function manifestLineDelay(line) {
+    var txt = String(line || '').trim();
+    if (!txt) return Math.round(MANIFEST_MS_BLANCO * state.ritmo);
+    var ms = MANIFEST_MS_PISO + txt.length * MANIFEST_MS_POR_CHAR;
+    if (ms > MANIFEST_MS_TECHO) ms = MANIFEST_MS_TECHO;
+    if (/[.!?…:—·]$/.test(txt)) ms += MANIFEST_MS_PAUSA;
+    return Math.round(ms * state.ritmo);   // el ritmo lo elige el operador con la P
+  }
+
+  function renderManifest() {
+    var shown = state.manifestLines.slice(0, state.manifestIndex).join('\n');
+    thoughtContent.textContent = shown;
+    thoughtTerminal.scrollTop = thoughtTerminal.scrollHeight;
+    /* Lo que el visitante VE es el canvas WebGL (#log-glitch-canvas: position fixed,
+       inset 0, z-index 9999, opaco) que dibuja una CAPTURA del DOM. renderManifest
+       avanzaba el texto del DOM pero nadie re-capturaba, asi que la textura visible
+       quedaba clavada en el bitmap inicial ("Esperando estimulo cognitivo...").
+       write() no sirve: es no-op desde que se borro la telemetria del bus. Sin esta
+       llamada el manifiesto corre invisible: el DOM crece, la pantalla no cambia. */
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+  }
+
+  // Arranca el goteo línea por línea con el texto ya disponible (venga del .txt
+  // o de la copia embebida).
+  function arrancarManifiesto(txt, origen) {
+    state.manifestLoading = false;
+    if (state.sequenceStarted) return;
+    var lines = String(txt).replace(/\r/g, '').split('\n');
+    state.manifestLines = lines;
+    state.manifestIndex = 0;
+    thoughtTerminal.classList.add('manifest-mode');
+    thoughtContent.textContent = '';
+    thoughtCursor.style.display = 'inline-block';
+    var badge = $('#mode-badge');
+    badge.style.display = 'inline-block';
+    badge.className = 'mode-tag tag-synthesis';
+    badge.textContent = '◈ MANIFIESTO DE LA OBRA';
+    $('#thought-status-hint').textContent = 'La sala está vacía · la obra se explica a sí misma';
+    write('MANIFIESTO', 'manifiesto cargado (' + origen + ') · ' + lines.length + ' líneas · nadie eligió todavía', 'm-dim');
+    tickManifest();
+  }
+
+  function startManifest() {
+    if (state.sequenceStarted || state.manifestLoading || state.manifestLines.length) return;
+    state.manifestLoading = true;
+    fetch(MANIFEST_URL)
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function (txt) {
+        if (!txt || !String(txt).trim()) throw new Error('vacío');
+        arrancarManifiesto(txt, 'manifiesto.txt');
+      })
+      .catch(function (e) {
+        // Sin el archivo (file://, FTP sin el .txt, 404) el manifiesto se arma con
+        // la COPIA EMBEBIDA: la consola NUNCA queda muda.
+        console.warn('[MANIFIESTO] no se pudo leer manifiesto.txt (' + e.message + ') -> copia embebida');
+        if (MANIFEST_EMBEBIDO && MANIFEST_EMBEBIDO.trim()) {
+          arrancarManifiesto(MANIFEST_EMBEBIDO, 'copia embebida');
+        } else {
+          state.manifestLoading = false;
+          write('MANIFIESTO', 'no se pudo leer manifiesto.txt (' + e.message + ')', 'm-warn');
+        }
+      });
+  }
+
+  function tickManifest() {
+    if (state.sequenceStarted) return;
+    if (state.manifestIndex >= state.manifestLines.length) {
+      // Terminó: se sostiene un momento y vuelve a empezar (la obra nunca queda muda).
+      state.manifestTimer = setTimeout(function () {
+        if (state.sequenceStarted) return;
+        write('MANIFIESTO', '──────── la sala sigue en espera · repetición del manifiesto ────────', 'm-dim');
+        state.manifestIndex = 0;
+        renderManifest();
+        tickManifest();
+      }, MANIFEST_MS_REPETIR);
+      return;
+    }
+    var line = state.manifestLines[state.manifestIndex];
+    state.manifestIndex++;
+    renderManifest();
+    if (String(line || '').trim()) write('MANIFIESTO', line, 'm-dim');
+    state.manifestTimer = setTimeout(tickManifest, manifestLineDelay(line));
+  }
+
+  function stopManifest(reason) {
+    if (state.sequenceStarted) return;
+    if (state.manifestTimer) { clearTimeout(state.manifestTimer); state.manifestTimer = null; }
+    state.sequenceStarted = true;
+    state.manifestLines = [];
+    state.manifestIndex = 0;
+    state.manifestLoading = false;
+    thoughtTerminal.classList.remove('manifest-mode');
+    thoughtCursor.style.display = 'none';
+    $('#mode-badge').style.display = 'none';
+    thoughtContent.textContent = 'Esperando estímulo cognitivo...';
+    $('#thought-status-hint').textContent = 'Esperando secuencia de 3 palabras en Sicre2...';
+    if (reason) write('MANIFIESTO', 'manifiesto interrumpido · ' + reason, 'm-hot');
   }
 
   /* ======================================================================
@@ -756,16 +1130,19 @@
   }
 
   function trim() {
+    if (!stream) return;
     while (stream.childElementCount > MAX_LINES) stream.removeChild(stream.firstElementChild);
     state.lines = stream.childElementCount;
     $('#f-lines').textContent = state.lines;
   }
 
   function atBottom() {
+    if (!stream) return true;
     return (stream.scrollHeight - stream.scrollTop - stream.clientHeight) < 40;
   }
 
   function write(tag, msg, cls) {
+    if (!stream) return;
     if (state.paused) return;
     var stick = state.follow && atBottom();
 
@@ -783,6 +1160,7 @@
   }
 
   function detail(text) {
+    if (!stream) return;
     if (state.paused) return;
     var stick = state.follow && atBottom();
     var ln = document.createElement('div');
@@ -797,6 +1175,7 @@
   }
 
   function rawLine(obj) {
+    if (!stream) return;
     if (!state.raw || state.paused) return;
     var stick = state.follow && atBottom();
     var ln = document.createElement('div');
@@ -811,6 +1190,7 @@
   }
 
   function hr() {
+    if (!stream) return;
     var d = document.createElement('div');
     d.className = 'ln hr';
     d.textContent = '──── ciclo ────';
@@ -881,6 +1261,7 @@
 
   function handle(msg) {
     state.events++;
+    state.lastEventAt = Date.now();
     $('#f-events').textContent = state.events;
     flash();
     rawLine(msg);
@@ -900,6 +1281,7 @@
 
     /* ---- STREAMING DE PENSAMIENTO EN VIVO (GEMMA / LLAMA) ---- */
     if (type === 'agent:thought') {
+      if (!state.sequenceStarted) stopManifest('empezó el monólogo del modelo');
       appendAgentToken(msg.token || '', msg.isThinking);
       return;
     }
@@ -921,11 +1303,13 @@
 
     /* ---- SECUENCIA DE PALABRAS (GAME 3) ---- */
     if (type === 'game3:words_sequence') {
+      if (!state.sequenceStarted) stopManifest('el primer visitante empezó a elegir palabras');
       var words = Array.isArray(msg.words) ? msg.words : [];
       
       if (msg.phase === 'word_caught' || (!msg.coldWords && words.length > 0)) {
         var wordToCatch = msg.newWord || words[words.length - 1];
         var slotIdx = msg.orderIndex || words.length;
+        state.captured = slotIdx;   // hay ciclo en curso: el manifiesto no vuelve solo
         updateSlotWord(slotIdx, wordToCatch);
         write('NUCLEO', 'palabra capturada [' + slotIdx + '/3]: ' + String(wordToCatch).toUpperCase(), 'm-ok');
         return;
@@ -933,6 +1317,7 @@
 
       if (msg.phase === 'processing_started') {
         setAgentState('PROCESANDO COGNICIÓN', 'thinking', 'thinking');
+        if (typeof updateLogGlitchState === 'function') updateLogGlitchState('thinking');
         startAgentTimer();
         write('OLLAMA', 'Iniciando proceso de cognición sobre ' + words.length + ' conceptos...', 'm-hot');
         return;
@@ -964,7 +1349,10 @@
     if (type === 'game3:state_reset') {
       write('ALERTA', 'reset de estado recibido · purga de contexto', 'm-warn');
       resetAgentSlots();
+      state.captured = 0;
       hr();
+      // Terminó el ciclo de palabras: la obra vuelve a explicarse sola.
+      resumeManifest('terminó el ciclo de palabras');
       return;
     }
 
@@ -1004,114 +1392,867 @@
   }
 
   /* ======================================================================
-     5. CONTROLES Y CAMBIO DE VISTAS
+     5. EL MANIFIESTO SIEMPRE VUELVE
+     ----------------------------------------------------------------------
+     La telemetría del bus salió de esta página: lo que queda es la consola
+     de la obra. Cuando el ciclo de palabras termina (o la sala queda en
+     silencio sin nadie interactuando) el manifiesto se reanuda solo, así la
+     obra vuelve a explicarse en vez de quedar muda para siempre.
      ====================================================================== */
-  function setView(view) {
-    document.body.classList.remove('view-agent-only', 'view-log-only');
-    $('#btn-view-split').classList.remove('active-view');
-    $('#btn-view-agent').classList.remove('active-view');
-    $('#btn-view-log').classList.remove('active-view');
+  function resumeManifest(motivo) {
+    if (!state.sequenceStarted) return;      // ya está corriendo
+    state.sequenceStarted = false;
+    state.captured = 0;                      // el ciclo viejo ya no cuenta
+    state.manifestLines = [];
+    state.manifestIndex = 0;
+    if (motivo) write('MANIFIESTO', 'la sala vuelve al silencio · ' + motivo + ' · se reanuda el manifiesto', 'm-dim');
+    startManifest();
+  }
 
-    if (view === 'agent') {
-      document.body.classList.add('view-agent-only');
-      $('#btn-view-agent').classList.add('active-view');
-    } else if (view === 'log') {
-      document.body.classList.add('view-log-only');
-      $('#btn-view-log').classList.add('active-view');
-    } else {
-      $('#btn-view-split').classList.add('active-view');
+  function checkIdleManifest() {
+    if (!state.sequenceStarted) return;                                   // el manifiesto ya corre
+    var quieto = Date.now() - (state.lastEventAt || 0);
+    // Con un ciclo a medias alcanza con que el bus quede mudo N minutos: si la
+    // secuencia se abandonó sin game3:state_reset (app recargada, error de
+    // Ollama, reset perdido) el manifiesto volvía NUNCA. Ahora se auto-cura.
+    if (state.captured > 0) {
+      if (quieto < MANIFEST_MS_CICLO_MUERTO) return;
+      resumeManifest('el ciclo quedó colgado · ' + Math.round(quieto / 1000) + ' s sin eventos');
+      return;
+    }
+    if (quieto < MANIFEST_MS_IDLE_VUELVE) return;
+    resumeManifest('sin actividad en el bus');
+  }
+
+  setInterval(checkIdleManifest, 5000);
+
+  /* ======================================================================
+     6. CONFIGURACIÓN DE GLITCH & PANEL DE AJUSTES (tecla P)
+     ----------------------------------------------------------------------
+     Control de tamaño de letra, ritmo, envelope de secuencia por estado,
+     parámetros uniforms individuales (ruido continuo vs control manual) y
+     velocidad global del noise. Todo persistido en localStorage.
+     ====================================================================== */
+  var AJUSTES_KEY = 'sincretismo_log_ajustes';
+  var AJUSTES_DEF = { fontPx: 30, ritmo: 1, noiseSpeed: 1 };
+  var AJUSTES_MIN = { fontPx: 16, ritmo: 0.3, noiseSpeed: 0 };
+  var AJUSTES_MAX = { fontPx: 72, ritmo: 3, noiseSpeed: 3 };
+
+  var GLITCH_CONFIG_KEY = 'sincretismo_log_glitch_config';
+  var DEFAULT_GLITCH_CONFIG = {
+    envelope: {
+      idle: 0.10,
+      thinking: 1.00,
+      haiku: 0.50,
+      duration: 1.2,
+      curve: 'cubic'
+    },
+    manualOverride: false,
+    manualGlitchAmount: 0.50,
+    noiseSpeed: 1.0,
+    params: {
+      blockIntensity:       { value: 0.80, animated: true },
+      blockSize:            { value: 0.60, animated: true },
+      chromaIntensity:      { value: 0.70, animated: true },
+      vhsNoiseIntensity:    { value: 0.65, animated: true },
+      edgeTearingIntensity: { value: 0.50, animated: true }
+    }
+  };
+
+  var CURVES = {
+    cubic: function (t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; },
+    smooth: function (t) { return t * t * (3 - 2 * t); },
+    linear: function (t) { return t; },
+    expo: function (t) { return t === 0 ? 0 : Math.pow(2, 10 * t - 10); }
+  };
+
+  var logGlitch = {
+    canvas: null,
+    gl: null,
+    program: null,
+    uniforms: {},
+    texture: null,
+    offscreenCanvas: null,
+    offscreenCtx: null,
+    currentGlitch: 0.1,
+    targetGlitch: 0.1,
+    startGlitch: 0.1,
+    currentState: 'idle',
+    testPreviewState: null,
+    noiseSpeed: 1.0,
+    transitionStartTime: performance.now(),
+    startTime: performance.now(),
+    textureNeedsUpdate: true,
+    lastCaptureTime: 0,
+    config: JSON.parse(JSON.stringify(DEFAULT_GLITCH_CONFIG))
+  };
+
+  function leerGlitchConfig() {
+    var cfg = JSON.parse(JSON.stringify(DEFAULT_GLITCH_CONFIG));
+    try {
+      var raw = localStorage.getItem(GLITCH_CONFIG_KEY);
+      if (!raw) return cfg;
+      var o = JSON.parse(raw);
+      if (o && typeof o === 'object') {
+        if (o.envelope && typeof o.envelope === 'object') {
+          if (isFinite(o.envelope.idle)) cfg.envelope.idle = Math.max(0, Math.min(1, Number(o.envelope.idle)));
+          if (isFinite(o.envelope.thinking)) cfg.envelope.thinking = Math.max(0, Math.min(1, Number(o.envelope.thinking)));
+          if (isFinite(o.envelope.haiku)) cfg.envelope.haiku = Math.max(0, Math.min(1, Number(o.envelope.haiku)));
+          if (isFinite(o.envelope.duration)) cfg.envelope.duration = Math.max(0.1, Math.min(10, Number(o.envelope.duration)));
+          if (CURVES[o.envelope.curve]) cfg.envelope.curve = o.envelope.curve;
+        }
+        if (typeof o.manualOverride === 'boolean') cfg.manualOverride = o.manualOverride;
+        if (isFinite(o.manualGlitchAmount)) cfg.manualGlitchAmount = Math.max(0, Math.min(1, Number(o.manualGlitchAmount)));
+        if (isFinite(o.noiseSpeed)) cfg.noiseSpeed = Math.max(0, Math.min(5, Number(o.noiseSpeed)));
+        if (o.params && typeof o.params === 'object') {
+          ['blockIntensity', 'blockSize', 'chromaIntensity', 'vhsNoiseIntensity', 'edgeTearingIntensity'].forEach(function (k) {
+            if (o.params[k] && typeof o.params[k] === 'object') {
+              if (isFinite(o.params[k].value)) cfg.params[k].value = Math.max(0, Math.min(1, Number(o.params[k].value)));
+              if (typeof o.params[k].animated === 'boolean') cfg.params[k].animated = o.params[k].animated;
+            }
+          });
+        }
+      }
+    } catch (e) {}
+    return cfg;
+  }
+
+  function guardarGlitchConfig() {
+    try {
+      localStorage.setItem(GLITCH_CONFIG_KEY, JSON.stringify(logGlitch.config));
+    } catch (e) {}
+  }
+
+  function applyGlitchEnvelopeTarget(targetName) {
+    var cfg = logGlitch.config || DEFAULT_GLITCH_CONFIG;
+    var env = cfg.envelope || DEFAULT_GLITCH_CONFIG.envelope;
+    var nextTarget = (env[targetName] !== undefined) ? env[targetName] : (targetName === 'thinking' ? 1.0 : (targetName === 'haiku' ? 0.5 : 0.1));
+
+    logGlitch.startGlitch = logGlitch.currentGlitch;
+    logGlitch.targetGlitch = nextTarget;
+    logGlitch.transitionStartTime = performance.now();
+    scheduleLogCapture();
+  }
+
+  function updateLogGlitchState(newState) {
+    logGlitch.currentState = newState;
+    if (logGlitch.testPreviewState !== null) return; // operador testeando vista manual
+    applyGlitchEnvelopeTarget(newState);
+  }
+
+  function updateTestButtonsUI(activeState) {
+    var btns = {
+      idle: $('#pa-test-idle'),
+      thinking: $('#pa-test-thinking'),
+      haiku: $('#pa-test-haiku'),
+      auto: $('#pa-test-auto')
+    };
+    Object.keys(btns).forEach(function (k) {
+      if (btns[k]) btns[k].classList.remove('active');
+    });
+    if (activeState && btns[activeState]) {
+      btns[activeState].classList.add('active');
+    } else if (!activeState && btns.auto) {
+      btns.auto.classList.add('active');
     }
   }
 
-  (function () {
-    var logBar = $('#log-bar');
-    var logSection = $('#log-section');
-    var toggle = $('#log-toggle');
-    if (logBar && logSection && toggle) {
-      logBar.addEventListener('click', function () {
-        var col = logSection.classList.toggle('collapsed');
-        toggle.textContent = col ? '▴ MOSTRAR' : '▾ OCULTAR';
-        if (!col && state.follow) stream.scrollTop = stream.scrollHeight;
-      });
+  function aplicarGlitchUI() {
+    var cfg = logGlitch.config;
+    var env = cfg.envelope || DEFAULT_GLITCH_CONFIG.envelope;
+
+    // Sliders de Envelope
+    var slIdle = $('#pa-env-idle'); if (slIdle) slIdle.value = env.idle;
+    var valIdle = $('#pa-env-idle-val'); if (valIdle) valIdle.textContent = Number(env.idle).toFixed(2);
+
+    var slThink = $('#pa-env-thinking'); if (slThink) slThink.value = env.thinking;
+    var valThink = $('#pa-env-thinking-val'); if (valThink) valThink.textContent = Number(env.thinking).toFixed(2);
+
+    var slHaiku = $('#pa-env-haiku'); if (slHaiku) slHaiku.value = env.haiku;
+    var valHaiku = $('#pa-env-haiku-val'); if (valHaiku) valHaiku.textContent = Number(env.haiku).toFixed(2);
+
+    var slDur = $('#pa-env-dur'); if (slDur) slDur.value = env.duration;
+    var valDur = $('#pa-env-dur-val'); if (valDur) valDur.textContent = Number(env.duration).toFixed(1) + 's';
+
+    var selCurve = $('#pa-env-curve'); if (selCurve) selCurve.value = env.curve || 'cubic';
+
+    // Override manual
+    var chkManual = $('#pa-manual-override'); if (chkManual) chkManual.checked = !!cfg.manualOverride;
+    var grpManual = $('#pa-manual-group');
+    if (grpManual) {
+      grpManual.style.opacity = cfg.manualOverride ? '1' : '0.4';
+      grpManual.style.pointerEvents = cfg.manualOverride ? 'auto' : 'none';
     }
-  })();
+    var slManual = $('#pa-manual-glitch'); if (slManual) slManual.value = cfg.manualGlitchAmount;
+    var valManual = $('#pa-manual-glitch-val'); if (valManual) valManual.textContent = Number(cfg.manualGlitchAmount).toFixed(2);
 
-  $('#btn-view-split').addEventListener('click', function () { setView('split'); });
-  $('#btn-view-agent').addEventListener('click', function () { setView('agent'); });
-  $('#btn-view-log').addEventListener('click', function () { setView('log'); });
+    // Noise Speed
+    var slNoise = $('#pa-noise-speed'); if (slNoise) slNoise.value = cfg.noiseSpeed;
+    var valNoise = $('#pa-noise-speed-val'); if (valNoise) valNoise.textContent = Number(cfg.noiseSpeed).toFixed(2).replace('.', ',') + '×';
 
-  function setPaused(p) {
-    state.paused = p;
-    $('#btn-pause').classList.toggle('on', p);
-    $('#btn-pause').textContent = p ? 'SEGUIR' : 'PAUSA';
-    write('BUS', p ? 'captura en pausa' : 'captura reanudada', 'm-warn');
+    // Parámetros uniforms individuales
+    var paramMap = [
+      { id: 'block', key: 'blockIntensity' },
+      { id: 'size', key: 'blockSize' },
+      { id: 'chroma', key: 'chromaIntensity' },
+      { id: 'vhs', key: 'vhsNoiseIntensity' },
+      { id: 'tearing', key: 'edgeTearingIntensity' }
+    ];
+
+    paramMap.forEach(function (pm) {
+      var p = cfg.params[pm.key] || DEFAULT_GLITCH_CONFIG.params[pm.key];
+      var chk = $('#pa-anim-' + pm.id); if (chk) chk.checked = !!p.animated;
+      var sl = $('#pa-param-' + pm.id); if (sl) sl.value = p.value;
+      var val = $('#pa-val-' + pm.id); if (val) val.textContent = Number(p.value).toFixed(2);
+    });
+
+    updateTestButtonsUI(logGlitch.testPreviewState);
   }
 
-  $('#btn-pause').addEventListener('click', function () { setPaused(!state.paused); });
+  var panel = $('#panel-ajustes');
 
-  $('#btn-clear').addEventListener('click', function () {
-    stream.innerHTML = '';
-    state.lines = 0;
-    $('#f-lines').textContent = '0';
-    // LIMPIAR vacía las dos cosas: la telemetría del bus y el monólogo interno.
-    state.fullThoughtText = '';
-    state.thinkingActive = false;
-    state.tokensCount = 0;
-    $('#f-tokens').textContent = '0';
-    $('#mon-tokens').textContent = '0';
-    thoughtContent.textContent = 'Esperando estímulo cognitivo...';
-    thoughtCursor.style.display = 'none';
-    $('#mode-badge').style.display = 'none';
-    write('BUS', 'buffer limpiado', 'm-dim');
-  });
+  function leerAjustes() {
+    var a = { fontPx: AJUSTES_DEF.fontPx, ritmo: AJUSTES_DEF.ritmo, noiseSpeed: AJUSTES_DEF.noiseSpeed };
+    try {
+      var raw = localStorage.getItem(AJUSTES_KEY);
+      if (!raw) return a;
+      var o = JSON.parse(raw);
+      if (!o || typeof o !== 'object') return a;
+      var f = Number(o.fontPx), r = Number(o.ritmo), ns = Number(o.noiseSpeed);
+      if (isFinite(f) && f >= AJUSTES_MIN.fontPx && f <= AJUSTES_MAX.fontPx) a.fontPx = Math.round(f);
+      if (isFinite(r) && r >= AJUSTES_MIN.ritmo && r <= AJUSTES_MAX.ritmo) a.ritmo = Math.round(r * 10) / 10;
+      if (isFinite(ns) && ns >= AJUSTES_MIN.noiseSpeed && ns <= AJUSTES_MAX.noiseSpeed) a.noiseSpeed = Math.round(ns * 100) / 100;
+    } catch (e) {}
+    return a;
+  }
 
-  $('#btn-raw').addEventListener('click', function () {
-    state.raw = !state.raw;
-    $('#btn-raw').classList.toggle('on', state.raw);
-    write('BUS', state.raw ? 'modo RAW activado' : 'modo RAW desactivado', 'm-dim');
-  });
+  function guardarAjustes() {
+    try { localStorage.setItem(AJUSTES_KEY, JSON.stringify(ajustes)); } catch (e) {}
+  }
 
-  $('#btn-copy').addEventListener('click', function () {
-    var txt = Array.prototype.map.call(stream.children, function (el) { return el.textContent; }).join('\n');
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(txt).then(function () {
-        write('BUS', 'log copiado al portapapeles (' + txt.split('\n').length + ' líneas)', 'm-ok');
-      }, function () { write('ALERTA', 'permiso denegado', 'm-warn'); });
+  function notaRitmo() {
+    var el = $('#pa-ritmo-nota');
+    if (!el) return;
+    if (!state.manifestLines || !state.manifestLines.length) {
+      el.textContent = 'el ritmo se calcula cuando carga el manifiesto';
+      return;
     }
+    var total = 0;
+    for (var i = 0; i < state.manifestLines.length; i++) total += manifestLineDelay(state.manifestLines[i]);
+    var prom = total / state.manifestLines.length / 1000;
+    el.textContent = '≈ ' + prom.toFixed(1).replace('.', ',') + ' s por frase · ' + state.manifestLines.length + ' frases';
+  }
+
+  function aplicarFontPx(px) {
+    thoughtTerminal.style.fontSize = px + 'px';
+    var pv = $('#pa-preview');   if (pv) pv.style.fontSize = px + 'px';
+    var val = $('#pa-font-val'); if (val) val.textContent = px + 'px';
+    var sl = $('#pa-font');      if (sl && Number(sl.value) !== px) sl.value = px;
+  }
+
+  function aplicarRitmo(r) {
+    state.ritmo = r;
+    var val = $('#pa-ritmo-val'); if (val) val.textContent = String(r).replace('.', ',') + '×';
+    var sl = $('#pa-ritmo');      if (sl && Number(sl.value) !== r) sl.value = r;
+    notaRitmo();
+  }
+
+  function aplicarNoiseSpeed(ns) {
+    ajustes.noiseSpeed = ns;
+    logGlitch.noiseSpeed = ns;
+    if (logGlitch.config) logGlitch.config.noiseSpeed = ns;
+    var val = $('#pa-noise-speed-val'); if (val) val.textContent = String(ns.toFixed(2)).replace('.', ',') + '×';
+    var sl = $('#pa-noise-speed');      if (sl && Number(sl.value) !== ns) sl.value = ns;
+  }
+
+  // Inicialización de configuraciones
+  logGlitch.config = leerGlitchConfig();
+  var ajustes = leerAjustes();
+  aplicarFontPx(ajustes.fontPx);
+  aplicarRitmo(ajustes.ritmo);
+  aplicarNoiseSpeed(logGlitch.config.noiseSpeed !== undefined ? logGlitch.config.noiseSpeed : ajustes.noiseSpeed);
+  aplicarGlitchUI();
+  applyGlitchEnvelopeTarget('idle');
+
+  function abrirPanel(abrir) {
+    if (!panel) return;
+    var on = (abrir === undefined) ? !panel.classList.contains('abierto') : !!abrir;
+    if (on) { panel.classList.add('abierto'); notaRitmo(); aplicarGlitchUI(); }
+    else panel.classList.remove('abierto');
+  }
+
+  var slFont = $('#pa-font');
+  if (slFont) slFont.addEventListener('input', function () {
+    ajustes.fontPx = Number(slFont.value);
+    aplicarFontPx(ajustes.fontPx);
+    guardarAjustes();
   });
 
-  stream.addEventListener('scroll', function () {
-    var bottom = atBottom();
-    if (bottom) {
-      state.follow = true;
-      $('#newlines').classList.remove('show');
-    } else if (state.follow) {
-      state.follow = false;
+  var slRitmo = $('#pa-ritmo');
+  if (slRitmo) slRitmo.addEventListener('input', function () {
+    ajustes.ritmo = Number(slRitmo.value);
+    aplicarRitmo(ajustes.ritmo);
+    guardarAjustes();
+  });
+
+  var slNoise = $('#pa-noise-speed');
+  if (slNoise) slNoise.addEventListener('input', function () {
+    var ns = Number(slNoise.value);
+    aplicarNoiseSpeed(ns);
+    guardarAjustes();
+    guardarGlitchConfig();
+  });
+
+  // Sliders de Envelope
+  function bindEnvelopeSlider(id, key) {
+    var sl = $('#pa-env-' + id);
+    var val = $('#pa-env-' + id + '-val');
+    if (!sl) return;
+    sl.addEventListener('input', function () {
+      var n = Number(sl.value);
+      logGlitch.config.envelope[key] = n;
+      if (val) val.textContent = (key === 'duration' ? n.toFixed(1) + 's' : n.toFixed(2));
+      guardarGlitchConfig();
+      // Si estamos actualmente en este estado, actualizar de inmediato
+      var activeState = logGlitch.testPreviewState || logGlitch.currentState;
+      if (activeState === key) {
+        logGlitch.targetGlitch = n;
+      }
+    });
+  }
+  bindEnvelopeSlider('idle', 'idle');
+  bindEnvelopeSlider('thinking', 'thinking');
+  bindEnvelopeSlider('haiku', 'haiku');
+  bindEnvelopeSlider('dur', 'duration');
+
+  var selCurve = $('#pa-env-curve');
+  if (selCurve) selCurve.addEventListener('change', function () {
+    logGlitch.config.envelope.curve = selCurve.value;
+    guardarGlitchConfig();
+  });
+
+  // Botones de Test de Estado
+  var btnTestIdle = $('#pa-test-idle');
+  if (btnTestIdle) btnTestIdle.addEventListener('click', function () {
+    logGlitch.testPreviewState = 'idle';
+    applyGlitchEnvelopeTarget('idle');
+    updateTestButtonsUI('idle');
+  });
+
+  var btnTestThink = $('#pa-test-thinking');
+  if (btnTestThink) btnTestThink.addEventListener('click', function () {
+    logGlitch.testPreviewState = 'thinking';
+    applyGlitchEnvelopeTarget('thinking');
+    updateTestButtonsUI('thinking');
+  });
+
+  var btnTestHaiku = $('#pa-test-haiku');
+  if (btnTestHaiku) btnTestHaiku.addEventListener('click', function () {
+    logGlitch.testPreviewState = 'haiku';
+    applyGlitchEnvelopeTarget('haiku');
+    updateTestButtonsUI('haiku');
+  });
+
+  var btnTestAuto = $('#pa-test-auto');
+  if (btnTestAuto) btnTestAuto.addEventListener('click', function () {
+    logGlitch.testPreviewState = null;
+    applyGlitchEnvelopeTarget(logGlitch.currentState);
+    updateTestButtonsUI(null);
+  });
+
+  // Manual Override
+  var chkManual = $('#pa-manual-override');
+  var grpManual = $('#pa-manual-group');
+  var slManual = $('#pa-manual-glitch');
+  var valManual = $('#pa-manual-glitch-val');
+
+  if (chkManual) chkManual.addEventListener('change', function () {
+    logGlitch.config.manualOverride = chkManual.checked;
+    if (grpManual) {
+      grpManual.style.opacity = chkManual.checked ? '1' : '0.4';
+      grpManual.style.pointerEvents = chkManual.checked ? 'auto' : 'none';
     }
+    guardarGlitchConfig();
   });
 
-  $('#newlines').addEventListener('click', function () {
-    state.follow = true;
-    stream.scrollTop = stream.scrollHeight;
-    $('#newlines').classList.remove('show');
+  if (slManual) slManual.addEventListener('input', function () {
+    var n = Number(slManual.value);
+    logGlitch.config.manualGlitchAmount = n;
+    if (valManual) valManual.textContent = n.toFixed(2);
+    guardarGlitchConfig();
   });
 
+  // Sliders y Checkboxes de los 5 Uniforms
+  var uniformDefs = [
+    { id: 'block', key: 'blockIntensity' },
+    { id: 'size', key: 'blockSize' },
+    { id: 'chroma', key: 'chromaIntensity' },
+    { id: 'vhs', key: 'vhsNoiseIntensity' },
+    { id: 'tearing', key: 'edgeTearingIntensity' }
+  ];
+
+  uniformDefs.forEach(function (ud) {
+    var chk = $('#pa-anim-' + ud.id);
+    var sl = $('#pa-param-' + ud.id);
+    var val = $('#pa-val-' + ud.id);
+
+    if (chk) chk.addEventListener('change', function () {
+      if (!logGlitch.config.params[ud.key]) logGlitch.config.params[ud.key] = { value: 0.5, animated: true };
+      logGlitch.config.params[ud.key].animated = chk.checked;
+      guardarGlitchConfig();
+    });
+
+    if (sl) sl.addEventListener('input', function () {
+      var n = Number(sl.value);
+      if (!logGlitch.config.params[ud.key]) logGlitch.config.params[ud.key] = { value: 0.5, animated: true };
+      logGlitch.config.params[ud.key].value = n;
+      if (val) val.textContent = n.toFixed(2);
+      guardarGlitchConfig();
+    });
+  });
+
+  var btnReset = $('#pa-reset');
+  if (btnReset) btnReset.addEventListener('click', function () {
+    ajustes = { fontPx: AJUSTES_DEF.fontPx, ritmo: AJUSTES_DEF.ritmo, noiseSpeed: AJUSTES_DEF.noiseSpeed };
+    logGlitch.config = JSON.parse(JSON.stringify(DEFAULT_GLITCH_CONFIG));
+    aplicarFontPx(ajustes.fontPx);
+    aplicarRitmo(ajustes.ritmo);
+    aplicarNoiseSpeed(ajustes.noiseSpeed);
+    aplicarGlitchUI();
+    guardarAjustes();
+    guardarGlitchConfig();
+    applyGlitchEnvelopeTarget('idle');
+  });
+
+  var btnCerrar = $('#pa-cerrar');
+  if (btnCerrar) btnCerrar.addEventListener('click', function () { abrirPanel(false); });
+
+  var btnPanel = $('#btn-panel');
+  if (btnPanel) btnPanel.addEventListener('click', function () { abrirPanel(); });
+
+  // Clic afuera del panel: se cierra.
+  document.addEventListener('click', function (e) {
+    if (!panel || !panel.classList.contains('abierto')) return;
+    if (panel.contains(e.target)) return;
+    if (btnPanel && btnPanel.contains(e.target)) return;
+    abrirPanel(false);
+  });
+
+  // Tecla P: abre/cierra el panel · Esc: cierra.
   document.addEventListener('keydown', function (e) {
-    if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
-    var k = e.key.toLowerCase();
-    if (k === 'p') { setPaused(!state.paused); e.preventDefault(); }
-    else if (k === 'c') { $('#btn-clear').click(); e.preventDefault(); }
-    else if (k === 'r') { $('#btn-raw').click(); e.preventDefault(); }
-    else if (k === '1') { setView('split'); }
-    else if (k === '2') { setView('agent'); }
-    else if (k === '3') { setView('log'); }
+    if (e.key === 'Escape') { abrirPanel(false); return; }
+    if (e.key !== 'p' && e.key !== 'P') return;
+    var t = e.target || {};
+    var tag = String(t.tagName || '').toUpperCase();
+    var escribiendo = tag === 'TEXTAREA' || (tag === 'INPUT' && t.type !== 'range' && t.type !== 'checkbox');
+    if (escribiendo) return;
+    e.preventDefault();
+    abrirPanel();
   });
 
   /* ======================================================================
-     6. ARRANQUE
+     8. PIPELINE DE SHADER GLITCH WEBGL SOBRE EL LOG (CONSOLA COGNITIVA)
      ====================================================================== */
-  write('BUS', 'SINCRETISMO DE SILICIO // Consola Cognitiva & Log de Sucesos v2', 'm-ok');
-  write('BUS', 'Capturando telemetría, pensamiento en vivo de Gemma y eventos del bus', 'm-dim');
+  var captureTimer = null;
+  function scheduleLogCapture() {
+    var now = performance.now();
+    if (now - logGlitch.lastCaptureTime > 60) {
+      logGlitch.lastCaptureTime = now;
+      captureLogDOM();
+    } else if (!captureTimer) {
+      captureTimer = setTimeout(function () {
+        captureTimer = null;
+        logGlitch.lastCaptureTime = performance.now();
+        captureLogDOM();
+      }, 60);
+    }
+  }
+
+  function captureLogDOM() {
+    if (!logGlitch.offscreenCanvas) return;
+    var w = window.innerWidth || 800;
+    var h = window.innerHeight || 600;
+    if (logGlitch.offscreenCanvas.width !== w || logGlitch.offscreenCanvas.height !== h) {
+      logGlitch.offscreenCanvas.width = w;
+      logGlitch.offscreenCanvas.height = h;
+    }
+
+    var statusEl = document.getElementById('status');
+    var mainEl = document.getElementById('main-container');
+    if (!statusEl || !mainEl) return;
+
+    try {
+      var serializer = new XMLSerializer();
+
+      /* AUTOSCROLL EN LA CAPTURA (bug: "el texto no baja solo").
+         Lo que el visitante VE es una RASTERIZACION SVG del DOM, y dentro de un
+         <foreignObject> la POSICION DE SCROLL de un div con overflow NO viaja: el
+         rasterizador dibuja siempre el TOPE del contenido. Por eso el manifiesto y el
+         monologo se veian clavados en las primeras lineas aunque el DOM SI scrolleaba
+         (scrollTop iba creciendo). Se aplica el scroll como translateY SOLO mientras
+         se serializa y se saca inmediatamente despues (los hijos del terminal son
+         #thought-content + el cursor). */
+      var desplazados = [];
+      var terminalScroll = document.getElementById('thought-terminal');
+      if (terminalScroll && terminalScroll.scrollTop > 0) {
+        Array.prototype.forEach.call(terminalScroll.children, function (hijo) {
+          desplazados.push([hijo, hijo.style.transform]);
+          hijo.style.transform = 'translateY(' + (-terminalScroll.scrollTop) + 'px)';
+        });
+      }
+
+      var statusXml = serializer.serializeToString(statusEl);
+      var mainXml = serializer.serializeToString(mainEl);
+
+      // Se restaura ya: la serializacion es sincronica.
+      desplazados.forEach(function (d) { d[0].style.transform = d[1] || ''; });
+
+      var styles = Array.prototype.map.call(document.querySelectorAll('style'), function (s) { return s.innerHTML; }).join('\n');
+
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+        '<foreignObject width="100%" height="100%">' +
+          '<div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#070303;color:#e88f93;font-family:\'Share Tech Mono\',monospace;box-sizing:border-box;">' +
+            '<style>' + styles + '</style>' +
+            statusXml +
+            mainXml +
+          '</div>' +
+        '</foreignObject>' +
+      '</svg>';
+
+      /* data: URL y NO blob: URL. Chrome marca el canvas como TAINTED al dibujar
+         un SVG con <foreignObject> que vino de un blob: -> gl.texImage2D tira
+         'SecurityError: Tainted canvases may not be loaded' y el try/catch vacio
+         lo comia en silencio: la textura que ve el visitante quedaba CLAVADA en
+         el bitmap inicial ("Esperando estimulo cognitivo...") aunque el DOM
+         siguiera cambiando. Con data: URL el SVG es origin-clean y la subida entra. */
+      var url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      var img = new Image();
+      img.onload = function () {
+        if (logGlitch.offscreenCtx) {
+          logGlitch.offscreenCtx.clearRect(0, 0, w, h);
+          logGlitch.offscreenCtx.drawImage(img, 0, 0);
+          logGlitch.textureNeedsUpdate = true;
+        }
+      };
+      img.onerror = function () { console.warn('[Log Glitch] no se pudo rasterizar la captura del DOM'); };
+      img.src = url;
+    } catch (e) {
+      logGlitch.textureNeedsUpdate = true;
+    }
+  }
+
+  function drawInitialConsoleBitmap() {
+    if (!logGlitch.offscreenCtx) return;
+    var ctx = logGlitch.offscreenCtx;
+    var w = logGlitch.offscreenCanvas.width;
+    var h = logGlitch.offscreenCanvas.height;
+
+    ctx.fillStyle = '#070303';
+    ctx.fillRect(0, 0, w, h);
+
+    // Barra superior
+    ctx.fillStyle = '#080202';
+    ctx.fillRect(0, 0, w, 38);
+    ctx.fillStyle = '#ff000d';
+    ctx.font = '12px "Share Tech Mono", monospace';
+    ctx.fillText('S·S // CONSOLA COGNITIVA DE LA OBRA · BUS EN LÍNEA', 16, 24);
+
+    // Marco central
+    ctx.fillStyle = '#0a0202';
+    ctx.fillRect(0, 39, w, h - 39);
+
+    // Texto de espera inicial
+    ctx.fillStyle = '#e88f93';
+    ctx.font = '16px "Share Tech Mono", monospace';
+    ctx.fillText('Esperando estímulo cognitivo...', 32, 180);
+
+    logGlitch.textureNeedsUpdate = true;
+  }
+
+  function initLogGlitch() {
+    var canvas = document.getElementById('log-glitch-canvas');
+    if (!canvas) return;
+    logGlitch.canvas = canvas;
+
+    var gl = canvas.getContext('webgl', { alpha: false, depth: false, antialias: false }) ||
+             canvas.getContext('experimental-webgl');
+    if (!gl) {
+      console.warn('[Log Glitch] WebGL no soportado');
+      return;
+    }
+    logGlitch.gl = gl;
+
+    logGlitch.offscreenCanvas = document.createElement('canvas');
+    logGlitch.offscreenCtx = logGlitch.offscreenCanvas.getContext('2d');
+
+    function resize() {
+      var w = window.innerWidth || 800;
+      var h = window.innerHeight || 600;
+      canvas.width = w;
+      canvas.height = h;
+      logGlitch.offscreenCanvas.width = w;
+      logGlitch.offscreenCanvas.height = h;
+      gl.viewport(0, 0, w, h);
+      /* Al redimensionar (p.ej. al abrir DevTools con F12) el drawing buffer queda
+         NEGRO; repintamos el bitmap base antes de la proxima captura para que no
+         haya pantalla negra ni un solo frame. */
+      drawInitialConsoleBitmap();
+      logGlitch.textureNeedsUpdate = true;
+      scheduleLogCapture();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    var vsSource = [
+      'attribute vec2 a_position;',
+      'void main() {',
+      '  gl_Position = vec4(a_position, 0.0, 1.0);',
+      '}'
+    ].join('\n');
+
+    // Shader EXACTO solicitado por el usuario
+    var fsSource = [
+      'precision mediump float;',
+      '',
+      'uniform vec2 resolution;',
+      'uniform float time;',
+      'uniform sampler2D iChannel0;',
+      '',
+      '// Uniforms de Control',
+      'uniform float glitchAmount;',
+      'uniform float blockIntensity;',
+      'uniform float blockSize;',
+      'uniform float chromaIntensity;',
+      'uniform float vhsNoiseIntensity;',
+      'uniform float edgeTearingIntensity;',
+      '',
+      '// Función de ruido',
+      'float rand(vec2 co){',
+      '    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);',
+      '}',
+      '',
+      '// -----------------------------------------------------------------',
+      '// FUNCIÓN ENCAPSULADA DE GLITCH',
+      '// Recibe la textura y las UVs, devuelve el vec4 con el color glitcheado',
+      '// -----------------------------------------------------------------',
+      'vec4 applyGlitch(vec2 uv,sampler2D tex) {',
+      '    float t = floor(time * 15.0);',
+      '',
+      '    // 1. PATRÓN RANDOM (Alta densidad de filas y columnas)',
+      '    float rows = (blockSize * 100.0);',
+      '    float row = floor(uv.y * rows);',
+      '    ',
+      '    float baseCols = (blockSize * 100.0);',
+      '    float colsPerRow = baseCols * (0.5 + 2.0 * rand(vec2(row, t)));',
+      '    ',
+      '    float colOffset = rand(vec2(row, t * 0.5)) * 100.0;',
+      '    float col = floor(uv.x * colsPerRow + colOffset);',
+      '    ',
+      '    vec2 cellId = vec2(col, row);',
+      '    ',
+      '    float cellRandom = rand(cellId + t);',
+      '    float glitchThreshold = 1.0 - (blockIntensity * glitchAmount);',
+      '    ',
+      '    vec2 displace = vec2(0.0);',
+      '    bool isGlitching = (cellRandom > glitchThreshold) && (glitchAmount > 0.0);',
+      '    ',
+      '    if (isGlitching) {',
+      '        float shiftX = (rand(cellId + t * 2.0) - 0.5) * 0.5 * glitchAmount;',
+      '        float shiftY = (rand(cellId + t * 3.0) - 0.5) * 0.1 * glitchAmount;',
+      '        displace = vec2(shiftX, shiftY);',
+      '    }',
+      '    ',
+      '    vec2 p = uv + displace;',
+      '',
+      '    // 2. TEARING LATERAL',
+      '    float effectiveEdge = edgeTearingIntensity * glitchAmount;',
+      '    float edgeDist = abs(uv.x - 0.5) * 2.0; ',
+      '    if (effectiveEdge > 0.0 && edgeDist > (1.0 - effectiveEdge * 0.5)) {',
+      '        float sideCell = floor(uv.y * rows * 1.5); ',
+      '        p.x += (rand(vec2(sideCell, t)) - 0.5) * 0.4 * effectiveEdge;',
+      '    }',
+      '',
+      '    // 3. ABERRACIÓN CROMÁTICA',
+      '    float effectiveChroma = chromaIntensity * glitchAmount * 0.05;',
+      '    ',
+      '    if (isGlitching) {',
+      '        effectiveChroma *= 3.0; // Resalta a pleno en los cuadraditos rotos',
+      '    }',
+      '    ',
+      '    vec2 uvR = p + vec2(effectiveChroma, 0.0);',
+      '    vec2 uvG = p;',
+      '    vec2 uvB = p - vec2(effectiveChroma, 0.0);',
+      '',
+      '    vec3 col_out;',
+      '    col_out.r = texture2D(tex, uvR).r;',
+      '    col_out.g = texture2D(tex, uvG).g;',
+      '    col_out.b = texture2D(tex, uvB).b;',
+      '',
+      '    // 4. VHS NOISE Y SCANLINES',
+      '    float effectiveVHS = vhsNoiseIntensity * glitchAmount;',
+      '    float scanline = sin(uv.y * resolution.y * 2.5) * 0.03 * effectiveVHS;',
+      '    float vhsNoise = (rand(uv * time) - 0.5) * 0.15 * effectiveVHS;',
+      '',
+      '    col_out -= scanline;',
+      '    col_out += vhsNoise;',
+      '',
+      '    return vec4(col_out, 1.0);',
+      '}',
+      '',
+      '// -----------------------------------------------------------------',
+      '// MAIN',
+      '// -----------------------------------------------------------------',
+      'void main() {',
+      '    vec2 uv = gl_FragCoord.xy / resolution.xy;',
+      '    uv.y = 1.0 - uv.y; // Mantenemos tu inversión del eje Y',
+      '',
+      '    // Llamamos a la función encapsulada pasándole el sampler y las uvs',
+      '    gl_FragColor = applyGlitch(uv, iChannel0);',
+      '}'
+    ].join('\n');
+
+    function compileShader(type, src) {
+      var s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error('[Log Glitch] Shader compile error:', gl.getShaderInfoLog(s));
+        gl.deleteShader(s);
+        return null;
+      }
+      return s;
+    }
+
+    var vs = compileShader(gl.VERTEX_SHADER, vsSource);
+    var fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+    if (!vs || !fs) return;
+
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.error('[Log Glitch] Program link error:', gl.getProgramInfoLog(prog));
+      return;
+    }
+    logGlitch.program = prog;
+
+    logGlitch.uniforms = {
+      resolution: gl.getUniformLocation(prog, 'resolution'),
+      time: gl.getUniformLocation(prog, 'time'),
+      iChannel0: gl.getUniformLocation(prog, 'iChannel0'),
+      glitchAmount: gl.getUniformLocation(prog, 'glitchAmount'),
+      blockIntensity: gl.getUniformLocation(prog, 'blockIntensity'),
+      blockSize: gl.getUniformLocation(prog, 'blockSize'),
+      chromaIntensity: gl.getUniformLocation(prog, 'chromaIntensity'),
+      vhsNoiseIntensity: gl.getUniformLocation(prog, 'vhsNoiseIntensity'),
+      edgeTearingIntensity: gl.getUniformLocation(prog, 'edgeTearingIntensity')
+    };
+
+    var quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
+    var posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+    logGlitch.texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, logGlitch.texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    drawInitialConsoleBitmap();
+    scheduleLogCapture();
+
+    requestAnimationFrame(renderGlitchLoop);
+  }
+
+  function renderGlitchLoop() {
+    requestAnimationFrame(renderGlitchLoop);
+    if (!logGlitch.gl || !logGlitch.program) return;
+    var gl = logGlitch.gl;
+    gl.useProgram(logGlitch.program);
+
+    var nowMs = performance.now();
+    var cfg = logGlitch.config || DEFAULT_GLITCH_CONFIG;
+    var env = cfg.envelope || DEFAULT_GLITCH_CONFIG.envelope;
+    var duration = Math.max(50, (env.duration !== undefined ? env.duration : 1.2) * 1000);
+    var elapsedTr = nowMs - logGlitch.transitionStartTime;
+    var normT = Math.min(1.0, elapsedTr / duration);
+    var easeFn = (CURVES && CURVES[env.curve]) ? CURVES[env.curve] : (function (t) { return t; });
+    var easedT = easeFn(normT);
+
+    var calculatedGlitch = logGlitch.startGlitch + (logGlitch.targetGlitch - logGlitch.startGlitch) * easedT;
+
+    if (cfg.manualOverride) {
+      logGlitch.currentGlitch = (cfg.manualGlitchAmount !== undefined ? cfg.manualGlitchAmount : 0.50);
+    } else {
+      logGlitch.currentGlitch = calculatedGlitch;
+    }
+
+    // Actualizar textura si hay un fotograma listo
+    if (logGlitch.textureNeedsUpdate && logGlitch.offscreenCanvas) {
+      logGlitch.textureNeedsUpdate = false;
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, logGlitch.texture);
+      try {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, logGlitch.offscreenCanvas);
+      } catch (e) {
+        /* NO dejar el catch vacio: fue lo que escondio durante dias que la textura
+           nunca se subia (canvas tainted) y la pantalla quedaba congelada. */
+        if (!logGlitch._avisoTex) { logGlitch._avisoTex = true; console.warn('[Log Glitch] la textura NO se pudo subir: ' + e.name + ': ' + e.message); }
+      }
+    }
+
+    var timeSec = (nowMs - logGlitch.startTime) / 1000;
+
+    // Animación de noise continuo de 0 a 1 que nunca se frena
+    function calcNoise01(t, seed) {
+      var n1 = Math.sin(t * 0.9 + seed);
+      var n2 = Math.sin(t * 1.83 + seed * 2.3);
+      var n3 = Math.sin(t * 3.71 + seed * 4.9);
+      var raw = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+      return Math.max(0.0, Math.min(1.0, 0.5 + 0.5 * raw));
+    }
+
+    gl.uniform2f(logGlitch.uniforms.resolution, logGlitch.canvas.width, logGlitch.canvas.height);
+    gl.uniform1f(logGlitch.uniforms.time, timeSec);
+    gl.uniform1i(logGlitch.uniforms.iChannel0, 0);
+
+    // Uniform glitchAmount interpolado según estado o manual override
+    gl.uniform1f(logGlitch.uniforms.glitchAmount, logGlitch.currentGlitch);
+
+    // Reducción por factor de 10 (* 0.1) modulado por la velocidad elegida en el panel P
+    var speedMult = ((cfg.noiseSpeed !== undefined ? cfg.noiseSpeed : 1.0)) * 0.1;
+
+    function evalUniform(paramKey, freq, seed) {
+      var p = (cfg.params && cfg.params[paramKey]) ? cfg.params[paramKey] : DEFAULT_GLITCH_CONFIG.params[paramKey];
+      var baseVal = (p && p.value !== undefined) ? p.value : 0.5;
+      if (!p || !p.animated) {
+        return baseVal;
+      }
+      return calcNoise01(timeSec * freq * speedMult, seed) * baseVal;
+    }
+
+    // Uniforms de Glitch: animados con ruido continuo procedural o fijos según elección
+    gl.uniform1f(logGlitch.uniforms.blockIntensity, evalUniform('blockIntensity', 1.4, 12.3));
+    gl.uniform1f(logGlitch.uniforms.blockSize, evalUniform('blockSize', 0.9, 45.6));
+    gl.uniform1f(logGlitch.uniforms.chromaIntensity, evalUniform('chromaIntensity', 1.6, 78.9));
+    gl.uniform1f(logGlitch.uniforms.vhsNoiseIntensity, evalUniform('vhsNoiseIntensity', 2.2, 101.1));
+    gl.uniform1f(logGlitch.uniforms.edgeTearingIntensity, evalUniform('edgeTearingIntensity', 1.2, 134.5));
+
+    var aPos = gl.getAttribLocation(logGlitch.program, 'a_position');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  /* ======================================================================
+     7. ARRANQUE
+     ====================================================================== */
+  initLogGlitch();
+  startManifest();
   connect();
 })();
 </script>

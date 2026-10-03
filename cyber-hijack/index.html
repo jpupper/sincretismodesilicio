@@ -8,7 +8,7 @@
   <!-- Los assets viven en ./cambiapalabras/ y son RELATIVOS a esta página: funciona
        en la raíz (/cambiapalabras.html), en subpath (/sincretismo/cambiapalabras.html)
        y en el hosting estático del FTP, sin <base> ni recompilar nada. -->
-  <script src="js/base-path.js?v=3.17"></script>
+  <script src="js/base-path.js?v=3.30"></script>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=3.17">
+  <link rel="stylesheet" href="style.css?v=3.30">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -25,9 +25,16 @@
   <!-- JPShaderEditor Include (Engine embebible de Nodos y Shaders de Galería) -->
   <script>
     (function () {
-      var base = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+      // Servidor elegido a mano en el panel del include (tecla S). Si hay uno,
+      // manda sobre el automatico: la pagina y el engine salen del mismo lado.
+      var elegido = '';
+      try {
+        var st = JSON.parse(localStorage.getItem('jpsi:config') || '{}');
+        if (st && st.baseManual && st.base) elegido = st.base;
+      } catch (e) { }
+      var base = elegido || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
         ? location.origin + '/jpshadereditor'
-        : 'https://vps-4455523-x.dattaweb.com/jpshadereditor';
+        : 'https://vps-4455523-x.dattaweb.com/jpshadereditor');
 
       function loadScript(url, next) {
         var s = document.createElement('script');
@@ -91,6 +98,9 @@
 
     <!-- Capa 1.8: Superposición Cinemática de Esqueleto y Articulaciones OpenPose -->
     <canvas id="openpose-overlay-canvas"></canvas>
+
+    <!-- Capa 1.8b: Superposición de Campo de Flujo Vectorial (Flow Field) -->
+    <canvas id="flowfield-overlay-canvas"></canvas>
 
     <!-- Capa 1.9: Punteros de Interacción Unificados (Retículas HUD) -->
     <canvas id="pointers-overlay-canvas"></canvas>
@@ -182,24 +192,20 @@
       <div class="corner corner-br"></div>
     </div>
 
-    <!-- Indicador Flotante de Telemetría Biometría / Cursor -->
-    <div id="telemetry-badge">
-      <div class="badge-row">
-        <span class="badge-label">SENSOR:</span>
-        <span class="badge-val" id="telemetry-sensor">MOUSE [CLIC DIRECTO]</span>
-      </div>
-      <div class="badge-row">
-        <span class="badge-label">COORD:</span>
-        <span class="badge-val" id="telemetry-coords">X: 000 | Y: 000</span>
-      </div>
-      <div class="badge-row">
-        <span class="badge-label">CONFIANZA:</span>
-        <span class="badge-val" id="telemetry-confidence">100%</span>
-      </div>
-    </div>
 
     <!-- Capa 4: Contenedor de Palabras Orgánicas Flotantes -->
     <div id="floating-words-layer"></div>
+
+    <!-- Capa 5: Call to action por inactividad (nadie tocó nada en 12 s) -->
+    <div id="idle-cta" class="idle-cta hidden">
+      <div class="idle-cta-frame">
+        <div class="idle-cta-kicker">◈ SECUESTRO CIBERNÉTICO · SALA EN ESPERA</div>
+        <div class="idle-cta-title">ELEGÍ TU PALABRA PARA FORMAR TU HAIKU VIRTUAL</div>
+        <div class="idle-cta-sub">Sostené la mano o el cursor sobre una palabra flotante hasta capturarla ·
+          tres palabras y la máquina escribe el haiku en tu lugar</div>
+        <div class="idle-cta-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
 
     <!-- Cursor Táctico / Retículo de Fijación -->
     <div id="cursor-reticle" class="reticle">
@@ -216,17 +222,9 @@
     <!-- Capa 6: Escenario Central de Resignificación y Síntesis IA -->
     <div id="mutation-stage" class="mutation-stage hidden">
       <div class="mutation-backdrop-glitch"></div>
-      <!-- Lluvia de partículas corporativas de fondo (👔 😊 💪 💵) -->
-      <canvas id="corporate-rain-canvas"></canvas>
+      <!-- Lluvia de partículas corporativas de fondo (desactivada) -->
+      <canvas id="corporate-rain-canvas" style="display: none; pointer-events: none;"></canvas>
       
-      <!-- Cartel de DESPROCESANDO mientras giran las letras y procesa la IA -->
-      <div id="desprocesando-banner" class="desprocesando-banner hidden">
-        <div class="desp-glitch-border"></div>
-        <div class="desp-content">
-          <span class="desp-pulse-dot"></span>
-          <span class="desp-title">&gt;&gt; DESPROCESANDO &lt;&lt;</span>
-        </div>
-      </div>
 
       <!-- Las 3 tarjetas del medio se eliminaron: las palabras son el mismo
            objeto unificado que baja al centro y luego vuela a su lugar en la frase. -->
@@ -245,7 +243,7 @@
       <div class="pip-header">
         <div class="pip-title">
           <span class="pip-status-dot"></span>
-          <span class="pip-title-text">DEPTH MAP // SENSOR SEGMENTACIÓN</span>
+          <span class="pip-title-text">DEPTH MAP</span>
         </div>
         <div class="pip-actions">
           <span class="pip-tag" id="depth-pip-fps">60 FPS</span>
@@ -291,7 +289,6 @@
         </div>
         <div class="pip-overlay-meta">
           <div class="meta-row"><span>SUJETO:</span><span>HUMANO_01</span></div>
-          <div class="meta-row"><span>CONFIANZA:</span><span id="face-meta-conf">0%</span></div>
         </div>
       </div>
       <div class="pip-footer">
@@ -333,6 +330,10 @@
           <button type="button" class="modal-tab-btn" data-tab="tab-render">
             <span class="tab-icon">🎛️</span>
             <span class="tab-text">RENDER &amp; CAPAS</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-glitch">
+            <span class="tab-icon">📺</span>
+            <span class="tab-text">GLITCH &amp; ENVELOPE</span>
           </button>
           <button type="button" class="modal-tab-btn" data-tab="tab-particles">
             <span class="tab-icon">✨</span>
@@ -893,6 +894,21 @@
                   </div>
                 </div>
 
+                <!-- Capa 4b: Vectores Flow Field (Flujo Óptico) -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Capa Flow Field">
+                      <input type="checkbox" id="cfg-render-flowfield-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">4b. Vectores Flow Field (Flujo Óptico)</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-flowfield-opacity">Opacidad: <span id="val-render-flowfield-opacity">100</span>%</label>
+                    <input type="range" id="cfg-render-flowfield-opacity" min="0" max="100" step="1" value="100">
+                  </div>
+                </div>
+
                 <!-- Capa 5: Punteros de Interacción Unificados -->
                 <div class="render-layer-item">
                   <div class="layer-header">
@@ -970,7 +986,7 @@
                 <div class="render-layer-item">
                   <div class="layer-header">
                     <label class="switch-toggle" title="Activar/Desactivar Lluvia de Partículas Corporativas">
-                      <input type="checkbox" id="cfg-render-corpparticles-toggle" checked>
+                      <input type="checkbox" id="cfg-render-corpparticles-toggle">
                       <span class="slider-round"></span>
                     </label>
                     <span class="layer-title">10. Partículas Corporativas (👔 😊 💪 💵)</span>
@@ -981,6 +997,183 @@
                   </div>
                   <small class="item-desc">Lluvia de íconos que cae durante el discurso final inspiracional</small>
                 </div>
+
+                <!-- Capa 11: Control de Velocidad de Noise (Glitch Shader Master Output) -->
+                <div class="render-layer-item master-noise-control-item" style="grid-column: 1 / -1; border: 1px solid #ff000d; background: rgba(255, 0, 13, 0.07); padding: 12px; border-radius: 4px; margin-top: 6px;">
+                  <div class="layer-header" style="margin-bottom: 6px;">
+                    <span class="layer-title" style="color: #ff3b45; font-weight: 700; font-size: 13px;">⚡ VELOCIDAD DE ANIMACIÓN NOISE // SHADER MASTER OUTPUT</span>
+                  </div>
+                  <div class="layer-slider-group">
+                    <label for="cfg-render-noise-speed">Velocidad Noise (Sutil ×10): <span id="val-render-noise-speed">1.0</span>×</label>
+                    <input type="range" id="cfg-render-noise-speed" min="0" max="3" step="0.05" value="1.0">
+                  </div>
+                  <small class="item-desc" style="color: #c9888c; display: block; margin-top: 4px;">Modula la velocidad del ruido procedural continuo (glitch). Reducido 10× para una animación sutil y orgánica.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: GLITCH & ENVELOPE DE SECUENCIA -->
+          <div class="modal-tab-pane" id="tab-glitch">
+            <div class="ascii-controls-card">
+              <div class="section-subtitle">
+                <span>⚡ ENVELOPE DE SECUENCIA &amp; CALIBRACIÓN DE GLITCH</span>
+              </div>
+              <p class="words-help-text">
+                Calibra la intensidad y el comportamiento del efecto Glitch en cada fase de la performance interactiva (Reposo, Procesamiento del modelo, y Síntesis poética final).
+              </p>
+
+              <!-- Botones de Test / Previsualización de Estado -->
+              <div style="margin: 12px 0 16px;">
+                <div style="font-size: 11px; font-weight: 700; color: #ff3b45; margin-bottom: 8px; letter-spacing: 0.06em;">PREVISUALIZAR FASE DE SECUENCIA EN VIVO:</div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-idle" style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ REPOSO (IDLE)</button>
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-thinking" style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ PENSANDO (THINKING)</button>
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-haiku" style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ SECUESTRO (HAIKU)</button>
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-auto" style="flex: 0.8; min-width: 100px; font-size: 11px; padding: 7px 10px;">↺ EN VIVO (AUTO)</button>
+                </div>
+              </div>
+
+              <!-- Sliders de Envelope -->
+              <div class="calibration-grid">
+                <div class="calib-item">
+                  <label for="cfg-env-idle"><strong>Nivel en REPOSO (IDLE):</strong> <span id="val-env-idle">0.10</span></label>
+                  <input type="range" id="cfg-env-idle" min="0" max="1" step="0.02" value="0.10">
+                  <small class="item-desc">Intensidad de glitch mientras la obra espera interacción (0.00 a 1.00)</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-env-thinking"><strong>Nivel en RAZONAMIENTO (THINKING):</strong> <span id="val-env-thinking">1.00</span></label>
+                  <input type="range" id="cfg-env-thinking" min="0" max="1" step="0.02" value="1.00">
+                  <small class="item-desc">Intensidad máxima durante la inferencia y procesamiento cognitivo</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-env-haiku"><strong>Nivel en POEMA SINTETIZADO (HAIKU):</strong> <span id="val-env-haiku">0.50</span></label>
+                  <input type="range" id="cfg-env-haiku" min="0" max="1" step="0.02" value="0.50">
+                  <small class="item-desc">Intensidad durante el secuestro final de pantalla y declamación</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-env-dur"><strong>Duración de Transición (Envelope Time):</strong> <span id="val-env-dur">1.2</span>s</label>
+                  <input type="range" id="cfg-env-dur" min="0.1" max="4.0" step="0.1" value="1.2">
+                  <small class="item-desc">Tiempo de fundido y aceleración entre cada fase</small>
+                </div>
+
+                <div class="calib-item" style="grid-column: 1 / -1;">
+                  <label for="cfg-env-curve"><strong>Curva de Transición (Easing Envelope):</strong></label>
+                  <select id="cfg-env-curve" class="cyber-select" style="margin-top: 6px; width: 100%;">
+                    <option value="cubic" selected>Cúbica Suave (In-Out)</option>
+                    <option value="smooth">Smoothstep (Orgánica)</option>
+                    <option value="linear">Lineal Continua</option>
+                    <option value="expo">Exponencial (Agresiva)</option>
+                  </select>
+                </div>
+
+                <!-- Bypass / Override Manual -->
+                <div class="calib-item" style="grid-column: 1 / -1; background: rgba(255, 0, 13, 0.08); border: 1px solid #ff000d; border-radius: 4px; padding: 10px;">
+                  <label class="checkbox-label" style="font-weight: 700; color: #ff3b45;">
+                    <input type="checkbox" id="cfg-glitch-manual-override">
+                    <span>FORZAR GLITCH MANUAL (Bypass de Envelope de Secuencia)</span>
+                  </label>
+                  <div id="cfg-glitch-manual-group" style="opacity: 0.4; pointer-events: none; transition: opacity .2s; margin-top: 8px;">
+                    <label for="cfg-glitch-manual-val">Intensidad Fija Manual: <span id="val-glitch-manual">0.50</span></label>
+                    <input type="range" id="cfg-glitch-manual-val" min="0" max="1" step="0.01" value="0.50">
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECCIÓN 2: CONTROL DE UNIFORMS INDIVIDUALES (NOISE VS MANUAL) -->
+              <div class="section-subtitle" style="margin-top: 24px;">
+                <span>🎛️ CONTROL DE UNIFORMS DEL EFECTO GLITCH (ANIMACIÓN VS MANUAL)</span>
+              </div>
+              <p class="words-help-text">
+                Activa o desactiva la animación por ruido procedural continuo para cada uniform individualmente. Si la animación está desactivada, el parámetro responde estáticamente al valor manual elegido.
+              </p>
+
+              <!-- Velocidad de Noise -->
+              <div class="render-layer-item" style="border: 1px solid #ff000d; background: rgba(255, 0, 13, 0.07); padding: 12px; border-radius: 4px; margin-bottom: 14px;">
+                <div class="layer-header" style="margin-bottom: 6px;">
+                  <span class="layer-title" style="color: #ff3b45; font-weight: 700; font-size: 13px;">⚡ VELOCIDAD GLOBAL DE NOISE (×0.1 BASE SUTIL)</span>
+                </div>
+                <div class="layer-slider-group">
+                  <label for="cfg-glitch-noise-speed">Velocidad Noise: <span id="val-glitch-noise-speed">1.00</span>×</label>
+                  <input type="range" id="cfg-glitch-noise-speed" min="0" max="3" step="0.05" value="1.00">
+                </div>
+                <small class="item-desc" style="color: #c9888c; display: block; margin-top: 4px;">Modula la frecuencia de animación de todos los uniforms activados con ruido.</small>
+              </div>
+
+              <div class="calibration-grid">
+                <!-- 1. Bloques Rotos (blockIntensity) -->
+                <div class="calib-item">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="checkbox-label" style="margin: 0;">
+                      <input type="checkbox" id="cfg-glitch-anim-block" checked>
+                      <strong>Animar con Noise</strong>
+                    </label>
+                    <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-block">0.80</span>
+                  </div>
+                  <label for="cfg-glitch-param-block" style="font-size: 11px; color: #a0aec0;">Intensidad de Bloques Rotos (blockIntensity):</label>
+                  <input type="range" id="cfg-glitch-param-block" min="0" max="1" step="0.02" value="0.80">
+                </div>
+
+                <!-- 2. Tamaño Cuadrados (blockSize) -->
+                <div class="calib-item">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="checkbox-label" style="margin: 0;">
+                      <input type="checkbox" id="cfg-glitch-anim-size" checked>
+                      <strong>Animar con Noise</strong>
+                    </label>
+                    <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-size">0.60</span>
+                  </div>
+                  <label for="cfg-glitch-param-size" style="font-size: 11px; color: #a0aec0;">Tamaño de Cuadrados (blockSize):</label>
+                  <input type="range" id="cfg-glitch-param-size" min="0.05" max="1" step="0.02" value="0.60">
+                </div>
+
+                <!-- 3. Aberración Cromática (chromaIntensity) -->
+                <div class="calib-item">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="checkbox-label" style="margin: 0;">
+                      <input type="checkbox" id="cfg-glitch-anim-chroma" checked>
+                      <strong>Animar con Noise</strong>
+                    </label>
+                    <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-chroma">0.70</span>
+                  </div>
+                  <label for="cfg-glitch-param-chroma" style="font-size: 11px; color: #a0aec0;">Aberración Cromática RGB (chromaIntensity):</label>
+                  <input type="range" id="cfg-glitch-param-chroma" min="0" max="1" step="0.02" value="0.70">
+                </div>
+
+                <!-- 4. Ruido VHS & Scanlines (vhsNoiseIntensity) -->
+                <div class="calib-item">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="checkbox-label" style="margin: 0;">
+                      <input type="checkbox" id="cfg-glitch-anim-vhs" checked>
+                      <strong>Animar con Noise</strong>
+                    </label>
+                    <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-vhs">0.65</span>
+                  </div>
+                  <label for="cfg-glitch-param-vhs" style="font-size: 11px; color: #a0aec0;">Ruido VHS &amp; Scanlines (vhsNoiseIntensity):</label>
+                  <input type="range" id="cfg-glitch-param-vhs" min="0" max="1" step="0.02" value="0.65">
+                </div>
+
+                <!-- 5. Desgarro Lateral (edgeTearingIntensity) -->
+                <div class="calib-item">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="checkbox-label" style="margin: 0;">
+                      <input type="checkbox" id="cfg-glitch-anim-tearing" checked>
+                      <strong>Animar con Noise</strong>
+                    </label>
+                    <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-tearing">0.50</span>
+                  </div>
+                  <label for="cfg-glitch-param-tearing" style="font-size: 11px; color: #a0aec0;">Desgarro Lateral / Tearing (edgeTearingIntensity):</label>
+                  <input type="range" id="cfg-glitch-param-tearing" min="0" max="1" step="0.02" value="0.50">
+                </div>
+              </div>
+
+              <div class="calib-actions-row" style="margin-top: 16px;">
+                <button type="button" class="btn-calib-action" id="btn-glitch-reset-defaults">
+                  ↺ Restaurar Glitch Predeterminado
+                </button>
               </div>
             </div>
           </div>
@@ -1155,6 +1348,6 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=3.17"></script>
+  <script src="script.js?v=3.30"></script>
 </body>
 </html>

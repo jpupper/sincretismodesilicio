@@ -9,10 +9,10 @@
   <!-- Tipografías de Alta Fidelidad -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   
-  <script src="js/base-path.js?v=3.15"></script>
-  <link rel="stylesheet" href="css/cosmos-clusters.css?v=3.15" />
+  <script src="js/base-path.js?v=3.27"></script>
+  <link rel="stylesheet" href="css/cosmos-clusters.css?v=3.30" />
 </head>
 <body>
 
@@ -37,7 +37,12 @@
         <span>📋</span>
         <span>log.html</span>
       </a>
-      <button type="button" class="btn-standalone-nav" id="btn-fullscreen-cluster-cosmos" title="Alternar Pantalla Completa (F)">
+      <button type="button" class="btn-standalone-nav" id="btn-cosmos-ajustes" title="Tama&ntilde;o de las palabras y de los carteles del 3D (tecla P)">
+        <span>&#9881;</span>
+        <span>Ajustes de texto (P)</span>
+      </button>
+      <button type="button" class="btn-standalone-nav" id="btn-fullscreen-cluster-cosmos"
+ title="Alternar Pantalla Completa (F)">
         <span>⛶</span>
         <span>Pantalla Completa (F)</span>
       </button>
@@ -128,10 +133,50 @@
         <span class="hint-key">F</span>
         <span>Pantalla Completa</span>
       </div>
+      <div class="hint-chip">
+        <span class="hint-key">P</span>
+        <span>Tam. de textos</span>
+      </div>
+      <div class="hint-chip">
+        <span class="hint-key">M</span>
+        <span>Simular 3 Esferas</span>
+      </div>
     </div>
+
+    <!-- ===================================================================== -->
+    <!-- PANEL DE CONFIGURACION (tecla P) — pestanas: TEXTOS / PLANETAS / CAMARA  -->
+    <!-- Vive dentro del viewport para seguir visible en pantalla completa.       -->
+    <!-- Los controles los genera js/cosmos-clusters.js desde GRUPOS_AJUSTES.     -->
+    <!-- ===================================================================== -->
+    <div id="panel-ajustes-cosmos">
+      <div class="pa-titulo">
+        <span>&#9881; CONFIGURACI&Oacute;N DEL C&Uacute;MULO 3D</span>
+        <button type="button" class="pa-cerrar" id="pa-cerrar" title="Cerrar (P o Esc)">&#10005;</button>
+      </div>
+
+      <div class="pa-tabs" id="pa-tabs">
+        <button type="button" class="pa-tab activo" data-tab="textos">TEXTOS</button>
+        <button type="button" class="pa-tab" data-tab="planetas">PLANETAS</button>
+        <button type="button" class="pa-tab" data-tab="fondo">FONDO</button>
+        <button type="button" class="pa-tab" data-tab="camara">C&Aacute;MARA</button>
+      </div>
+
+      <div class="pa-seccion activo" id="pa-seccion-textos"></div>
+      <div class="pa-seccion" id="pa-seccion-planetas"></div>
+      <div class="pa-seccion" id="pa-seccion-fondo"></div>
+      <div class="pa-seccion" id="pa-seccion-camara"></div>
+
+      <div class="pa-nota" id="pa-aplicado-nota">Se aplica en vivo sobre la escena y se guarda solo.</div>
+
+      <div class="pa-pie">
+        <button type="button" class="pa-reset" id="pa-reset">RESTABLECER TODO</button>
+        <span class="pa-nota">P o Esc para cerrar</span>
+      </div>
+    </div>
+
 
   </main>
 
-  <script type="module" src="js/cosmos-clusters.js?v=3.15"></script>
+  <script type="module" src="js/cosmos-clusters.js?v=3.30"></script>
 </body>
 </html>

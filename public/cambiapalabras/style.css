@@ -1639,6 +1639,22 @@ textarea:focus {
   display: block;
 }
 
+/* REGLA DEL MASTER OUTPUT: es la ÚLTIMA etapa de la imagen.
+   Ninguna capa de POSTPROCESAMIENTO DOM (ruido procedural, VHS, scanlines,
+   viñeta, framediff/ascii) puede quedar por encima: si no, ensucian -entre otras
+   cosas- la zona del contenedor del haiku, que el shader mantiene inmune.
+   Con master-output activo el canvas sube por encima de esas capas (z 2-3) y
+   por debajo quedan sólo las capas de ENTRADA (que el maestro muestrea como
+   textura) y por encima las palabras / HUD / texto, que son CONTENIDO, no post. */
+html.master-output-active #master-output-canvas {
+  z-index: 4;
+}
+/* MODO SOLO MASTER OUTPUT (tecla Y / ?solo=1): se oculta todo menos el canvas
+   del shader de salida; el fondo va a negro puro para que no se cuele nada. */
+html.solo-master {
+  background: #000 !important;
+}
+
 /* Cuando el SHADER MAESTRO está activo (clase puesta por MasterOutputShader),
    estas capas pasan a ser ENTRADAS del shader: siguen renderizando en su canvas
    (el maestro las muestrea como textura) pero dejan de verse como capa.
@@ -1648,8 +1664,31 @@ html.master-output-active #webcam-video,
 html.master-output-active #cutout-camera-canvas,
 html.master-output-active #ascii-camera-canvas,
 html.master-output-active #framediff-camera-canvas,
-html.master-output-active #openpose-overlay-canvas {
+html.master-output-active #openpose-overlay-canvas,
+html.master-output-active #flowfield-overlay-canvas {
   visibility: hidden !important;
+}
+
+/* Botones de previsualización de fase Glitch en el modal */
+.pa-cp-btn-test {
+  background: rgba(255, 0, 13, 0.12) !important;
+  color: #ff8a90 !important;
+  border: 1px solid #7a181d !important;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.pa-cp-btn-test:hover {
+  background: rgba(255, 0, 13, 0.25) !important;
+  border-color: #ff000d !important;
+  box-shadow: 0 0 10px rgba(255, 0, 13, 0.4);
+}
+.pa-cp-btn-test.active {
+  background: #ff000d !important;
+  color: #000 !important;
+  font-weight: 900 !important;
+  border-color: #ff000d !important;
+  box-shadow: 0 0 14px rgba(255, 0, 13, 0.7);
 }
 
 #ascii-camera-canvas {
@@ -1682,6 +1721,15 @@ html.master-output-active #openpose-overlay-canvas {
   width: 100vw;
   height: 100vh;
   z-index: 15;
+  pointer-events: none;
+}
+
+#flowfield-overlay-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 14;
   pointer-events: none;
 }
 
@@ -3009,3 +3057,72 @@ textarea {
   opacity: 0 !important;
   animation: none !important;
 }
+
+/* ==========================================================================
+   CALL TO ACTION POR INACTIVIDAD (CambiaPalabras)
+   Aparece cuando nadie toca la instalación durante IDLE_CTA_DELAY_MS y se
+   esconde al primer estímulo. pointer-events:none — nunca bloquea la captura.
+   ========================================================================== */
+.idle-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  /* Por encima de la banda de toasts (#toast-container va a bottom:100px) */
+  bottom: clamp(122px, 17vh, 172px);
+  display: flex;
+  justify-content: center;
+  z-index: 22;
+  pointer-events: none;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity .6s ease, transform .6s cubic-bezier(.16, 1, .3, 1);
+}
+.idle-cta.hidden { opacity: 0; transform: translateY(18px); }
+.idle-cta-frame {
+  max-width: min(820px, 88vw);
+  padding: 16px 34px 14px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(4, 9, 14, .74), rgba(4, 9, 14, .32));
+  border: 1px solid var(--accent-1-mid);
+  border-top-width: 2px;
+  border-radius: 3px;
+  box-shadow: 0 0 22px var(--accent-1-soft), inset 0 0 26px rgba(0, 0, 0, .5);
+}
+.idle-cta-kicker {
+  font-family: var(--font-cyber);
+  font-size: 10.5px;
+  letter-spacing: .3em;
+  color: var(--accent-1-strong);
+  text-transform: uppercase;
+}
+.idle-cta-title {
+  margin-top: 7px;
+  font-family: var(--font-cyber);
+  font-size: clamp(1.1rem, 2.5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--text-main);
+  animation: idleCtaPulse 2.8s ease-in-out infinite;
+}
+.idle-cta-sub {
+  margin-top: 8px;
+  font-family: var(--font-organic);
+  font-size: clamp(.7rem, 1.05vw, .92rem);
+  line-height: 1.5;
+  color: var(--text-muted);
+  letter-spacing: .03em;
+}
+.idle-cta-dots { display: flex; gap: 6px; justify-content: center; margin-top: 11px; }
+.idle-cta-dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-1-strong);
+  opacity: .22;
+  animation: idleCtaDot 1.6s infinite;
+}
+.idle-cta-dots span:nth-child(2) { animation-delay: .22s; }
+.idle-cta-dots span:nth-child(3) { animation-delay: .44s; }
+@keyframes idleCtaPulse {
+  0%, 100% { opacity: .9; text-shadow: 0 0 8px var(--accent-1-soft); }
+  50%      { opacity: 1;  text-shadow: 0 0 20px var(--accent-1-mid); }
+}
+@keyframes idleCtaDot { 0%, 100% { opacity: .18; } 50% { opacity: .95; } }
