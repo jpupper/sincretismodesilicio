@@ -39,8 +39,8 @@
   --bg-desp: rgba(22, 6, 12, 0.95);
   --bg-input: rgba(4, 8, 14, 0.9);
 
-  --font-organic: 'Share Tech Mono', 'VT323', 'IBM Plex Mono', monospace;
-  --font-cyber: 'Share Tech Mono', 'VT323', 'IBM Plex Mono', monospace;
+  --font-organic: var(--gs-fuente, 'Share Tech Mono', monospace);
+  --font-cyber: var(--gs-fuente, 'Share Tech Mono', monospace);
   
   --glow-cyan: 0 0 5px rgba(0, 240, 255, 0.35);
   --glow-green: 0 0 6px rgba(0, 255, 102, 0.4);
@@ -72,6 +72,13 @@
   margin: 0;
   padding: 0;
   user-select: none;
+  text-transform: uppercase !important;
+}
+
+html, body, button, input, select, textarea, div, p, span, h1, h2, h3, h4, h5, h6, a, label, pre, code,
+.organic-word-item, .organic-word-item *, .cctv-word, .modal-card, .modal-card *, .speech-text-output,
+.word-chip, #cctv-hud, #cctv-hud *, .speech-text, .cctv-tag, .chip-btn, .modal-tab-btn, .cctv-preview-card {
+  text-transform: uppercase !important;
 }
 
 html, body {
@@ -498,10 +505,16 @@ html, body {
   font-weight: 600;
   letter-spacing: 1px;
   color: var(--word-color, #ffffff);
-  /* Reborde del texto configurable desde la pestaña PARTÍCULAS */
-  -webkit-text-stroke: var(--word-outline, 1px) var(--word-outline-color, rgba(4, 8, 18, 0.85));
+  /* Reborde del texto negro para contraste contra el fondo */
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000;
   paint-order: stroke fill;
-  text-shadow: var(--word-glow, 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 18px rgba(255, 255, 255, 0.45));
+  text-shadow: 
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     var(--word-glow, 0 2px 10px rgba(0, 0, 0, 0.95));
   will-change: transform, opacity;
   pointer-events: auto;
   transition: color 0.2s ease, filter 0.2s ease, text-shadow 0.2s ease;
@@ -516,6 +529,9 @@ html, body {
   position: relative;
   z-index: 2;
   pointer-events: none;
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000;
+  paint-order: stroke fill;
 }
 
 .word-lock-badge {
@@ -529,10 +545,17 @@ html, body {
   letter-spacing: 1px;
 }
 
-/* Estado de Fijación / Proximidad: Resplandor cyberpunk estático, SIN vibración ni destellos */
+/* Estado de Fijación / Proximidad: Resplandor cyberpunk estático manteniendo stroke negro */
 .organic-word-item.targeting {
-  /* Sólo resplandor de proximidad: el COLOR de la letra no cambia. */
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  paint-order: stroke fill;
+  text-shadow: 
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
 }
 
 /* ==========================================================================
@@ -553,6 +576,9 @@ html, body {
   letter-spacing: 2px !important;
   font-family: var(--font-cyber) !important;
   pointer-events: none !important;
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  paint-order: stroke fill;
   transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.4s ease !important;
 }
 
@@ -563,7 +589,7 @@ html, body {
   min-width: 280px !important;
   max-width: 85vw !important;
   padding: 14px 36px !important;
-  font-size: var(--word-font-size-center, 38px) !important;
+  font-size: var(--word-font-size-center, 52px) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 700 !important;
   letter-spacing: 4px !important;
@@ -571,6 +597,9 @@ html, body {
   background: transparent !important;
   box-shadow: none !important;
   pointer-events: none !important;
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  paint-order: stroke fill;
   transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease !important;
 }
 
@@ -581,7 +610,7 @@ html, body {
   min-width: 280px !important;
   max-width: 85vw !important;
   padding: 14px 36px !important;
-  font-size: var(--word-font-size-center, 38px) !important;
+  font-size: var(--word-font-size-center, 52px) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 800 !important;
   letter-spacing: 3px !important;
@@ -589,6 +618,9 @@ html, body {
   background: transparent !important;
   box-shadow: none !important;
   pointer-events: none !important;
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  paint-order: stroke fill;
   transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease !important;
 }
 
@@ -599,7 +631,7 @@ html, body {
   transform: none !important;
   margin: 3px 6px !important;
   padding: 4px 14px !important;
-  font-size: var(--word-font-size-phrase, 26px) !important;
+  font-size: var(--word-font-size-phrase, 62px) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 800 !important;
   letter-spacing: 1.5px !important;
@@ -607,6 +639,9 @@ html, body {
   background: transparent !important;
   box-shadow: none !important;   /* sin halo rectangular: la palabra es texto limpio */
   pointer-events: none !important;
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  paint-order: stroke fill;
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease, margin 0.5s cubic-bezier(0.16, 1, 0.3, 1), padding 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
@@ -617,7 +652,7 @@ html, body {
   transform: none !important;
   margin: 3px 4px !important;
   padding: 4px 10px !important;
-  font-size: calc(var(--word-font-size-phrase, 26px) * 0.86) !important;
+  font-size: calc(var(--word-font-size-phrase, 62px) * 0.86) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 500 !important;
   letter-spacing: 1px !important;
@@ -625,7 +660,15 @@ html, body {
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 14px var(--accent-1-mid) !important;
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  paint-order: stroke fill;
+  text-shadow: 
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0 2px 10px rgba(0, 0, 0, 0.95), 0 0 14px var(--accent-1-mid) !important;
   opacity: 0;
   animation: auxGlitchIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   pointer-events: none !important;
@@ -823,6 +866,10 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 1px;
   color: #fff;
+  -webkit-text-stroke: 1px #000000;
+  text-stroke: 1px #000000;
+  paint-order: stroke fill;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
 }
 
 .slot-box.empty .slot-content {
@@ -2432,7 +2479,8 @@ input[type="color"]:hover {
   background: var(--bg-panel);
   border: 1px solid var(--border-cyan);
   border-radius: 0;
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85), 0 0 18px rgba(0, 240, 255, 0.25);
+  /* El glow sigue la PALETA (acento 1): antes era cian fijo y no acompañaba al cobre. */
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85), 0 0 20px var(--accent-1-mid);
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
@@ -2445,6 +2493,7 @@ input[type="color"]:hover {
   pointer-events: none;
   transform: scale(0.92);
 }
+
 
 .pip-bottom-right {
   bottom: 80px;
@@ -2464,13 +2513,15 @@ input[type="color"]:hover {
   justify-content: space-between;
   padding: 6px 10px;
   background: var(--bg-accent-soft);
-  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+  border-bottom: 1px solid var(--accent-1-line);
+  box-shadow: inset 0 -1px 14px var(--accent-1-soft);
 }
 
 .pip-title {
   display: flex;
   align-items: center;
   gap: 6px;
+  text-shadow: 0 0 9px var(--accent-1-mid);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.8px;
@@ -2567,8 +2618,9 @@ input[type="color"]:hover {
 
 .face-target-corners .fc {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  /* Marcadores mas chicos (pedido: "los puntos del contenedor de la cara") */
+  width: 8px;
+  height: 8px;
   border-color: #ff0055;
   border-style: solid;
 }
@@ -2583,8 +2635,9 @@ input[type="color"]:hover {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 44px;
-  height: 44px;
+  /* Reticula mas chica (44 -> 26 px) */
+  width: 26px;
+  height: 26px;
   pointer-events: none;
 }
 
@@ -2924,7 +2977,7 @@ button,
 input,
 select,
 textarea {
-  font-family: 'Share Tech Mono', 'VT323', 'IBM Plex Mono', monospace !important;
+  font-family: var(--gs-fuente, 'Share Tech Mono', monospace) !important;
 }
 
 /* Look consola: paddings y brillos reducidos (sin cápsula).
@@ -2978,7 +3031,7 @@ textarea {
 }
 
 .speech-text-output {
-  font-family: 'Share Tech Mono', 'VT323', 'IBM Plex Mono', monospace !important;
+  font-family: var(--gs-fuente, 'Share Tech Mono', monospace) !important;
   white-space: pre-line !important;
   display: inline;
 }
@@ -3013,7 +3066,7 @@ textarea {
 .tab-badge,
 .banner-status-tag {
   border-radius: 0 !important;
-  font-family: 'Share Tech Mono', 'VT323', 'IBM Plex Mono', monospace !important;
+  font-family: var(--gs-fuente, 'Share Tech Mono', monospace) !important;
 }
 
 .state-dot,
@@ -3046,7 +3099,7 @@ textarea {
   font-weight: 800;
   letter-spacing: 1.5px;
   /* Debe medir EXACTAMENTE igual que la palabra real que va a ocupar el hueco */
-  font-size: var(--word-font-size-phrase, 26px);
+  font-size: var(--word-font-size-phrase, 62px);
   visibility: hidden;
   pointer-events: none;
 }
@@ -3086,13 +3139,15 @@ textarea {
   border: 1px solid var(--accent-1-mid);
   border-top-width: 2px;
   border-radius: 3px;
-  box-shadow: 0 0 22px var(--accent-1-soft), inset 0 0 26px rgba(0, 0, 0, .5);
+  /* COBRE + GLOW: el marco y el resplandor salen del acento de la paleta. */
+  box-shadow: 0 0 30px var(--accent-1-mid), 0 0 70px var(--accent-1-soft), inset 0 0 26px rgba(0, 0, 0, .5);
 }
 .idle-cta-kicker {
   font-family: var(--font-cyber);
   font-size: 10.5px;
   letter-spacing: .3em;
   color: var(--accent-1-strong);
+  text-shadow: 0 0 10px var(--accent-1-mid);
   text-transform: uppercase;
 }
 .idle-cta-title {
@@ -3126,3 +3181,19 @@ textarea {
   50%      { opacity: 1;  text-shadow: 0 0 20px var(--accent-1-mid); }
 }
 @keyframes idleCtaDot { 0%, 100% { opacity: .18; } 50% { opacity: .95; } }
+
+/* ---------------------------------------------------------------------------
+   TINTE DE PALETA DE LOS MONITORES PiP (depth map + biometría facial)
+   Cambia el TONO y conserva la luminancia de la imagen (mix-blend-mode: color).
+   El color y la opacidad los escribe aplicarTintePaletaPips() con la paleta
+   global del GLOBALSTYLE y el slider TINTE DE LOS MONITORES (MASTER OUTPUT SHADER).
+   --------------------------------------------------------------------------- */
+.pip-paleta-tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: color;
+  background: #ffffff;
+  opacity: 0;
+  z-index: 3;
+}

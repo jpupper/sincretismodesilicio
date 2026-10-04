@@ -78,6 +78,7 @@ app.post('/api/game-config', (req, res) => {
     }
 
     fs.writeFileSync(configFilePath, JSON.stringify(newConfig, null, 2), 'utf-8');
+    registrarJsonGuardado('CONFIG DEL JUEGO (game-config)', configFilePath, newConfig);
     return res.json({ success: true, message: 'Configuración guardada correctamente', config: newConfig });
   } catch (err) {
     console.error('Error al escribir game_config.json:', err);
@@ -157,6 +158,7 @@ app.post('/api/clusters', (req, res) => {
     }
 
     fs.writeFileSync(clustersFilePath, JSON.stringify(clusters, null, 2), 'utf-8');
+    registrarJsonGuardado('BIBLIOTECA DE CLUSTERS', clustersFilePath, clusters);
     return res.json({ success: true, message: 'Clusters guardados correctamente', clusters });
   } catch (err) {
     console.error('Error al escribir user_clusters.json:', err);
@@ -266,6 +268,7 @@ app.post('/api/clusters', (req, res) => {
     }
     const clustersPath = path.join(publicPath, 'data', 'user_clusters.json');
     fs.writeFileSync(clustersPath, JSON.stringify(clusters, null, 2), 'utf-8');
+    registrarJsonGuardado('BIBLIOTECA DE CLUSTERS', clustersPath, clusters);
     return res.json({ success: true, count: clusters.length });
   } catch (err) {
     console.error('Error al guardar clusters:', err);
@@ -304,6 +307,112 @@ app.get(['/log', '/log.html'], (req, res) => {
 });
 
 // Universo 3D por Cúmulos (Neuronas & Sinapsis standalone)
+// API: DISENO GLOBAL (GLOBALSTYLE) -------------------------------------------------
+// Un solo lugar decide tipografia, paleta y contenedores de TODAS las paginas.
+// Lo edita /globalstyle.html y lo lee cada pagina con js/global-style.js.
+const globalStylePath = path.join(publicPath, 'data', 'global_style.json');
+
+app.get('/api/global-style', (req, res) => {
+  try {
+    if (!fs.existsSync(globalStylePath)) return res.json({});
+    return res.json(JSON.parse(fs.readFileSync(globalStylePath, 'utf-8')));
+  } catch (err) {
+    console.error('Error al leer global_style.json:', err);
+    return res.status(500).json({ error: 'Error al leer el diseno global' });
+  }
+});
+
+app.post('/api/global-style', (req, res) => {
+  try {
+    const cfg = req.body;
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
+      return res.status(400).json({ error: 'Formato de diseno invalido' });
+    }
+    fs.writeFileSync(globalStylePath, JSON.stringify(cfg, null, 2), 'utf-8');
+    registrarJsonGuardado('DISENO GLOBAL (globalstyle)', globalStylePath, cfg);
+    if (typeof broadcastGlobalStyle === 'function') {
+      broadcastGlobalStyle(cfg);
+    }
+    return res.json({ ok: true, config: cfg });
+  } catch (err) {
+    console.error('Error al escribir global_style.json:', err);
+    return res.status(500).json({ error: 'Error al guardar el diseno global' });
+  }
+});
+
+// ============================================================================
+// REGISTRO DE JSONs GUARDADOS
+// ----------------------------------------------------------------------------
+// Cada vez que el server ESCRIBE un JSON de configuración, se anota acá: qué
+// archivo, cuándo, cuántos bytes y el contenido completo. Vive en
+// public/data/jsons_guardados.json y se ve lindo en /jsons.html
+// (GET /api/jsons-guardados devuelve el mismo contenido).
+// ============================================================================
+const registroJsonsPath = path.join(publicPath, 'data', 'jsons_guardados.json');
+
+function registrarJsonGuardado(etiqueta, filePath, datos, opciones) {
+  const semilla = !!(opciones && opciones.semilla);
+  try {
+    let reg = { actualizado: null, total: 0, archivos: [] };
+    if (fs.existsSync(registroJsonsPath)) {
+      try {
+        const leido = JSON.parse(fs.readFileSync(registroJsonsPath, 'utf-8'));
+        if (leido && typeof leido === 'object') reg = leido;
+      } catch (e) { /* registro corrupto: se rehace */ }
+    }
+    if (!Array.isArray(reg.archivos)) reg.archivos = [];
+    const json = JSON.stringify(datos, null, 2);
+    // En modo SEMILLA (arranque del server) la fecha es la del archivo en disco y
+    // no cuenta como "guardado": sólo queda listado para /jsons.html.
+    let fecha = new Date().toISOString();
+    if (semilla) {
+      try { fecha = fs.statSync(filePath).mtime.toISOString(); } catch (e) {}
+    }
+    const entrada = {
+      etiqueta: etiqueta,
+      archivo: path.basename(filePath),
+      ruta: '/' + path.relative(publicPath, filePath).split(path.sep).join('/'),
+      bytes: Buffer.byteLength(json, 'utf-8'),
+      guardado: fecha,
+      versiones: 0,
+      json: datos
+    };
+    const i = reg.archivos.findIndex((a) => a.archivo === entrada.archivo);
+    if (i >= 0) {
+      entrada.versiones = semilla ? (reg.archivos[i].versiones || 0) : (reg.archivos[i].versiones || 0) + 1;
+      reg.archivos[i] = entrada;
+    } else {
+      reg.archivos.push(entrada);
+    }
+    reg.total = reg.archivos.length;
+    reg.actualizado = entrada.guardado;
+    reg.archivos.sort((a, b) => String(a.archivo).localeCompare(String(b.archivo)));
+    fs.writeFileSync(registroJsonsPath, JSON.stringify(reg, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Registro JSON] no se pudo actualizar:', e.message);
+  }
+}
+
+app.get('/api/jsons-guardados', (req, res) => {
+  try {
+    if (!fs.existsSync(registroJsonsPath)) {
+      return res.json({ actualizado: null, total: 0, archivos: [] });
+    }
+    return res.json(JSON.parse(fs.readFileSync(registroJsonsPath, 'utf-8')));
+  } catch (err) {
+    console.error('Error al leer el registro de JSONs:', err);
+    return res.status(500).json({ error: 'Error al leer el registro de JSONs' });
+  }
+});
+
+app.get(['/jsons', '/jsons.html'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'jsons.html'));
+});
+
+app.get(['/globalstyle', '/globalstyle.html'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'globalstyle.html'));
+});
+
 app.get(['/cosmos-clusters', '/cosmos-clusters.html', '/clusters3d', '/cosmos3d'], (req, res) => {
   res.sendFile(path.join(publicPath, 'cosmos-clusters.html'));
 });
@@ -314,37 +423,62 @@ app.get(['/cosmos-clusters', '/cosmos-clusters.html', '/clusters3d', '/cosmos3d'
 const rootConfigPath = path.join(__dirname, 'config.json');
 
 const defaultWordsPool = [
-  'amor', 'nostalgia', 'fragilidad', 'ternura', 'abrazo', 
-  'recuerdo', 'latido', 'suspiro', 'silencio', 'alma', 
-  'caricia', 'esperanza', 'anhelo', 'piel', 'lágrima', 
-  'respirar', 'cuerpo', 'deseo', 'infancia', 'duelo', 
-  'poesía', 'mirada', 'calidez', 'intimidad', 'olvido', 
-  'consuelo', 'vulnerabilidad', 'sueño', 'tiempo', 'perdón',
-  'beso', 'aliento', 'herida', 'sangre', 'soledad', 
-  'refugio', 'susurro', 'ausencia', 'presencia', 'memoria', 
-  'origen', 'raíz', 'viento', 'sombra', 'luz', 
-  'calma', 'espera', 'paciencia', 'ansiedad', 'miedo', 
-  'valentía', 'inocencia', 'vértigo', 'pesar', 'gozo', 
-  'tristeza', 'alegría', 'pasión', 'temblor', 'desvelo', 
-  'añoranza', 'apego', 'desapego', 'vínculo', 'orilla', 
-  'horizonte', 'ceniza', 'fuego', 'océano', 'abismo', 
-  'secreto', 'confianza', 'lealtad', 'paz', 'grito', 
-  'eco', 'huella', 'camino', 'viaje', 'regreso', 
-  'partida', 'despedida', 'encuentro', 'distancia', 'cercanía', 
-  'contacto', 'tacto', 'aroma', 'sabor', 'estación', 
-  'otoño', 'invierno', 'primavera', 'lluvia', 'rocío', 
-  'niebla', 'aurora', 'atardecer', 'crepúsculo', 'noche', 
-  'madrugada', 'despertar', 'humano', 'mortal', 'efímero', 
-  'eterno', 'cicatriz', 'grieta', 'destino', 'azar', 
-  'fortuna', 'casualidad', 'búsqueda', 'hallazgo', 'pérdida', 
-  'promesa', 'juramento', 'fe', 'duda', 'certeza', 
-  'verdad', 'belleza', 'imperfección', 'piedad', 'empatía', 
-  'compasión', 'dolor', 'alivio', 'resguardo', 'cobijo', 
-  'latir', 'sentir', 'vivir', 'morir', 'renacer', 
-  'creer', 'llorar', 'reír', 'amar', 'recordar', 
-  'olvidar', 'sanar', 'cuidar', 'pertenencia', 'caridad', 
-  'melancolía', 'cobardía', 'asombro', 'gratitud', 'desamparo', 
-  'candor', 'suspicacia', 'reconciliación', 'redención'
+  "política", "izquierda", "derecha", "fascismo", "comunismo", "gobierno",
+  "estado", "democracia", "ideología", "justicia", "ley", "soberanía",
+  "república", "autoridad", "libertad", "imperio", "perro", "gato",
+  "elefante", "tigre", "león", "caballo", "lobo", "águila",
+  "ballena", "delfín", "oso", "serpiente", "halcón", "zorro",
+  "ciervo", "pantera", "existencia", "tiempo", "filosofía", "mente",
+  "alma", "verdad", "conciencia", "universo", "destino", "razón",
+  "muerte", "infinito", "ética", "esencia", "duda", "conocimiento",
+  "computadora", "robot", "código", "algoritmo", "futuro", "silicio",
+  "red", "memoria", "procesador", "sistema", "inteligencia", "interfaz",
+  "servidor", "cibernética", "datos", "enlace", "amor", "nostalgia",
+  "ternura", "tristeza", "alegría", "fragilidad", "esperanza", "miedo",
+  "anhelo", "soledad", "duelo", "calma", "pasión", "desvelo",
+  "empatía", "consuelo", "verso", "metáfora", "ritmo", "silencio",
+  "belleza", "poema", "sombra", "eco", "espejo", "misterio",
+  "ceniza", "aurora", "abismo", "origen", "creación", "armonía",
+  "bosque", "río", "montaña", "océano", "viento", "lluvia",
+  "raíz", "tierra", "semilla", "flor", "cielo", "hoja",
+  "tormenta", "desierto", "nieve", "sol", "transhumanismo", "extropianismo",
+  "singularidad", "singularitarismo", "cosmismo", "racionalismo", "altruismo", "largoterminismo",
+  "aceleracionismo", "tecnoptimismo", "tecnoutopía", "posthumanismo", "superinteligencia", "agi",
+  "existencial", "extinción", "colonización", "inmortalidad", "mejoramiento", "criónica",
+  "abundancia", "inevitable", "progreso", "disrupción", "disruptivo", "escalar",
+  "escalabilidad", "hipercrecimiento", "ecosistema", "plataforma", "foso", "efecto",
+  "exponencial", "palanca", "pivote", "unicornio", "decacornio", "viable",
+  "monetización", "tracción", "adopción", "expansión", "velocidad", "dominio",
+  "centralización", "monopolio", "dato", "modelo", "fundación", "inferencia",
+  "entrenamiento", "alineación", "mundo", "mejorar", "romper", "malvado",
+  "equis", "grindset", "hustle", "moonshot", "frontera", "misión",
+  "global", "descentralización", "visión", "revolución", "tecnócrata", "tecnomagnate",
+  "magnate", "oligarca", "gurú", "visionario", "fundador", "inversor",
+  "capital", "mecenas", "emporio", "tirano", "neolengua", "viejalengua",
+  "doblepensar", "bipensar", "ideadelito", "crimen", "policía", "negroblanco",
+  "pato", "despersonalizado", "agujero", "telepantalla", "ministerio", "hermano",
+  "bueno", "doble", "ingsoc", "cinco", "orwelliano", "ortodoxia",
+  "heterodoxia", "banear", "suspensión", "desmonetizar", "despriorizar", "marcado",
+  "sensible", "directrices", "odio", "desinformación", "bulo", "deepfake",
+  "verificación", "filtro", "bloqueo", "restricción", "reporte", "apelación",
+  "moderador", "bot", "desvivir", "morir", "seggs", "panini",
+  "pandemia", "maquillaje", "contabilidad", "maíz", "uva", "bean",
+  "algospeak", "autocensura", "eufemismo", "clave", "disfraz", "camuflaje",
+  "voldemorting", "captura", "netspeak", "índice", "prohibido", "excomunión",
+  "quema", "herejía", "blasfemia", "tabú", "veto", "prohibida",
+  "cortafuegos", "sensibilidad", "control", "exclusión", "censurar", "tachar",
+  "borrar", "silenciar", "clausurar", "prohibición", "cibersoberanía", "autonomía",
+  "autarquía", "dependencia", "resiliencia", "infraestructura", "jurisdicción", "regulación",
+  "gobernanza", "cumplimiento", "marco", "normativa", "responsable", "confiable",
+  "humanismo", "enfoque", "riesgo", "algorítmico", "auditoría", "caja",
+  "opacidad", "transparencia", "explicabilidad", "sesgo", "discriminación", "rendición",
+  "supervisión", "conformidad", "aceptable", "alto", "inaceptable", "transformación",
+  "digitalización", "modernización", "innovación", "competitividad", "eficiencia", "productividad",
+  "economía", "sociedad", "industria", "sostenible", "inclusión", "brecha",
+  "ciudadanía", "abierto", "agenda", "talento", "liderazgo", "usuario",
+  "ciudadano", "contribuyente", "beneficiario", "perfil", "identidad", "expediente",
+  "trámite", "pasaporte", "biometría", "padrón", "registro", "puntuación",
+  "score", "crédito", "legajo", "formulario"
 ];
 
 const defaultHijackConfig = {
@@ -364,6 +498,7 @@ app.get('/config', (req, res) => {
       return res.json(parsed);
     }
     fs.writeFileSync(rootConfigPath, JSON.stringify(defaultHijackConfig, null, 2), 'utf-8');
+    registrarJsonGuardado('CONFIG DEL JUEGO (raiz, defaults)', rootConfigPath, defaultHijackConfig);
     return res.json(defaultHijackConfig);
   } catch (err) {
     console.error('[API /config] Error al leer config.json:', err);
@@ -418,6 +553,7 @@ app.post('/config', (req, res) => {
     }
 
     fs.writeFileSync(rootConfigPath, JSON.stringify(mergedConfig, null, 2), 'utf-8');
+    registrarJsonGuardado('CONFIG DEL JUEGO (raiz)', rootConfigPath, mergedConfig);
     console.log('[API /config] config.json actualizado físicamente en raíz. Modelo:', mergedConfig.ollamaModel, 'Palabras:', mergedConfig.wordsPool.length);
     return res.json({ success: true, message: 'Configuración guardada físicamente en config.json', config: mergedConfig });
   } catch (err) {
@@ -939,18 +1075,39 @@ function broadcastClientCount() {
   }
 }
 
+function broadcastGlobalStyle(cfg) {
+  try {
+    const payload = JSON.stringify({ type: 'globalstyle:update', config: cfg, timestamp: Date.now() });
+    for (const client of wsClients) {
+      if (client.readyState === WebSocket.OPEN) client.send(payload);
+    }
+  } catch (e) {
+    console.warn('[WebSocket] Error al emitir globalstyle:update:', e.message);
+  }
+}
+
 wss.on('connection', (ws, req) => {
   wsClients.add(ws);
   console.log(`[WebSocket] Cliente conectado (${wsClients.size} activos) desde ${req.socket.remoteAddress}`);
 
   try {
     ws.send(JSON.stringify({ type: 'server:welcome', clients: wsClients.size, timestamp: Date.now() }));
+    if (fs.existsSync(globalStylePath)) {
+      const currentGlobalStyle = JSON.parse(fs.readFileSync(globalStylePath, 'utf-8'));
+      ws.send(JSON.stringify({ type: 'globalstyle:update', config: currentGlobalStyle, timestamp: Date.now() }));
+    }
   } catch (e) {}
   broadcastClientCount();
 
   ws.on('message', (message) => {
     try {
       const parsed = JSON.parse(message.toString());
+      if (parsed.type === 'globalstyle:update' && parsed.config) {
+        try {
+          fs.writeFileSync(globalStylePath, JSON.stringify(parsed.config, null, 2), 'utf-8');
+          registrarJsonGuardado('DISENO GLOBAL (globalstyle)', globalStylePath, parsed.config);
+        } catch (e) {}
+      }
       // Reenviar a todos los demás clientes conectados
       const payload = JSON.stringify(parsed);
       for (const client of wsClients) {
@@ -983,6 +1140,25 @@ server.on('error', (err) => {
     console.error('\n[ERROR en el servidor]:', err.message);
   }
 });
+
+/* SEMBRADO INICIAL DEL REGISTRO DE JSONs: al arrancar se listan los JSON de
+   configuracion que YA existen (config.json, game_config.json, user_clusters.json,
+   global_style.json), asi /jsons.html muestra todo desde el primer momento. */
+setTimeout(() => {
+  [
+    ['CONFIG DEL JUEGO (raiz)', rootConfigPath],
+    ['CONFIG DEL JUEGO (game-config)', configFilePath],
+    ['BIBLIOTECA DE CLUSTERS', clustersFilePath],
+    ['DISENO GLOBAL (globalstyle)', globalStylePath]
+  ].forEach(([etq, ruta]) => {
+    try {
+      if (fs.existsSync(ruta)) {
+        registrarJsonGuardado(etq, ruta, JSON.parse(fs.readFileSync(ruta, 'utf-8')), { semilla: true });
+      }
+    } catch (e) { /* archivo ausente o JSON invalido: se ignora */ }
+  });
+  console.log('[Registro JSON] sembrado inicial listo.');
+}, 1500);
 
 process.on('SIGINT', () => {
   console.log('\nCerrando servidor...');

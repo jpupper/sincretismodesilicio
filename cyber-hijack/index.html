@@ -8,7 +8,8 @@
   <!-- Los assets viven en ./cambiapalabras/ y son RELATIVOS a esta página: funciona
        en la raíz (/cambiapalabras.html), en subpath (/sincretismo/cambiapalabras.html)
        y en el hosting estático del FTP, sin <base> ni recompilar nada. -->
-  <script src="js/base-path.js?v=3.30"></script>
+  <script src="js/base-path.js?v=3.38"></script>
+  <script src="js/global-style.js?v=1.1"></script>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
@@ -16,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=3.30">
+  <link rel="stylesheet" href="style.css?v=3.38">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -158,6 +159,12 @@
           <kbd>U</kbd>
         </button>
 
+        <!-- Botón Diseño global (GLOBALSTYLE) -->
+        <a class="cctv-btn" id="btn-open-globalstyle" href="./globalstyle.html" target="_blank" rel="noopener noreferrer" title="Diseño global: tipografía, paleta y contenedores (se aplica en vivo)">
+          <span class="btn-icon">&#127899;</span>
+          <span>DISEÑO</span>
+        </a>
+
         <!-- Botón Log de Sucesos (solo stream de eventos) -->
         <button class="cctv-btn" id="btn-open-log" title="Abrir el Log de Sucesos en otra ventana (Tecla O)">
           <span class="btn-icon">📜</span>
@@ -199,10 +206,8 @@
     <!-- Capa 5: Call to action por inactividad (nadie tocó nada en 12 s) -->
     <div id="idle-cta" class="idle-cta hidden">
       <div class="idle-cta-frame">
-        <div class="idle-cta-kicker">◈ SECUESTRO CIBERNÉTICO · SALA EN ESPERA</div>
-        <div class="idle-cta-title">ELEGÍ TU PALABRA PARA FORMAR TU HAIKU VIRTUAL</div>
-        <div class="idle-cta-sub">Sostené la mano o el cursor sobre una palabra flotante hasta capturarla ·
-          tres palabras y la máquina escribe el haiku en tu lugar</div>
+        <div class="idle-cta-kicker">ESTADO : ESPERANDO INPUT DEL USUARIO</div>
+        <div class="idle-cta-title">OBJETIVO : MOVER LOS PUNTOS DE TRACKEO HACIA LAS PALABRAS</div>
         <div class="idle-cta-dots"><span></span><span></span><span></span></div>
       </div>
     </div>
@@ -252,6 +257,7 @@
       </div>
       <div class="pip-canvas-wrapper">
         <canvas id="depth-map-canvas" width="240" height="160"></canvas>
+        <div class="pip-paleta-tint" id="depth-pip-tint"></div>
         <div class="pip-scanline"></div>
         <div class="pip-overlay-meta">
           <div class="meta-row"><span>COBERTURA:</span><span id="depth-meta-coverage">0%</span></div>
@@ -277,6 +283,7 @@
       </div>
       <div class="pip-canvas-wrapper">
         <canvas id="face-cam-canvas" width="220" height="220"></canvas>
+        <div class="pip-paleta-tint" id="face-pip-tint"></div>
         <div class="pip-scanline"></div>
         <div class="face-target-corners">
           <span class="fc fc-tl"></span><span class="fc fc-tr"></span>
@@ -338,6 +345,10 @@
           <button type="button" class="modal-tab-btn" data-tab="tab-particles">
             <span class="tab-icon">✨</span>
             <span class="tab-text">PARTÍCULAS</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-masterrdm">
+            <span class="tab-icon">🌀</span>
+            <span class="tab-text">MASTER OUTPUT SHADER</span>
           </button>
           <button type="button" class="modal-tab-btn" data-tab="tab-colors">
             <span class="tab-icon">🎨</span>
@@ -547,8 +558,8 @@
                     <strong>Graficar Articulaciones / Huesos</strong>
                   </label>
                   <div class="calib-subslider">
-                    <label for="cfg-track-bone-width">Grosor de líneas: <span id="val-track-bone-width">4</span>px</label>
-                    <input type="range" id="cfg-track-bone-width" min="1" max="10" step="1" value="4">
+                    <label for="cfg-track-bone-width">Grosor de líneas (px): <span id="val-track-bone-width">0.5</span></label>
+                    <input type="range" id="cfg-track-bone-width" min="0.25" max="5" step="0.25" value="0.5">
                   </div>
                 </div>
 
@@ -559,8 +570,8 @@
                     <strong>Graficar Puntos del Cuerpo (33 Nodos)</strong>
                   </label>
                   <div class="calib-subslider">
-                    <label for="cfg-track-point-radius">Radio de articulación: <span id="val-track-point-radius">5</span>px</label>
-                    <input type="range" id="cfg-track-point-radius" min="2" max="14" step="1" value="5">
+                    <label for="cfg-track-point-radius">Radio de articulación (px): <span id="val-track-point-radius">0.75</span></label>
+                    <input type="range" id="cfg-track-point-radius" min="0.5" max="7" step="0.25" value="0.75">
                   </div>
                 </div>
 
@@ -1195,13 +1206,13 @@
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-part-fontsize-center"><strong>Tamaño en el CENTRO</strong> (girando y transformándose): <span id="val-part-fontsize-center">38</span>px</label>
-                  <input type="range" id="cfg-part-fontsize-center" min="12" max="140" step="1" value="38">
+                  <label for="cfg-part-fontsize-center"><strong>Tamaño en el CENTRO</strong> (girando y transformándose): <span id="val-part-fontsize-center">52</span>px</label>
+                  <input type="range" id="cfg-part-fontsize-center" min="12" max="140" step="1" value="52">
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-part-fontsize-phrase"><strong>Tamaño en la FRASE FINAL</strong>: <span id="val-part-fontsize-phrase">26</span>px</label>
-                  <input type="range" id="cfg-part-fontsize-phrase" min="10" max="90" step="1" value="26">
+                  <label for="cfg-part-fontsize-phrase"><strong>Tamaño en la FRASE FINAL</strong>: <span id="val-part-fontsize-phrase">62</span>px</label>
+                  <input type="range" id="cfg-part-fontsize-phrase" min="10" max="90" step="1" value="62">
                   <small class="item-desc">Las palabras auxiliares de la frase se escalan al 86% de este valor.</small>
                 </div>
 
@@ -1259,6 +1270,20 @@
           </div>
 
           <!-- TAB 7: COLORES GLOBALES DE LA INTERFAZ -->
+          <div class="modal-tab-pane" id="tab-masterrdm">
+            <div class="particles-controls-card">
+              <div class="section-subtitle">
+                <span>🌀 MASTER OUTPUT SHADER · PATRÓN RDM DEL FONDO + PALETA UNIFICADA</span>
+              </div>
+              <p class="words-help-text">
+                El fondo de las <strong>cajas de palabras</strong> y del <strong>contenedor del HAIKU</strong> ya no es un FBM:
+                es el patrón <em>random multi-capa</em> del shader <strong>rdmf</strong> de jpShadereditor.
+                Los deslizadores son los <strong>uniformes de FORMA</strong> de ese shader, en su escala real.
+                El <strong>COLOR</strong> arranca en blanco. Se guarda solo en este navegador (localStorage).
+              </p>
+              <div class="calibration-grid" id="masterrdm-grid"></div>
+            </div>
+          </div>
           <div class="modal-tab-pane" id="tab-colors">
             <div class="ascii-controls-card">
               <div class="section-subtitle"><span>🎚️ PALETAS GLOBALES (3 COLORES)</span></div>
@@ -1348,6 +1373,6 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=3.30"></script>
+  <script src="script.js?v=3.38"></script>
 </body>
 </html>

@@ -34,45 +34,67 @@ const STATES = {
 };
 
 const DEFAULT_WORDS_POOL = [
-  // 30 palabras fundacionales
-  'amor', 'nostalgia', 'fragilidad', 'ternura', 'abrazo', 
-  'recuerdo', 'latido', 'suspiro', 'silencio', 'alma', 
-  'caricia', 'esperanza', 'anhelo', 'piel', 'lágrima', 
-  'respirar', 'cuerpo', 'deseo', 'infancia', 'duelo', 
-  'poesía', 'mirada', 'calidez', 'intimidad', 'olvido', 
-  'consuelo', 'vulnerabilidad', 'sueño', 'tiempo', 'perdón',
-
-  // 124 palabras humanas orgánicas adicionales
-  'beso', 'aliento', 'herida', 'sangre', 'soledad', 
-  'refugio', 'susurro', 'ausencia', 'presencia', 'memoria', 
-  'origen', 'raíz', 'viento', 'sombra', 'luz', 
-  'calma', 'espera', 'paciencia', 'ansiedad', 'miedo', 
-  'valentía', 'inocencia', 'vértigo', 'pesar', 'gozo', 
-  'tristeza', 'alegría', 'pasión', 'temblor', 'desvelo', 
-  'añoranza', 'apego', 'desapego', 'vínculo', 'orilla', 
-  'horizonte', 'ceniza', 'fuego', 'océano', 'abismo', 
-  'secreto', 'confianza', 'lealtad', 'paz', 'grito', 
-  'eco', 'huella', 'camino', 'viaje', 'regreso', 
-  'partida', 'despedida', 'encuentro', 'distancia', 'cercanía', 
-  'contacto', 'tacto', 'aroma', 'sabor', 'estación', 
-  'otoño', 'invierno', 'primavera', 'lluvia', 'rocío', 
-  'niebla', 'aurora', 'atardecer', 'crepúsculo', 'noche', 
-  'madrugada', 'despertar', 'humano', 'mortal', 'efímero', 
-  'eterno', 'cicatriz', 'grieta', 'destino', 'azar', 
-  'fortuna', 'casualidad', 'búsqueda', 'hallazgo', 'pérdida', 
-  'promesa', 'juramento', 'fe', 'duda', 'certeza', 
-  'verdad', 'belleza', 'imperfección', 'piedad', 'empatía', 
-  'compasión', 'dolor', 'alivio', 'resguardo', 'cobijo', 
-  'latir', 'sentir', 'vivir', 'morir', 'renacer', 
-  'creer', 'llorar', 'reír', 'amar', 'recordar', 
-  'olvidar', 'sanar', 'cuidar', 'pertenencia', 'caridad', 
-  'melancolía', 'cobardía', 'asombro', 'gratitud', 'desamparo', 
-  'candor', 'suspicacia', 'reconciliación', 'redención'
+  "política", "izquierda", "derecha", "fascismo", "comunismo", "gobierno",
+  "estado", "democracia", "ideología", "justicia", "ley", "soberanía",
+  "república", "autoridad", "libertad", "imperio", "perro", "gato",
+  "elefante", "tigre", "león", "caballo", "lobo", "águila",
+  "ballena", "delfín", "oso", "serpiente", "halcón", "zorro",
+  "ciervo", "pantera", "existencia", "tiempo", "filosofía", "mente",
+  "alma", "verdad", "conciencia", "universo", "destino", "razón",
+  "muerte", "infinito", "ética", "esencia", "duda", "conocimiento",
+  "computadora", "robot", "código", "algoritmo", "futuro", "silicio",
+  "red", "memoria", "procesador", "sistema", "inteligencia", "interfaz",
+  "servidor", "cibernética", "datos", "enlace", "amor", "nostalgia",
+  "ternura", "tristeza", "alegría", "fragilidad", "esperanza", "miedo",
+  "anhelo", "soledad", "duelo", "calma", "pasión", "desvelo",
+  "empatía", "consuelo", "verso", "metáfora", "ritmo", "silencio",
+  "belleza", "poema", "sombra", "eco", "espejo", "misterio",
+  "ceniza", "aurora", "abismo", "origen", "creación", "armonía",
+  "bosque", "río", "montaña", "océano", "viento", "lluvia",
+  "raíz", "tierra", "semilla", "flor", "cielo", "hoja",
+  "tormenta", "desierto", "nieve", "sol", "transhumanismo", "extropianismo",
+  "singularidad", "singularitarismo", "cosmismo", "racionalismo", "altruismo", "largoterminismo",
+  "aceleracionismo", "tecnoptimismo", "tecnoutopía", "posthumanismo", "superinteligencia", "agi",
+  "existencial", "extinción", "colonización", "inmortalidad", "mejoramiento", "criónica",
+  "abundancia", "inevitable", "progreso", "disrupción", "disruptivo", "escalar",
+  "escalabilidad", "hipercrecimiento", "ecosistema", "plataforma", "foso", "efecto",
+  "exponencial", "palanca", "pivote", "unicornio", "decacornio", "viable",
+  "monetización", "tracción", "adopción", "expansión", "velocidad", "dominio",
+  "centralización", "monopolio", "dato", "modelo", "fundación", "inferencia",
+  "entrenamiento", "alineación", "mundo", "mejorar", "romper", "malvado",
+  "equis", "grindset", "hustle", "moonshot", "frontera", "misión",
+  "global", "descentralización", "visión", "revolución", "tecnócrata", "tecnomagnate",
+  "magnate", "oligarca", "gurú", "visionario", "fundador", "inversor",
+  "capital", "mecenas", "emporio", "tirano", "neolengua", "viejalengua",
+  "doblepensar", "bipensar", "ideadelito", "crimen", "policía", "negroblanco",
+  "pato", "despersonalizado", "agujero", "telepantalla", "ministerio", "hermano",
+  "bueno", "doble", "ingsoc", "cinco", "orwelliano", "ortodoxia",
+  "heterodoxia", "banear", "suspensión", "desmonetizar", "despriorizar", "marcado",
+  "sensible", "directrices", "odio", "desinformación", "bulo", "deepfake",
+  "verificación", "filtro", "bloqueo", "restricción", "reporte", "apelación",
+  "moderador", "bot", "desvivir", "morir", "seggs", "panini",
+  "pandemia", "maquillaje", "contabilidad", "maíz", "uva", "bean",
+  "algospeak", "autocensura", "eufemismo", "clave", "disfraz", "camuflaje",
+  "voldemorting", "captura", "netspeak", "índice", "prohibido", "excomunión",
+  "quema", "herejía", "blasfemia", "tabú", "veto", "prohibida",
+  "cortafuegos", "sensibilidad", "control", "exclusión", "censurar", "tachar",
+  "borrar", "silenciar", "clausurar", "prohibición", "cibersoberanía", "autonomía",
+  "autarquía", "dependencia", "resiliencia", "infraestructura", "jurisdicción", "regulación",
+  "gobernanza", "cumplimiento", "marco", "normativa", "responsable", "confiable",
+  "humanismo", "enfoque", "riesgo", "algorítmico", "auditoría", "caja",
+  "opacidad", "transparencia", "explicabilidad", "sesgo", "discriminación", "rendición",
+  "supervisión", "conformidad", "aceptable", "alto", "inaceptable", "transformación",
+  "digitalización", "modernización", "innovación", "competitividad", "eficiencia", "productividad",
+  "economía", "sociedad", "industria", "sostenible", "inclusión", "brecha",
+  "ciudadanía", "abierto", "agenda", "talento", "liderazgo", "usuario",
+  "ciudadano", "contribuyente", "beneficiario", "perfil", "identidad", "expediente",
+  "trámite", "pasaporte", "biometría", "padrón", "registro", "puntuación",
+  "score", "crédito", "legajo", "formulario"
 ];
 
 const DEFAULT_CONFIG = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (SIEMPRE UNA SOLA PALABRA, en mayúsculas. PROHIBIDO el guion bajo, el espacio y el guion: nada de compuestos tipo OPTIMO_LUJO o CAJA_NEGRA, se dice OPTIMO o CAJA. Si el concepto necesita dos palabras, elegí LA MÁS FUERTE y usá solo esa).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno.\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno.\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona.\nREGLA CRUCIAL DE CONEXIÓN: Los tres versos deben narrar una sola imagen poética conectada y coherente donde los tres conceptos interactúan con naturalidad. NO deben sonar a palabras forzadas ni listas inconexas.\nAntes de responder, verificá que cada uno de los 3 términos sea UNA SOLA PALABRA sin separadores (sin guion bajo, sin espacio, sin guion).\\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "Verso 1 con TERMINO1\\nVerso 2 con TERMINO2\\nVerso 3 con TERMINO3"}.',
+  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (SIEMPRE UNA SOLA PALABRA, en mayúsculas. PROHIBIDO el guion bajo, el espacio y el guion: nada de compuestos tipo OPTIMO_LUJO o CAJA_NEGRA, se dice OPTIMO o CAJA. Si el concepto necesita dos palabras, elegí LA MÁS FUERTE y usá solo esa).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (SON 3 ORACIONES Y NADA MÁS, UNA POR VERSO: NUNCA 4 ORACIONES) (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno.\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno.\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona.\nREGLA DE ORO DEL CONTEO: el haiku tiene EXACTAMENTE 3 ORACIONES, una por verso, y cada verso llega a UN SOLO punto final (sin puntos internos que lo partan en dos). Si te sale una cuarta oración, la tenés que fundir en la tercera con una coma. 4 oraciones = ERROR.\nREGLA CRUCIAL DE CONEXIÓN: Los tres versos deben narrar una sola imagen poética conectada y coherente donde los tres conceptos interactúan con naturalidad. NO deben sonar a palabras forzadas ni listas inconexas.\nAntes de responder, verificá que cada uno de los 3 términos sea UNA SOLA PALABRA sin separadores (sin guion bajo, sin espacio, sin guion).\\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "Verso 1 con TERMINO1\\nVerso 2 con TERMINO2\\nVerso 3 con TERMINO3"}.',
   wordsPool: [...DEFAULT_WORDS_POOL]
 };
 
@@ -86,6 +108,14 @@ let HUMAN_WORDS_POOL = [...DEFAULT_WORDS_POOL];
 // ============================================================================
 const IDLE_CTA_DELAY_MS = 12000;        // 12 s sin tocar nada
 const IDLE_CTA_CAMERA_MOVE_PX = 26;     // movimiento mínimo para contar en cámara
+
+// MONITORES PiP (biometría facial + depth map): no se quedan fijos en pantalla.
+// Cada uno prende y apaga SOLO, con tiempos aleatorios entre MIN y MAX segundos
+// (apagado X s -> prendido Y s -> apagado Z s ...). Con 5/30 el ritmo es "vivo":
+// aparece, te muestra los datos y se va.
+const PIP_RANDOM_MIN_S = 5;
+const PIP_RANDOM_MAX_S = 30;
+
 
 
 // Paleta global de la interfaz — controlable desde la pestaña COLORES del modal [P]
@@ -194,10 +224,19 @@ const UI_PALETTES = [
   { id: 'electric',  name: 'Azul Eléctrico',    c1: '#3b82f6', c2: '#06b6d4', c3: '#f59e0b' },
   { id: 'oxide',     name: 'Oro y Óxido',       c1: '#ffd166', c2: '#e07a5f', c3: '#3d5a80' },
   { id: 'quantum',   name: 'Rosa Cuántico',     c1: '#ff4d8d', c2: '#7c3aed', c3: '#00e0b8' },
-  { id: 'mono',      name: 'Monocromo',         c1: '#e2e8f0', c2: '#94a3b8', c3: '#64748b' }
+  { id: 'mono',      name: 'Monocromo',         c1: '#e2e8f0', c2: '#94a3b8', c3: '#64748b' },
+  /* COBRE STEAMPUNK: la misma que el diseño global (global_style.json). Es la que
+     deja en cobre los fondos/acentos: antes la "matriz" (verde) teñía el HUD,
+     los monitores PiP y el call to action. */
+  { id: 'cobre',     name: 'Cobre Steampunk',   c1: '#d46238', c2: '#dca876', c3: '#b0431c' }
 ];
 
 const DEFAULT_PALETTE_ID = 'cyan';
+
+/* Revision de los ajustes de PARTICULAS guardados en localStorage: al subirla,
+   los valores viejos de tamanos de letra se descartan y valen los nuevos
+   (2 = frase 62 px y centro 52 px). */
+const PARTICLES_REV = 2;
 
 function hexToHsl(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
@@ -353,13 +392,13 @@ const appState = {
     fontFamily: 'share-tech',
     fontSize: 16,
     color: '#ffffff',
-    outline: 1.0,
-    outlineGlow: true,
+    outline: 1.5,
+    outlineGlow: false,
     lifetime: 0,
     maxWords: 9,
     speed: 1.0,
-    fontSizeCenter: 38,
-    fontSizePhrase: 26
+    fontSizeCenter: 52,
+    fontSizePhrase: 62
   },
 
   // Shader Maestro de Salida y Frame Difference
@@ -396,14 +435,18 @@ const appState = {
   openposeFrameId: 0,
   depthFrameId: 0,
   drawStaticNoise: null,
+  // Estado del parpadeo de los monitores PiP (lo maneja updatePipAutoCycle).
+  pipCycleVisible: { face: false, depth: false },
+  pipNextToggleAt: { face: 0, depth: 0 },
+  pipCycleDisabledByUser: false,
 
   // Configuración de Tracking y Calibración
   trackingConfig: {
     showOpenPose: false,
     drawBones: true,
     drawLandmarks: true,
-    boneWidth: 4,
-    pointRadius: 5,
+    boneWidth: 0.5,
+    pointRadius: 0.75,
     minConfidence: 0.5,
     colorTheme: 'cyberpunk', // 'classic' | 'cyberpunk' | 'phosphor' | 'thermal'
     bodyCollision: true, // REQUERIMIENTO 6: Colisión multi-articular de OpenPose con palabras
@@ -1063,456 +1106,524 @@ class MasterOutputShader {
       //   editá el otro (es el respaldo cuando el fetch no puede leer el archivo).
       // ---------------------------------------------------------------------
       fsSource = `
-        precision highp float;
-
-        // ============================================================================
-        // SHADER MAESTRO DE SALIDA (MASTER OUTPUT SHADER)
-        // ============================================================================
-        // 1) Render de la Cámara
-        uniform sampler2D u_cameraTexture;
-        uniform int u_hasCamera;
-
-        // 2) Render del Depth Map / Segmentación
-        uniform sampler2D u_depthTexture;
-        uniform int u_hasDepth;
-
-        // 3) Render de la Silueta / Overlay OpenPose
-        uniform sampler2D u_openposeTexture;
-        uniform int u_hasOpenpose;
-        uniform float u_openposeOpacity;
-
-        // 3b) Render de Vectores de Campo de Flujo (Flow Field)
-        uniform sampler2D u_flowfieldTexture;
-        uniform int u_hasFlowfield;
-        uniform float u_flowfieldOpacity;
-
-        // 4) Array con las posiciones normalizadas de las palabras en pantalla (UV: 0.0 a 1.0)
-        #define MAX_WORDS 32
-        uniform vec2 u_wordPositions[MAX_WORDS];
-        // Ancho REAL de cada palabra en UV x (px/ancho de pantalla). 0 = sin dato:
-        // en ese caso el marco usa el ancho fijo de WORD_BOX_X.
-        uniform float u_wordWidths[MAX_WORDS];
-        uniform int u_wordCount;
-
-        uniform sampler2D renderJPSHADER;
-
-        // 5) Estados activos del sistema:
-        //    u_activeState (0: IDLE, 1: PROCESSING/THINKING, 2: HIJACK/HAIKU)
-        //    u_stateWeights (vec3 interpolado continuo: x=IDLE, y=THINKING, z=HAIKU)
-        uniform int u_activeState;
-        uniform vec3 u_stateWeights;
-
-        // Uniforms de Control de GLITCH (Mismos parámetros que en LOG)
-        uniform float glitchAmount;
-        uniform float blockIntensity;
-        uniform float blockSize;
-        uniform float chromaIntensity;
-        uniform float vhsNoiseIntensity;
-        uniform float edgeTearingIntensity;
-
-        // Uniforms de resolución y tiempo
-        uniform vec2 u_resolution;
-        uniform float u_time;
-        #define pi 3.14159265359
-
-        // ---------------------------------------------------------------------------
-        // AJUSTES RÁPIDOS (editá acá y apretá R para recompilar en vivo)
-        // ---------------------------------------------------------------------------
-        // ANCHO de los contenedores de las palabras:
-        //   1.0 = cuadrado · 0.55 = 1.8x MÁS ANCHO · 0.40 = 2.5x MÁS ANCHO
-        #define WORD_BOX_X        0.55
-
-        // Tamaño del contenedor del HAIKU (media medida, en UV)
-        #define HAIKU_BOX_W       0.40
-        #define HAIKU_BOX_H       0.21
-
-        // Margen (en UV) alrededor del marco del haiku que queda INMUNE al glitch
-        #define HAIKU_IMMUNE_PAD  0.030
-
-        // VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
-        // Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
-        #define WORD_SPIN_SPEED   0.32
-
-        // Margen del marco alrededor del ancho real de la palabra (1.0 = exacto)
-        #define WORD_BOX_PAD      1.06
-
-        // CONTENEDOR DEL HAIKU: el interior es OPACO (el fondo NO se ve nunca) y ROJO.
-        // HAIKU_BG_TOP/BOT = relleno del cuadrado (rojo con profundidad).
-        // Si lo querés NEGRO PURO: vec3(0.0) en los dos.
-        // HAIKU_LINE_COL = la línea del marco (rojo claro, para que se lea sobre el rojo).
-        #define HAIKU_BG_TOP      vec3(0.05, 0.95, 0.30)
-        #define HAIKU_BG_BOT      vec3(0.004, 0.34, 0.10)
-        #define HAIKU_LINE_COL    vec3(0.55, 1.0, 0.62)
-        #define HAIKU_GLOW_COL    vec3(0.05, 0.92, 0.35)
-
-        // Función de ruido base pseudo-aleatorio
-        float rand(vec2 co){
-            return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-        }
-
-        // -----------------------------------------------------------------
-        // FORMAS POLIGONALES Y PALABRAS
-        // -----------------------------------------------------------------
-        float poly(vec2 uv, vec2 p, float s, float dif, int N, float a){
-            vec2 st = p - uv;
-            float a2 = atan(st.x, st.y) + a;
-            float r = pi * 2.0 / float(N);
-            float d = cos(floor(0.5 + a2 / r) * r - a2) * length(st);
-            float e = 1.0 - smoothstep(s, dif, d);
-            return e;
-        }
-
-        vec4 getWords(vec2 uv, float animPulse){
-            float t = u_time * (1.0 + animPulse * 1.5);
-            vec4 wordsEffect = vec4(0.0);
-            float fx = u_resolution.x / u_resolution.y;
-
-            for (int i = 0; i < MAX_WORDS; i++) {
-                if (i >= u_wordCount) break;
-                vec2 wPos = u_wordPositions[i];
-
-                vec2 uv2 = uv;
-                vec2 diff = (uv2 - wPos) * vec2(fx, 1.0);
-                float r = length(diff);
-
-                float s = mix(0.07, 0.12, animPulse);
-                float d = mix(0.07, 0.12, animPulse);
-
-                float e = 1.0 - smoothstep(s, s + d, r);
-                wordsEffect += e * 0.5;
-            }
-            return wordsEffect;
-        }
-
-        // Contenedores de las palabras (marcos).
-        // (c) AHORA SON MÁS ANCHOS: el eje X se comprime por WORD_BOX_X antes de
-        // evaluar el polígono, así el marco se estira horizontalmente alrededor de la
-        // palabra (el eje Y no se toca).
-        vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
-            // Giro MUCHO más lento: antes (1.0 + 2*animPulse) = hasta 3.0 rad/s.
-            float t = u_time * WORD_SPIN_SPEED * (1.0 + animPulse);
-            vec4 wordsEffect = vec4(0.0);
-            float fx = u_resolution.x / u_resolution.y;
-
-            for (int i = 0; i < MAX_WORDS; i++) {
-                if (i >= u_wordCount) break;
-                vec2 wPos = u_wordPositions[i];
-
-                float s = _s * (1.0 + animPulse * 0.35);
-                // grosor del trazo: nunca 0 (smoothstep con bordes iguales es indefinido
-                // y en algunos drivers el marco desaparecía por completo)
-                float d = max(_d, s * 0.10) * (1.0 + animPulse * 0.35);
-
-                // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
-                // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
-                float wAncho = u_wordWidths[i] * WORD_BOX_PAD;
-                float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
-                // uv_m = uv con el eje X comprimido alrededor de la palabra
-                vec2 uv_m = wPos + (uv - wPos) * vec2(kx, 1.0);
-
-                float e = poly(uv_m, wPos, s, s + d, 4, animPulse * sin(t + float(i)));
-                e -= poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, animPulse * sin(t + float(i)));
-
-                wordsEffect += e;
-            }
-            return wordsEffect;
-        }
-
-        // -----------------------------------------------------------------
-        // CONTENEDOR (MARCO CIBERNÉTICO) DEL HAIKU EN SHADER
-        // Se dibuja detrás del Haiku e interpola fluidamente con los 3 estados.
-        // La geometría se calcula SIEMPRE con la UV SIN GLITCH (rawUv): así el marco
-        // nunca se deforma y define una zona inmune que no se glitchea.
-        // -----------------------------------------------------------------
-        struct HaikuBox {
-            float presence;   // 0 en IDLE, sube en THINKING (escaneo), pleno en HAIKU
-            vec2  size;       // semitamaño del marco en UV
-            vec2  p;          // uv relativa al centro de pantalla
-            vec2  d;          // distancia por eje al borde (negativa = adentro)
-            float boxDist;    // distancia al contorno (0 = sobre el borde)
-            float inside;     // 1.0 adentro, 0.0 afuera
-        };
-
-        HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
-            HaikuBox b;
-            // SOLO cuando se está formando el haiku (estado HAIKU = weights.z). Antes de
-            // eso (THINKING: palabras girando y cambiando) el contenedor NO existe.
-            b.presence = clamp(weights.z, 0.0, 1.0);
-
-            float aspect = u_resolution.x / u_resolution.y;
-            vec2 targetSize = vec2(HAIKU_BOX_W, HAIKU_BOX_H);
-            b.size = targetSize * mix(0.70, 1.0, b.presence);
-
-            b.p = uv - vec2(0.5, 0.5);
-            b.d = abs(b.p) - b.size;
-            b.boxDist = max(b.d.x * aspect, b.d.y);
-            b.inside = (b.d.x < 0.0 && b.d.y < 0.0) ? 1.0 : 0.0;
-            return b;
-        }
-
-        // Zona INMUNE AL GLITCH: 1.0 dentro del marco (y su margen), 0.0 afuera.
-        // IMPORTANTE: NO se multiplica por 'presence'. La inmunidad es GEOMÉTRICA: donde
-        // el marco está dibujado, las UVs son SIEMPRE limpio (rawUv) — antes, con
-        // presence=0.55 (THINKING) sólo se corregía el 55% del desplazamiento y el
-        // contenedor entraba a pantalla ya con las UVs movidas por el glitch.
-        float getHaikuImmuneZone(vec2 uv, vec3 weights) {
-            HaikuBox b = haikuBoxAt(uv, weights);
-            if (b.presence < 0.005) return 0.0;
-            float zone = 1.0 - smoothstep(0.0, HAIKU_IMMUNE_PAD, b.boxDist);
-            return zone;
-        }
-
-        vec4 getHaikuContainer(vec2 uv, vec3 weights) {
-            HaikuBox b = haikuBoxAt(uv, weights);
-            if (b.presence < 0.005) return vec4(0.0);
-            if (b.boxDist > 0.08) return vec4(0.0);
-
-            float wThink = weights.y;
-            float wHaiku = weights.z;
-            float aspect = u_resolution.x / u_resolution.y;
-
-            vec4 outColor = vec4(0.0);
-
-            // 1. Fondo interior del contenedor (vidrio ahumado silicio + matriz)
-            if (b.inside > 0.5) {
-                // Rejilla de silicio holográfica interna
-                vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.04, 0.0));
-                float gridLine = (step(0.90, gridUv.x) + step(0.90, gridUv.y)) * 0.16;
-
-                // Barras de escaneo horizontal sutil
-                float scan = sin(uv.y * 140.0 + u_time * 6.0) * 0.05 * (wThink + 0.2);
-
-                // Relleno del contenedor: ROJO (degradado vertical suave).
-                vec3 bg = mix(HAIKU_BG_TOP, HAIKU_BG_BOT, uv.y);
-
-                // Viñeta interna: los bordes más apagados, el centro sostiene el texto
-                float bordeInt = min(min(b.size.x - abs(b.p.x), b.size.y - abs(b.p.y)) * 6.0, 1.0);
-                //bg *= mix(0.72, 1.0, bordeInt);
-
-                // SIN TRANSPARENCIA: el interior tapa el fondo por completo (el fondo ya
-                // no se ve en la zona del cuadrado). Sólo queda un fade corto al entrar.
-                float fillAlpha = smoothstep(0.02, 0.40, b.presence);
-                outColor = vec4(bg, fillAlpha);
-            }
-
-            // 2. Bordes y marcas tácticas del contenedor
-            float edgeGlow = exp(-abs(b.boxDist) * 220.0);          // marco principal
-            float innerLine = exp(-abs(b.boxDist + 0.014) * 260.0); // doble marco interior
-            // Aura EXTERIOR: sólo afuera del cuadrado (adentro valía 1.0 y "pintaba" todo el
-            // interior con el color del marco).
-            float outerAura = (b.boxDist > 0.0) ? exp(-b.boxDist * 34.0) * 1.10 : 0.0;
-            // Brillo INTERIOR: pegado al marco, decae hacia el centro.
-            float innerAura = exp(-max(0.0, -b.boxDist) * 30.0) * 0.55;
-
-            // Soportes de esquina (brackets tácticos)
-            vec2 cornerOffset = abs(abs(b.p) - b.size);
-            float isCorner = (step(cornerOffset.x, 0.055) * step(cornerOffset.y, 0.055));
-            float cornerBoost = (isCorner > 0.0) ? 2.6 : 1.0;
-
-            // Marco y esquinas: línea ROJA CLARA. Aura/brillo: ROJO (siempre, en los 3
-            // estados — antes en thinking el marco pasaba a oro/naranja).
-            float lineaAlpha = (edgeGlow * 3.2 * cornerBoost + innerLine * 1.6 * cornerBoost) * b.presence;
-            float auraAlpha = (outerAura + innerAura) * b.presence;
-
-            outColor.rgb = mix(outColor.rgb, HAIKU_GLOW_COL, clamp(auraAlpha, 0.0, 1.0));
-            outColor.rgb = mix(outColor.rgb, HAIKU_LINE_COL, clamp(lineaAlpha, 0.0, 1.0));
-            outColor.a = max(outColor.a, clamp(max(lineaAlpha, auraAlpha), 0.0, 1.0));
-
-            return outColor;
-        }
-
-        // -----------------------------------------------------------------
-        // FUNCIÓN ENCAPSULADA DE GLITCH
-        // -----------------------------------------------------------------
-        void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out float scanline, out float vhsNoise) {
-            float t = floor(u_time * 15.0);
-
-            // 1. PATRÓN RANDOM (Alta densidad de filas y columnas)
-            float rows = (blockSize * 100.0);
-            float row = floor(uv.y * rows);
-
-            float baseCols = (blockSize * 100.0);
-            float colsPerRow = baseCols * (0.5 + 2.0 * rand(vec2(row, t)));
-
-            float colOffset = rand(vec2(row, t * 0.5)) * 100.0;
-            float col = floor(uv.x * colsPerRow + colOffset);
-
-            vec2 cellId = vec2(col, row);
-
-            float cellRandom = rand(cellId + t);
-            float glitchThreshold = 1.0 - (blockIntensity * glitchAmount);
-
-            vec2 displace = vec2(0.0);
-            bool isGlitching = (cellRandom > glitchThreshold) && (glitchAmount > 0.0);
-
-            if (isGlitching) {
-                float shiftX = (rand(cellId + t * 2.0) - 0.5) * 0.5 * glitchAmount;
-                float shiftY = (rand(cellId + t * 3.0) - 0.5) * 0.1 * glitchAmount;
-                displace = vec2(shiftX, shiftY);
-            }
-
-            vec2 p = uv + displace;
-
-            // 2. TEARING LATERAL
-            float effectiveEdge = edgeTearingIntensity * glitchAmount;
-            float edgeDist = abs(uv.x - 0.5) * 2.0;
-            if (effectiveEdge > 0.0 && edgeDist > (1.0 - effectiveEdge * 0.5)) {
-                float sideCell = floor(uv.y * rows * 1.5);
-                p.x += (rand(vec2(sideCell, t)) - 0.5) * 0.4 * effectiveEdge;
-            }
-
-            // 3. ABERRACIÓN CROMÁTICA
-            float effectiveChroma = chromaIntensity * glitchAmount * 0.05;
-            if (isGlitching) {
-                effectiveChroma *= 3.0; // Resalta en los cuadraditos rotos
-            }
-
-            uvR = p + vec2(effectiveChroma, 0.0);
-            uvG = p;
-            uvB = p - vec2(effectiveChroma, 0.0);
-
-            // 4. VHS NOISE Y SCANLINES
-            float effectiveVHS = vhsNoiseIntensity * glitchAmount;
-            scanline = sin(uv.y * u_resolution.y * 2.5) * 0.03 * effectiveVHS;
-            vhsNoise = (rand(uv * u_time) - 0.5) * 0.15 * effectiveVHS;
-        }
-
-        // -----------------------------------------------------------------
-        // MAIN
-        // -----------------------------------------------------------------
-        void main() {
-            vec2 rawUv = gl_FragCoord.xy / u_resolution;
-
-            // Normalizar pesos de los 3 estados (fallback a u_activeState si u_stateWeights no se envió)
-            vec3 weights = u_stateWeights;
-            float sumW = weights.x + weights.y + weights.z;
-            if (sumW < 0.01) {
-                if (u_activeState == 1) weights = vec3(0.0, 1.0, 0.0);
-                else if (u_activeState == 2) weights = vec3(0.0, 0.0, 1.0);
-                else weights = vec3(1.0, 0.0, 0.0);
-            } else {
-                weights /= sumW;
-            }
-
-            // (b) ZONA INMUNE AL GLITCH: donde se dibuja el contenedor del haiku el
-            // shader NO se glitchea (ni se desplaza, ni aberra, ni mete scanlines/ruido).
-            float immune = getHaikuImmuneZone(rawUv, weights);
-
-            // Cálculo de coordenadas con GLITCH integrado
-            vec2 uvR, uvG, uvB;
-            float scanline, vhsNoise;
-            getGlitchCoords(rawUv, uvR, uvG, uvB, scanline, vhsNoise);
-
-            // Dentro del contenedor se usan las coordenadas LIMPIAS
-            uvR = mix(uvR, rawUv, immune);
-            uvG = mix(uvG, rawUv, immune);
-            uvB = mix(uvB, rawUv, immune);
-            scanline *= (1.0 - immune);
-            vhsNoise *= (1.0 - immune);
-
-            vec2 uv = uvG;
-
-            // Espejado horizontal de la cámara web
-            vec2 camUvR = vec2(1.0 - uvR.x, 1.0 - uvR.y);
-            vec2 camUvG = vec2(1.0 - uvG.x, 1.0 - uvG.y);
-            vec2 camUvB = vec2(1.0 - uvB.x, 1.0 - uvB.y);
-
-            // 1) Render Cámara con aberración cromática glitcheada
-            vec3 camCol = vec3(0.0);
-            if (u_hasCamera == 1) {
-                camCol.r = texture2D(u_cameraTexture, camUvR).r;
-                camCol.g = texture2D(u_cameraTexture, camUvG).g;
-                camCol.b = texture2D(u_cameraTexture, camUvB).b;
-            }
-            vec3 invcamCol = vec3(1.0, 1.0, 1.0) - camCol.rgb;
-
-            // 2) Render Depth Map / Segmentación
-            vec4 depthCol = (u_hasDepth == 1) ? texture2D(u_depthTexture, vec2(uv.x, 1.0 - uv.y)) : vec4(0.0);
-
-            // 3) Render Silueta / OpenPose (Esqueleto Cinemático & Nodos)
-            vec4 openposeCol = vec4(0.0);
-            if (u_hasOpenpose == 1) {
-                openposeCol = texture2D(u_openposeTexture, vec2(uv.x,1.-uv.y));
-                float opOpacity = (u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0;
-                openposeCol.rgb *= opOpacity;
-            }
-
-            // 3b) Render Flow Field (Campo de Flujo Vectorial Óptico)
-            vec4 flowfieldCol = vec4(0.0);
-            if (u_hasFlowfield == 1) {
-                flowfieldCol = texture2D(u_flowfieldTexture, uv);
-                float ffOpacity = (u_flowfieldOpacity > 0.0) ? u_flowfieldOpacity : 1.0;
-                flowfieldCol.rgb *= ffOpacity;
-            }
-
-            // 4) Render directo de JPShaderEditor Include
-            vec3 jpCol = vec3(0.0);
-            jpCol.r = texture2D(renderJPSHADER, uvR).r;
-            jpCol.g = texture2D(renderJPSHADER, uvG).g;
-            jpCol.b = texture2D(renderJPSHADER, uvB).b;
-
-            // 5) Efectos de palabras en pantalla (fondo de las palabras)
-            float animPulse = weights.y * 1.0 + weights.z * 0.3;
-            vec4 words = getWords(uv, animPulse);
-            vec4 wordsq = getQuadWords(uv, mix(0.03, 0.045, weights.y), 0.0, animPulse);
-
-            // (3) Los marcos de TODAS las palabras desaparecen apenas ENTRA el contenedor
-            //     del haiku (la caja empieza a aparecer en THINKING, no sólo en HAIKU) y
-            //     vuelven cuando la caja se retira.
-            float cajaPresence = clamp(weights.z, 0.0, 1.0);   // = presencia del contenedor
-            wordsq *= (1.0 - smoothstep(0.03, 0.45, cajaPresence));
-
-            // 6) DIBUJO DEL CONTENEDOR DEL HAIKU (con rawUv: geometría fija, sin glitch)
-            vec4 haikuBox = getHaikuContainer(rawUv, weights);
-
-            // Composición de capas de renderizado:
-            // Capa A: Salida base (JPShader + Cámara recortada por Depth Map)
-            vec3 finalColor = vec3(0.0);
-            finalColor += jpCol * words.r;
-            finalColor += mix(jpCol * words.r, camCol, depthCol.r);
-
-            // (a) SILUETA OPENPOSE: primero BLANCA y después, cuando la obra avanza a
-            //     THINKING / HAIKU, pasa al COLOR INVERTIDO DE LA CÁMARA.
-            //     En IDLE (weights.x) el esqueleto queda blanco puro; al entrar en los
-            //     otros estados se mezcla hacia (1 - cámara).
-            float opToInvert = clamp(weights.y + weights.z, 0.0, 1.0);
-            vec3 siluetaCol = mix(vec3(1.0), invcamCol, opToInvert);
-            finalColor += openposeCol.rgb * siluetaCol;
-
-            // Capa D: Integración del contenedor del Haiku detrás de los textos
-            finalColor = mix(finalColor, haikuBox.rgb, haikuBox.a);
-
-            // Fondo y halos de las palabras (transición suave entre estados)
-            vec3 wordQuadCol = mix(vec3(1.0, 0.05, 0.05), vec3(1.0, 0.65, 0.15), weights.y);
-            wordQuadCol = mix(wordQuadCol, vec3(0.2, 0.95, 1.0), weights.x * 0.4);
-            finalColor += wordsq.rgb * wordQuadCol;
-
-            // Modulación e interferencias continuas según el peso de cada estado.
-            // OJO: nada de esto entra en la zona del contenedor del haiku ('limpio' = 0
-            // ahí) — el marco y su texto son la última pila de la imagen del shader, así
-            // que ningún post efecto (ni del shader ni de una capa DOM superior) los toca.
-            float limpio = 1.0 - immune;
-
-            // Estado 0 (IDLE): tinte de reposo cibernético sutil
-            finalColor += vec3(0.0, 0.02, 0.04) * weights.x * limpio;
-
-            // Estado 1 (THINKING): interferencia de alta frecuencia y escaneo sináptico
-            float waveThink = sin(uv.y * 90.0 + u_time * 16.0) * 0.08;
-            //finalColor += vec3(0.14 + waveThink, 0.01, 0.05) * weights.y * limpio;
-
-            // Estado 2 (HAIKU): matriz estructurada y coherencia poética
-            float gridHaiku = sin(uv.y * 160.0 + u_time * 2.5) * 0.03;
-            finalColor += vec3(0.04, 0.01 + gridHaiku, 0.02) * weights.z * limpio;
-
-            // Aplicación de Scanlines y Ruido VHS de la función glitch
-            // (dentro del contenedor del haiku NO entran: el marco queda limpio)
-            finalColor -= scanline;
-            finalColor += vhsNoise;
-
-            gl_FragColor = vec4(finalColor, 1.0);
-        }
-
-`;
+precision highp float;
+
+// ============================================================================
+// SHADER MAESTRO DE SALIDA (MASTER OUTPUT SHADER)
+// ============================================================================
+// 1) Render de la Cámara
+uniform sampler2D u_cameraTexture;
+uniform int u_hasCamera;
+
+// 2) Render del Depth Map / Segmentación
+uniform sampler2D u_depthTexture;
+uniform int u_hasDepth;
+
+// 3) Render de la Silueta / Overlay OpenPose
+uniform sampler2D u_openposeTexture;
+uniform int u_hasOpenpose;
+uniform float u_openposeOpacity;
+
+// 3b) Render de Vectores de Campo de Flujo (Flow Field)
+uniform sampler2D u_flowfieldTexture;
+uniform int u_hasFlowfield;
+uniform float u_flowfieldOpacity;
+
+// 4) Array con las posiciones normalizadas de las palabras en pantalla (UV: 0.0 a 1.0)
+#define MAX_WORDS 32
+uniform vec2 u_wordPositions[MAX_WORDS];
+// Ancho REAL de cada palabra en UV x (px/ancho de pantalla). 0 = sin dato:
+// en ese caso el marco usa el ancho fijo de WORD_BOX_X.
+uniform float u_wordWidths[MAX_WORDS];
+uniform int u_wordCount;
+
+uniform sampler2D renderJPSHADER;
+
+// 5) Estados activos del sistema:
+//    u_activeState (0: IDLE, 1: PROCESSING/THINKING, 2: HIJACK/HAIKU)
+//    u_stateWeights (vec3 interpolado continuo: x=IDLE, y=THINKING, z=HAIKU)
+uniform int u_activeState;
+uniform vec3 u_stateWeights;
+
+
+// Uniforms de Control de GLITCH (Mismos parámetros que en LOG)
+uniform float glitchAmount;
+uniform float blockIntensity;
+uniform float blockSize;
+uniform float chromaIntensity;
+uniform float vhsNoiseIntensity;
+uniform float edgeTearingIntensity;
+
+// Uniforms de resolución y tiempo
+uniform vec2 u_resolution;
+uniform float u_time;
+
+// ---------------------------------------------------------------------------
+// PATRÓN RDM — FONDO DE LAS CAJAS DE PALABRAS Y DEL CONTENEDOR DEL HAIKU
+// ---------------------------------------------------------------------------
+// Port del shader "rdmf" de jpShadereditor (autor jpupper): un campo de RUIDO
+// ALEATORIO POR CAPAS. Del original se quitó el feedback (iChannel0) y el hue:
+// el patrón se calcula EN BLANCO y se tiñe con u_rdmColor.
+//
+// TODOS estos uniforms son manejables desde ARRIBA: los manda script.js en cada
+// frame desde el panel MASTER RDM del modal (tecla P) y desde MASTER_RDM_DEF
+// (arriba de todo en public/cambiapalabras/script.js). Llegan NORMALIZADOS a
+// 0..1 y acá se pasan a la escala física del shader original con rdMap().
+uniform float u_rdmCnt;        // CAPAS          (físico 1..20)
+uniform float u_rdmIteScale;   // ESCALA X CAPA  (físico 0..10)
+uniform float u_rdmSpeedX;     // deriva X       (físico -0.2..0.2)
+uniform float u_rdmSpeedY;     // deriva Y       (físico -0.2..0.2)
+uniform float u_rdmSpeedRot;   // rotación       (físico -0.01..0.01)
+uniform float u_rdmSpeedRnd;   // velocidad del random (0..1)
+uniform float u_rdmSm1;        // SMOOTH BAJO (umbral del smoothstep)
+uniform float u_rdmSm2;        // SMOOTH ALTO (dónde llega a blanco pleno)
+uniform float u_rdmForce;      // brillo final (e_force del original)
+uniform float u_rdmMix;        // PRESENCIA: 1 = tapa el fondo anterior
+uniform vec3  u_rdmColor;      // tinte del patrón
+
+// ---------------------------------------------------------------------------
+// PALETA UNIFICADA (la del GLOBALSTYLE: /globalstyle.html y global_style.json)
+// ---------------------------------------------------------------------------
+// u_palModo = 1 → el patrón RDM, los marcos de las palabras, el contenedor del
+// haiku y el tinte de la cámara usan la paleta. 0 → colores fijos de siempre.
+uniform vec3  u_palA;          // acento primario   (borde / acento)
+uniform vec3  u_palB;          // acento secundario (acento2)
+uniform float u_palModo;       // 1 = seguir la paleta global
+uniform float u_camPal;        // 0..1 cuánto se tiñe la cámara con la paleta
+#define pi 3.14159265359
+
+// ---------------------------------------------------------------------------
+// AJUSTES RÁPIDOS (editá acá y apretá R para recompilar en vivo)
+// ---------------------------------------------------------------------------
+// ANCHO de los contenedores de las palabras:
+//   1.0 = cuadrado · 0.55 = 1.8x MÁS ANCHO · 0.40 = 2.5x MÁS ANCHO
+#define WORD_BOX_X        0.55
+
+// Tamaño del contenedor del HAIKU (media medida, en UV)
+#define HAIKU_BOX_W       0.25
+#define HAIKU_BOX_H       0.3
+
+// VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
+// Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
+#define WORD_SPIN_SPEED   0.032
+
+// Margen del marco alrededor del ancho real de la palabra (1.0 = exacto)
+#define WORD_BOX_PAD   0.9
+#define HAIKU_BG_TOP      vec3(0.0, 0.0, 0.0)
+#define HAIKU_BG_BOT      vec3(0.0, 0.0, 0.0)
+#define HAIKU_LINE_COL    vec3(1.0, 1.0, 0.1)
+#define HAIKU_GLOW_COL    vec3(0.4, 0.4, 0.4)
+
+float rand(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+// Función de ruido suave 2D (Value Noise continuo con interpolación quintic)
+float noise2D(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+
+    float a = rand(i);
+    float b = rand(i + vec2(1.0, 0.0));
+    float c = rand(i + vec2(0.0, 1.0));
+    float d = rand(i + vec2(1.0, 1.0));
+
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Ruido FBM de muy alta frecuencia (5 octavas con rotación irracional)
+float fbmHighFreq(vec2 p) {
+    float val = 0.0;
+    float amp = 0.52;
+    mat2 rot = mat2(0.80, 0.60, -0.60, 0.80);
+    for (int i = 0; i < 5; i++) {
+        val += amp * noise2D(p);
+        p = rot * p * 2.07 + vec2(4.13, 7.37);
+        amp *= 0.50;
+    }
+    return val;
+}
+
+// Fondo de alta frecuencia para los contenedores de palabras y el contenedor del haiku:
+// Textura táctica densa con balance lumínico (no negro absoluto 0.0, ni blanco quemado)
+vec3 getHighFreqNoiseBg(vec2 uv) {
+    float aspect = u_resolution.x / u_resolution.y;
+    vec2 p = uv * vec2(280.0 * aspect, 280.0) + vec2(u_time * 0.35, u_time * 0.20);
+    float n = clamp(fbmHighFreq(p), 0.0, 1.0);
+    float lum = mix(0.08, 0.26, n);
+    return vec3(lum);
+}
+
+// ---------------------------------------------------------------------------
+// PATRÓN RDM (port de "rdmf"): se promedian u_rdmCnt capas de ruido aleatorio,
+// cada una con su fase, su rotación y su escala (ite_scale * i). El original
+// dividía por (cnt+1) y cerraba con un smoothstep: se respeta tal cual.
+// ---------------------------------------------------------------------------
+float rdMap(float v, float lo, float hi) { return lo + (hi - lo) * v; }
+mat2 rdRotate2d(float a) { return mat2(cos(a), -sin(a), sin(a), cos(a)); }
+mat2 rdScale2d(vec2 sc) { return mat2(sc.x, 0.0, 0.0, sc.y); }
+float rdRandom(vec2 st, float t) {
+    return fract(sin(dot(floor(st.xy), vec2(12.9898, 78.233))) * 43000.3 + t);
+}
+
+vec3 rdmPattern(vec2 uv) {
+    float fix = u_resolution.x / u_resolution.y;
+    uv.x *= fix;                                  // el original escala el X (si no, se estira)
+
+    int mcnt = int(floor(rdMap(u_rdmCnt, 1.0, 20.0)));
+    if (mcnt < 1) mcnt = 1;
+    float mite_scale = rdMap(u_rdmIteScale, 0.0, 10.0);
+    float mspeedx    = rdMap(u_rdmSpeedX, -0.2, 0.2);
+    float mspeedy    = rdMap(u_rdmSpeedY, -0.2, 0.2);
+    float mspeedrot  = rdMap(u_rdmSpeedRot, -0.01, 0.01);
+    float mspeedrdm  = u_rdmSpeedRnd;
+    float tm = u_time;
+
+    vec3 dib = vec3(1.0);
+    for (int i = 1; i < 10; i++) {
+        float fase = float(i) * pi * 2.0 / float(mcnt);
+        vec2 uv2 = uv;
+        uv2.x += tm * mspeedx;
+        uv2.y += tm * mspeedy;
+
+        uv2 -= vec2(0.5); uv2 *= rdRotate2d(mspeedrot * tm); uv2 += vec2(0.5);
+        uv2 -= vec2(0.5); uv2 *= rdScale2d(vec2(mite_scale * float(i))); uv2 += vec2(0.5);
+
+        float e = rdRandom(uv2 * mite_scale * float(i), tm * mspeedrdm + fase);
+        dib += vec3(e);
+    }
+    dib /= (float(mcnt) + 1.0);
+    dib = smoothstep(u_rdmSm1, max(u_rdmSm2, u_rdmSm1 + 0.001), dib);
+    return dib * u_rdmForce;
+}
+
+// Fondo RDM teñido. Con u_palModo = 1 el patrón se PINTA con la paleta global:
+// el degradado va del acento primario (oscuro) al acento secundario (crestas), y
+// el brillo del patrón modula la mezcla. Con u_palModo = 0 queda el color del
+// panel (blanco por defecto = tal cual el shader rdmf).
+vec3 getRdmBg(vec2 uv) {
+    vec3 p = rdmPattern(uv);
+    float g = clamp(dot(p, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+    vec3 conPaleta = mix(u_palA * 0.45, u_palB, g) * (0.35 + 0.65 * g);
+    return mix(p * u_rdmColor, conPaleta, clamp(u_palModo, 0.0, 1.0));
+}
+
+float poly(vec2 uv, vec2 p, float s, float dif, int N, float a){
+    vec2 st = p - uv;
+    float a2 = atan(st.x, st.y) + a;
+    float r = pi * 2.0 / float(N);
+    float d = cos(floor(0.5 + a2 / r) * r - a2) * length(st);
+    float e = 1.0 - smoothstep(s, dif, d);
+    return e;
+}
+vec4 getWords(vec2 uv, float animPulse){
+    float t = u_time * (1.0 + animPulse * 1.5);
+    vec4 wordsEffect = vec4(0.0);
+    float fx = u_resolution.x / u_resolution.y;
+
+    for (int i = 0; i < MAX_WORDS; i++) {
+        if (i >= u_wordCount) break;
+        vec2 wPos = u_wordPositions[i];
+
+        vec2 uv2 = uv;
+        vec2 diff = (uv2 - wPos) * vec2(fx, 1.0);
+        float r = length(diff);
+
+        float s = mix(0.07, 0.12, animPulse);
+        float d = mix(0.07, 0.12, animPulse);
+
+        float e = 1.0 - smoothstep(s, s + d, r);
+        wordsEffect += e * 0.5;
+    }
+    return wordsEffect;
+}
+vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
+
+    float t = u_time * WORD_SPIN_SPEED * (1.0 + animPulse);
+    vec4 wordsEffect = vec4(0.0);
+    float fx = u_resolution.x / u_resolution.y;
+
+    for (int i = 0; i < MAX_WORDS; i++) {
+        if (i >= u_wordCount) break;
+        vec2 wPos = u_wordPositions[i];
+
+        float s = _s * (1.0 + animPulse * 0.35);
+        // grosor del trazo: nunca 0 (smoothstep con bordes iguales es indefinido
+        // y en algunos drivers el marco desaparecía por completo)
+        float d = max(_d, s * 0.10) * (1.0 + animPulse * 0.35);
+
+        // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
+        // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
+        float wAncho = u_wordWidths[i] * WORD_BOX_PAD*.5;
+        float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
+        // uv_m = uv con el eje X comprimido alrededor de la palabra
+        vec2 uv_m = wPos + (uv - wPos) * vec2(kx, 1.0);
+
+        float rot = animPulse * sin(t + float(i));
+        float full = poly(uv_m, wPos, s, s + d, 4, rot);
+        float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
+        float border = max(0.0, full - inner);
+
+        wordsEffect.rgb += vec3(border);
+        wordsEffect.a = max(wordsEffect.a, full);
+    }
+    return wordsEffect;
+}
+struct HaikuBox {
+    float presence;   // 0 en IDLE, sube en THINKING (escaneo), pleno en HAIKU
+    vec2  size;       // semitamaño del marco en UV
+    vec2  p;          // uv relativa al centro de pantalla
+    vec2  d;          // distancia por eje al borde (negativa = adentro)
+    float boxDist;    // distancia al contorno (0 = sobre el borde)
+    float inside;     // 1.0 adentro, 0.0 afuera
+};
+HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
+    HaikuBox b;
+    // SOLO cuando se está formando el haiku (estado HAIKU = weights.z). Antes de
+    // eso (THINKING: palabras girando y cambiando) el contenedor NO existe.
+    b.presence = clamp(weights.z, 0.0, 1.0);
+
+    float aspect = u_resolution.x / u_resolution.y;
+    vec2 targetSize = vec2(HAIKU_BOX_W, HAIKU_BOX_H);
+    b.size = targetSize * mix(0.70, 1.0, b.presence);
+
+    b.p = uv - vec2(0.5, 0.5);
+    b.d = abs(b.p) - b.size;
+    b.boxDist = max(b.d.x * aspect, b.d.y);
+    b.inside = (b.d.x < 0.0 && b.d.y < 0.0) ? 1.0 : 0.0;
+    return b;
+}
+vec4 getHaikuContainer(vec2 uv, vec3 weights) {
+    HaikuBox b = haikuBoxAt(uv, weights);
+    if (b.presence < 0.005) return vec4(0.0);
+    if (b.boxDist > 0.08) return vec4(0.0);
+
+    float wThink = weights.y;
+    float wHaiku = weights.z;
+    float aspect = u_resolution.x / u_resolution.y;
+
+    vec4 outColor = vec4(0.0);
+
+    // 1. Fondo interior del contenedor (vidrio ahumado silicio + matriz)
+    if (b.inside > 0.5) {
+        // Rejilla de silicio holográfica interna
+        vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.04, 0.0));
+        float gridLine = (step(0.90, gridUv.x) + step(0.90, gridUv.y)) * 0.05;
+
+        // Barras de escaneo horizontal sutil
+        float scan = sin(uv.y * 140.0 + u_time * 6.0) * 0.05 * (wThink + 0.2);
+
+        // Relleno del contenedor: ruido FBM de alta frecuencia en vez de negro puro
+        // Fondo: RDM del panel MASTER RDM (u_rdmMix=1 lo tapa por completo).
+        vec3 bg = mix(getHighFreqNoiseBg(uv), getRdmBg(uv), u_rdmMix) + vec3(gridLine);
+    
+        // Viñeta interna: los bordes más apagados, el centro sostiene el texto
+        float bordeInt = min(min(b.size.x - abs(b.p.x), b.size.y - abs(b.p.y)) * 6.0, 1.0);
+        //bg *= mix(0.72, 1.0, bordeInt);
+
+        // SIN TRANSPARENCIA: el interior tapa el fondo por completo (el fondo ya
+        // no se ve en la zona del cuadrado). Sólo queda un fade corto al entrar.
+        float fillAlpha = smoothstep(0.02, 0.40, b.presence);
+        outColor = vec4(bg, fillAlpha);
+    }
+
+    // 2. Bordes y marcas tácticas del contenedor
+    float edgeGlow = exp(-abs(b.boxDist) * 220.0);          // marco principal
+    float innerLine = exp(-abs(b.boxDist + 0.014) * 260.0); // doble marco interior
+    // Aura EXTERIOR: sólo afuera del cuadrado (adentro valía 1.0 y "pintaba" todo el
+    // interior con el color del marco).
+    float outerAura = (b.boxDist > 0.0) ? exp(-b.boxDist * 34.0) * 1.10 : 0.0;
+    // Brillo INTERIOR: pegado al marco, decae hacia el centro.
+    float innerAura = exp(-max(0.0, -b.boxDist) * 30.0) * 0.55;
+
+    // Soportes de esquina (brackets tácticos)
+    vec2 cornerOffset = abs(abs(b.p) - b.size);
+    float isCorner = (step(cornerOffset.x, 0.055) * step(cornerOffset.y, 0.055));
+    float cornerBoost = (isCorner > 0.0) ? 2.6 : 1.0;
+
+    // Marco y esquinas: línea ROJA CLARA. Aura/brillo: ROJO (siempre, en los 3
+    // estados — antes en thinking el marco pasaba a oro/naranja).
+    float lineaAlpha = (edgeGlow * 3.2 * cornerBoost + innerLine * 1.6 * cornerBoost) * b.presence;
+    float auraAlpha = (outerAura + innerAura) * b.presence;
+
+    // Línea y aura del contenedor: con la paleta activa salen de u_palB / u_palA.
+    vec3 lineaCol = mix(HAIKU_LINE_COL, u_palB, clamp(u_palModo, 0.0, 1.0));
+    vec3 auraCol  = mix(HAIKU_GLOW_COL, u_palA * 0.55, clamp(u_palModo, 0.0, 1.0));
+
+    outColor.rgb = mix(outColor.rgb, auraCol, clamp(auraAlpha, 0.0, 1.0));
+    outColor.rgb = mix(outColor.rgb, lineaCol, clamp(lineaAlpha, 0.0, 1.0));
+    outColor.a = max(outColor.a, clamp(max(lineaAlpha, auraAlpha), 0.0, 1.0));
+
+    return outColor;
+}
+void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out float scanline, out float vhsNoise) {
+    float t = floor(u_time * 15.0);
+
+    // 1. PATRÓN RANDOM (Alta densidad de filas y columnas)
+    float rows = (blockSize * 100.0);
+    float row = floor(uv.y * rows);
+
+    float baseCols = (blockSize * 100.0);
+    float colsPerRow = baseCols * (0.5 + 2.0 * rand(vec2(row, t)));
+
+    float colOffset = rand(vec2(row, t * 0.5)) * 100.0;
+    float col = floor(uv.x * colsPerRow + colOffset);
+
+    vec2 cellId = vec2(col, row);
+
+    float cellRandom = rand(cellId + t);
+    float glitchThreshold = 1.0 - (blockIntensity * glitchAmount);
+
+    vec2 displace = vec2(0.0);
+    bool isGlitching = (cellRandom > glitchThreshold) && (glitchAmount > 0.0);
+
+    if (isGlitching) {
+        float shiftX = (rand(cellId + t * 2.0) - 0.5) * 0.5 * glitchAmount;
+        float shiftY = (rand(cellId + t * 3.0) - 0.5) * 0.1 * glitchAmount;
+        displace = vec2(shiftX, shiftY);
+    }
+
+    vec2 p = uv + displace;
+
+    // 2. TEARING LATERAL
+    float effectiveEdge = edgeTearingIntensity * glitchAmount;
+    float edgeDist = abs(uv.x - 0.5) * 2.0;
+    if (effectiveEdge > 0.0 && edgeDist > (1.0 - effectiveEdge * 0.5)) {
+        float sideCell = floor(uv.y * rows * 1.5);
+        p.x += (rand(vec2(sideCell, t)) - 0.5) * 0.4 * effectiveEdge;
+    }
+
+    // 3. ABERRACIÓN CROMÁTICA
+    float effectiveChroma = chromaIntensity * glitchAmount * 0.05;
+    if (isGlitching) {
+        effectiveChroma *= 3.0; // Resalta en los cuadraditos rotos
+    }
+
+    uvR = p + vec2(effectiveChroma, 0.0);
+    uvG = p;
+    uvB = p - vec2(effectiveChroma, 0.0);
+
+    // 4. VHS NOISE Y SCANLINES
+    float effectiveVHS = vhsNoiseIntensity * glitchAmount;
+    scanline = sin(uv.y * u_resolution.y * 2.5) * 0.03 * effectiveVHS;
+    vhsNoise = (rand(uv * u_time) - 0.5) * 0.15 * effectiveVHS;
+}
+
+void main() {
+    vec2 rawUv = gl_FragCoord.xy / u_resolution;
+
+    // Normalizar pesos de los 3 estados (fallback a u_activeState si u_stateWeights no se envió)
+    vec3 weights = u_stateWeights;
+    float sumW = weights.x + weights.y + weights.z;
+    if (sumW < 0.01) {
+        if (u_activeState == 1) weights = vec3(0.0, 1.0, 0.0);
+        else if (u_activeState == 2) weights = vec3(0.0, 0.0, 1.0);
+        else weights = vec3(1.0, 0.0, 0.0);
+    } else {
+        weights /= sumW;
+    }
+
+    vec2 uvR, uvG, uvB;
+    float scanline, vhsNoise;
+    getGlitchCoords(rawUv, uvR, uvG, uvB, scanline, vhsNoise);
+
+    vec2 uv = uvG;
+
+    // Espejado horizontal de la cámara web
+    vec2 camUvR = vec2(1.0 - uvR.x, 1.0 - uvR.y);
+    vec2 camUvG = vec2(1.0 - uvG.x, 1.0 - uvG.y);
+    vec2 camUvB = vec2(1.0 - uvB.x, 1.0 - uvB.y);
+
+    // 1) Render Cámara con aberración cromática glitcheada
+    vec3 camCol = texture2D(u_cameraTexture, camUvR).rgb;
+  /*  if (u_hasCamera == 1) {
+        camCol.r = texture2D(u_cameraTexture, camUvR).r;
+        camCol.g = texture2D(u_cameraTexture, camUvG).g;
+        camCol.b = texture2D(u_cameraTexture, camUvB).b;
+    }*/
+    // TINTE DE LA CÁMARA con la paleta unificada (u_camPal = 0 → imagen original).
+    if (u_hasCamera == 1 && u_camPal > 0.001) {
+        float camLum = dot(camCol, vec3(0.299, 0.587, 0.114));
+        vec3 camPalCol = mix(u_palA * 0.35, u_palB, clamp(camLum * 1.15, 0.0, 1.0));
+        camCol = mix(camCol, camPalCol, clamp(u_camPal * u_palModo, 0.0, 1.0));
+    }
+    vec3 invcamCol = vec3(1.0, 1.0, 1.0) - camCol.rgb;
+    vec4 depthCol = (u_hasDepth == 1) ? texture2D(u_depthTexture, vec2(uv.x, 1.0 - uv.y)) : vec4(0.0);
+
+    vec4 openposeCol = vec4(0.0);
+    if (u_hasOpenpose == 1) {
+        openposeCol = texture2D(u_openposeTexture, vec2(uv.x,1.-uv.y));
+        float opOpacity = (u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0;
+        openposeCol.rgb *= opOpacity;
+    }
+
+    // 3b) Render Flow Field (Campo de Flujo Vectorial Óptico)
+    vec4 flowfieldCol = vec4(0.0);
+    if (u_hasFlowfield == 1) {
+        flowfieldCol = texture2D(u_flowfieldTexture, uv);
+        float ffOpacity = (u_flowfieldOpacity > 0.0) ? u_flowfieldOpacity : 1.0;
+        flowfieldCol.rgb *= ffOpacity;
+    }
+
+    // 4) Render directo de JPShaderEditor Include
+    vec3 jpCol = texture2D(renderJPSHADER, uvR).rgb;
+
+    // 5) Efectos de palabras en pantalla (fondo de las palabras)
+    float animPulse = weights.y * 1.0 + weights.z * 0.3;
+    vec4 words = getWords(uv, animPulse);
+    vec4 wordsq = getQuadWords(rawUv, mix(0.03, 0.045, weights.y), 0.0, animPulse);
+
+    float cajaPresence = clamp(weights.z, 0.0, 1.0);   // = presencia del contenedor
+    wordsq *= (1.0 - smoothstep(0.03, 0.45, cajaPresence));
+
+    vec4 haikuBox = getHaikuContainer(rawUv, weights);
+
+
+
+
+    vec3 fin = vec3(0.0);
+    fin += jpCol * words.r;
+    fin += mix(jpCol * words.r, camCol, depthCol.r);
+
+    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
+    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
+    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
+    //     trackingConfig.boneWidth / pointRadius del overlay).
+    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
+    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
+    //     huesos de colores.
+    float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
+    fin += vec3(1.0) * opMask * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+
+    // Capa D: Integración del contenedor del Haiku detrás de los textos
+    fin = mix(fin, haikuBox.rgb, haikuBox.a);
+
+    // Fondo del interior de las cajas de las palabras: patrón RDM del panel
+    // MASTER RDM (u_rdmMix = 1 lo tapa por completo; en 0 queda el grano viejo).
+    float wordMask = clamp(wordsq.a, 0.0, 1.0);
+    vec3 wordNoise = mix(getHighFreqNoiseBg(rawUv), getRdmBg(rawUv), u_rdmMix);
+    fin = mix(fin, wordNoise, wordMask);
+
+    // Borde de las palabras: rojo→oro de siempre, o la paleta global si está activa.
+    vec3 wordQuadFijo = mix(vec3(1.0, 0.05, 0.05), vec3(1.0, 0.65, 0.15), weights.y);
+    vec3 wordQuadPal  = mix(u_palA, u_palB, clamp(weights.y * 0.85 + 0.15, 0.0, 1.0));
+    vec3 wordQuadCol = mix(wordQuadFijo, wordQuadPal, clamp(u_palModo, 0.0, 1.0));
+    fin += wordsq.rgb * wordQuadCol;
+
+    // Tinte y efectos sutiles de estado (sólo fuera de cajas de haiku y palabras)
+    float maskTotal = max(haikuBox.a, wordMask);
+    fin += vec3(0.0, 0.02, 0.04) * weights.x * (1.0 - maskTotal);
+
+    // Estado 2 (HAIKU): tinte parejo, SIN onda. El usuario pidio que no aparezca el
+    // dibujo de ondas/grilla animada mientras se esta generando el haiku (antes el
+    // tinte iba modulado por una senoidal vertical que barria toda la pantalla).
+    fin += vec3(0.04, 0.01, 0.02) * weights.z * (1.0 - maskTotal);
+
+
+    gl_FragColor = vec4(fin, 1.0);
+}
+    `;
     }
 
     const vs = this.compileShader(gl.VERTEX_SHADER, vsSource);
@@ -1564,7 +1675,24 @@ class MasterOutputShader {
       blockSize: gl.getUniformLocation(this.program, 'blockSize'),
       chromaIntensity: gl.getUniformLocation(this.program, 'chromaIntensity'),
       vhsNoiseIntensity: gl.getUniformLocation(this.program, 'vhsNoiseIntensity'),
-      edgeTearingIntensity: gl.getUniformLocation(this.program, 'edgeTearingIntensity')
+      edgeTearingIntensity: gl.getUniformLocation(this.program, 'edgeTearingIntensity'),
+      // Patrón RDM (random multi-capa) del fondo de palabras y del contenedor haiku
+      rdmCnt: gl.getUniformLocation(this.program, 'u_rdmCnt'),
+      rdmIteScale: gl.getUniformLocation(this.program, 'u_rdmIteScale'),
+      rdmSpeedRnd: gl.getUniformLocation(this.program, 'u_rdmSpeedRnd'),
+      rdmSpeedX: gl.getUniformLocation(this.program, 'u_rdmSpeedX'),
+      rdmSpeedY: gl.getUniformLocation(this.program, 'u_rdmSpeedY'),
+      rdmSpeedRot: gl.getUniformLocation(this.program, 'u_rdmSpeedRot'),
+      rdmSm1: gl.getUniformLocation(this.program, 'u_rdmSm1'),
+      rdmSm2: gl.getUniformLocation(this.program, 'u_rdmSm2'),
+      rdmForce: gl.getUniformLocation(this.program, 'u_rdmForce'),
+      rdmMix: gl.getUniformLocation(this.program, 'u_rdmMix'),
+      rdmColor: gl.getUniformLocation(this.program, 'u_rdmColor'),
+      // Paleta unificada (GLOBALSTYLE) + tinte de la cámara
+      palA: gl.getUniformLocation(this.program, 'u_palA'),
+      palB: gl.getUniformLocation(this.program, 'u_palB'),
+      palModo: gl.getUniformLocation(this.program, 'u_palModo'),
+      camPal: gl.getUniformLocation(this.program, 'u_camPal')
     };
 
     if (!window.GLITCH_ANIMATION_CONFIG) {
@@ -1617,6 +1745,15 @@ class MasterOutputShader {
     // Textura para JPShaderEditor Include (uniform sampler2D renderJPSHADER)
     this.jpShaderTexture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.jpShaderTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+
+    // Textura para Cámara Facial PiP
+    this.faceCamTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.faceCamTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -1748,6 +1885,7 @@ class MasterOutputShader {
       gl.uniform1i(this.uniforms.renderJPSHADER, 3);
     }
 
+
     // 4) Posiciones de todas las palabras (normalized UV coords) — CERO layout thrashing y CERO allocs en 60 FPS
     const allWords = [...appState.floatingWords, ...(appState.selectedWordObjects || [])];
     const wCount = Math.min(32, allWords.length);
@@ -1870,6 +2008,37 @@ class MasterOutputShader {
     if (this.uniforms.glitchAmount) {
       gl.uniform1f(this.uniforms.glitchAmount, this.currentGlitch);
     }
+
+    // Patrón RDM del panel MASTER RDM (fondo de las palabras + contenedor haiku).
+    // El panel trabaja en la escala FÍSICA del shader original (capas 1..20, etc.)
+    // y acá se normaliza a 0..1, que es lo que el shader espera (mapr del rdmf).
+    if (this.uniforms.rdmCnt) {
+      const rdm = masterRdmState();
+      gl.uniform1f(this.uniforms.rdmCnt,      rdNorm(rdm.cnt, 1.0, 20.0));
+      gl.uniform1f(this.uniforms.rdmIteScale, rdNorm(rdm.iteScale, 0.0, 10.0));
+      gl.uniform1f(this.uniforms.rdmSpeedX,   rdNorm(rdm.speedX, -0.2, 0.2));
+      gl.uniform1f(this.uniforms.rdmSpeedY,   rdNorm(rdm.speedY, -0.2, 0.2));
+      gl.uniform1f(this.uniforms.rdmSpeedRot, rdNorm(rdm.speedRot, -0.02, 0.02));
+      gl.uniform1f(this.uniforms.rdmSpeedRnd, rdm.speedRnd);
+      gl.uniform1f(this.uniforms.rdmSm1, rdm.sm1);
+      gl.uniform1f(this.uniforms.rdmSm2, Math.max(rdm.sm2, rdm.sm1 + 0.001));
+      gl.uniform1f(this.uniforms.rdmForce, rdm.force);
+      gl.uniform1f(this.uniforms.rdmMix, rdm.mix);
+      const rc = hexToRgb01(rdm.color, [1.0, 1.0, 1.0]);
+      gl.uniform3f(this.uniforms.rdmColor, rc[0], rc[1], rc[2]);
+    }
+
+    /* PALETA UNIFICADA (GLOBALSTYLE): se manda TODOS los frames. Con
+       SEGUIR PALETA activo, el patrón RDM, los marcos de las palabras, el
+       contenedor del haiku y el tinte de la cámara salen de acá. */
+    const pal = paletaGlobal();
+    const rdmParams = masterRdmState();
+    const modoPaleta = (rdmParams.seguirPaleta === 0 || rdmParams.seguirPaleta === false) ? 0.0 : 1.0;
+    if (this.uniforms.palA) gl.uniform3f(this.uniforms.palA, pal.a[0], pal.a[1], pal.a[2]);
+    if (this.uniforms.palB) gl.uniform3f(this.uniforms.palB, pal.b[0], pal.b[1], pal.b[2]);
+    if (this.uniforms.palModo) gl.uniform1f(this.uniforms.palModo, modoPaleta);
+    if (this.uniforms.camPal) gl.uniform1f(this.uniforms.camPal, (Number(rdmParams.camTinte) || 0) / 100);
+    aplicarTintePaletaPips(pal, rdmParams);
 
     const elapsed = (performance.now() - this.startTime) / 1000;
     const userNoiseSpeed = (glitchCfg.noiseSpeed !== undefined) ? glitchCfg.noiseSpeed : ((appState.renderConfig && appState.renderConfig.noiseSpeed !== undefined) ? appState.renderConfig.noiseSpeed : 1.0);
@@ -2881,6 +3050,11 @@ function initGameWebSocket() {
         if (msg.type === 'cluster:updated') {
           console.log('[WEBSOCKET] Notificación de clusters actualizados.');
           loadConfigFromServer();
+        } else if (msg.type === 'globalstyle:update' || msg.type === 'globalstyle:updated') {
+          console.log('[WEBSOCKET] Notificación de diseño global recibida en CambiaPalabras:', msg.config && msg.config.fuente);
+          if (window.GlobalStyle && typeof window.GlobalStyle.aplicar === 'function') {
+            window.GlobalStyle.aplicar(msg.config);
+          }
         }
       } catch (e) {}
     });
@@ -2897,6 +3071,16 @@ function initGameWebSocket() {
     console.warn('[WEBSOCKET] Error al inicializar socket:', err.message);
   }
 }
+
+window.addEventListener('globalstyle:applied', (e) => {
+  const cfg = e.detail;
+  if (cfg && cfg.fuente) {
+    const fam = '"' + cfg.fuente + '", monospace';
+    document.documentElement.style.setProperty('--font-cyber', fam);
+    document.documentElement.style.setProperty('--font-organic', fam);
+    document.documentElement.style.setProperty('--word-font-family', fam);
+  }
+});
 
 function broadcastCaughtWords(words, extra = {}) {
   const payload = {
@@ -2958,16 +3142,25 @@ async function loadConfigFromServer() {
   try {
     // REQUERIMIENTO 5: Todas las palabras de Game 3 provienen de la biblioteca de Clusters
     try {
-      const clusterRes = await sbFetch('/api/clusters');
-      if (clusterRes.ok) {
-        const clusterData = await clusterRes.json();
+      let clusterData = null;
+      try {
+        const clusterRes = await sbFetch('/api/clusters');
+        if (clusterRes.ok) clusterData = await clusterRes.json();
+      } catch (e) {}
+      if (!clusterData) {
+        try {
+          const directRes = await sbFetch('/data/user_clusters.json');
+          if (directRes.ok) clusterData = await directRes.json();
+        } catch (e) {}
+      }
+      if (clusterData) {
         const clusters = clusterData.clusters || clusterData;
         if (Array.isArray(clusters) && clusters.length > 0) {
           const allClusterWords = [];
           clusters.forEach(c => {
             if (Array.isArray(c.words)) {
               c.words.forEach(w => {
-                const clean = String(w).trim().toLowerCase();
+                const clean = String(typeof w === 'string' ? w : (w.word || w.label || '')).trim().toLowerCase();
                 if (clean && !allClusterWords.includes(clean)) {
                   allClusterWords.push(clean);
                 }
@@ -2982,7 +3175,7 @@ async function loadConfigFromServer() {
         }
       }
     } catch (err) {
-      console.warn('[CLUSTERS] No se pudo leer /api/clusters:', err.message);
+      console.warn('[CLUSTERS] Error al sincronizar palabras de la biblioteca:', err.message);
     }
 
     const res = await sbFetch('/config');
@@ -2998,6 +3191,9 @@ async function loadConfigFromServer() {
       if (data.uiColors && typeof data.uiColors === 'object') {
         appState.uiColors = { ...UI_COLORS, ...data.uiColors };
         if (data.uiPalette) appState.uiPalette = data.uiPalette;
+        // El server es la fuente de verdad de la paleta: que el localStorage viejo
+        // no la pise después (era el motivo de que siguiera el verde "matrix").
+        appState._uiFromServer = true;
         applyUiColors();
         syncUiColorsInputs();
         updatePaletteUi();
@@ -3671,20 +3867,44 @@ function renderOpenPoseOverlay(landmarks) {
 
   const minConf = Math.min(0.2, appState.trackingConfig.minConfidence ?? 0.2);
   const theme = appState.trackingConfig.colorTheme || 'cyberpunk';
-  const boneWidth = appState.trackingConfig.boneWidth || 4;
-  const ptRadius = appState.trackingConfig.pointRadius || 5;
+  /* LINEA FINA: el trazo del esqueleto se dibuja a la MITAD del valor configurado
+     (pedido: "la linea del openpose mas finita"). Los sliders de calibración siguen
+     mandando: 4 -> 2 px de trazo y 5 -> 2.5 px de punto. */
+  /* El slider de la pestaña TRACKING ahora vale PX REALES (min 0,25 de trazo y
+     0,5 de punto): antes eran px "nominales" que se dividian en secreto y por eso
+     la linea se veia gruesa aunque el numero fuera chico. */
+  const boneWidth = Math.max(0.25, Number(appState.trackingConfig.boneWidth) || 0.5);
+  const ptRadius = Math.max(0.5, Number(appState.trackingConfig.pointRadius) || 0.75);
+
+  /* BUFFER SUAVIZADO DE PUNTOS DEL OPENPOSE: en vez de saltar de posición cuando
+     MediaPipe entrega landmarks nuevos, cada punto se interpola hacia el nuevo
+     (lerp). Así el esqueleto se mueve continuo y no se notan los saltazos. */
+  const OPENPOSE_SUAVIZADO = 0.35;   // 0 = congelado · 1 = sin suavizado (crudo)
+  if (!appState.openposeSuave || appState.openposeSuave.length !== landmarks.length) {
+    appState.openposeSuave = landmarks.map((l) => ({
+      x: l.x, y: l.y, visibility: (l.visibility !== undefined ? l.visibility : 1)
+    }));
+  } else {
+    for (let i = 0; i < landmarks.length; i++) {
+      const l = landmarks[i], sm = appState.openposeSuave[i];
+      sm.x += (l.x - sm.x) * OPENPOSE_SUAVIZADO;
+      sm.y += (l.y - sm.y) * OPENPOSE_SUAVIZADO;
+      sm.visibility = (l.visibility !== undefined ? l.visibility : 1);
+    }
+  }
+  const suaves = appState.openposeSuave;
   const shouldDrawBones = appState.trackingConfig.drawBones !== false;
   const shouldDrawLandmarks = appState.trackingConfig.drawLandmarks !== false;
 
   // 4.1) Graficar Articulaciones / Huesos
   if (shouldDrawBones) {
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.lineCap = 'butt';    // 'round' redondeaba las puntas y sumaba medio pixel
+    ctx.lineJoin = 'miter';
 
     for (let i = 0; i < POSE_CONNECTIONS.length; i++) {
       const conn = POSE_CONNECTIONS[i];
-      const p1 = landmarks[conn.from];
-      const p2 = landmarks[conn.to];
+      const p1 = suaves[conn.from];
+      const p2 = suaves[conn.to];
       if (!p1 || !p2) continue;
 
       const conf1 = p1.visibility !== undefined ? p1.visibility : 1.0;
@@ -3701,7 +3921,7 @@ function renderOpenPoseOverlay(landmarks) {
         ctx.strokeStyle = col;
         ctx.lineWidth = boneWidth;
         ctx.shadowColor = col;
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 0;     // SIN halo: el glow engrosaba la linea (era lo que se veia grueso)
 
         ctx.beginPath();
         ctx.moveTo(x1, y1);
@@ -3713,8 +3933,8 @@ function renderOpenPoseOverlay(landmarks) {
 
   // 4.2) Graficar Puntos del Cuerpo (Landmarks)
   if (shouldDrawLandmarks) {
-    for (let i = 0; i < landmarks.length; i++) {
-      const lm = landmarks[i];
+    for (let i = 0; i < suaves.length; i++) {
+      const lm = suaves[i];
       const conf = lm.visibility !== undefined ? lm.visibility : 1.0;
       if (conf < minConf) continue;
 
@@ -3723,20 +3943,20 @@ function renderOpenPoseOverlay(landmarks) {
 
       const isAnchor = (i === 0 || i === 15 || i === 16);
 
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 0;     // puntos sin halo (antes 8: se veian como manchas)
       ctx.shadowColor = isAnchor ? '#ff0055' : (theme === 'phosphor' ? '#00ff41' : '#00f0ff');
 
       ctx.beginPath();
-      ctx.arc(x, y, isAnchor ? ptRadius + 3 : ptRadius, 0, Math.PI * 2);
+      ctx.arc(x, y, isAnchor ? ptRadius + 1.5 : ptRadius, 0, Math.PI * 2);
       ctx.fillStyle = isAnchor ? '#ff0055' : (theme === 'phosphor' ? '#00ff41' : '#ffffff');
       ctx.fill();
 
       // Anillo de fijación en puntos de interacción
       if (isAnchor) {
         ctx.beginPath();
-        ctx.arc(x, y, ptRadius + 8, 0, Math.PI * 2);
+        ctx.arc(x, y, ptRadius + 3.5, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(255, 0, 85, 0.75)';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1;
         ctx.stroke();
       }
     }
@@ -3812,18 +4032,13 @@ function renderSilhouetteCutout(results) {
 function renderDepthMap(results, landmarks) {
   if (!DOM.depthCanvas || !DOM.depthPip) return;
 
-  const isEnabled = appState.renderConfig.depthEnabled || appState.trackingConfig.showDepthMap;
-  if (!isEnabled) {
-    if (!DOM.depthPip.classList.contains('hidden')) {
-      DOM.depthPip.classList.add('hidden');
-    }
-    return;
-  }
-
-  if (DOM.depthPip.classList.contains('hidden')) {
-    DOM.depthPip.classList.remove('hidden');
-  }
-
+  // La visibilidad del monitor la decide SOLO el parpadeo aleatorio
+  // (PIP_RANDOM_MIN_S..MAX_S): no queda fijo en pantalla aunque las capas estén on.
+  /* ⚠ El DEPTH MAP QUE ENTRA AL SHADER SE DIBUJA SIEMPRE. DOM.depthCanvas es la
+     textura que muestrea el shader maestro (u_depthTexture): si esta función
+     corta, el shader se queda con el último frame (congelado). El parpadeo
+     aleatorio sólo decide si el MONITOR de costado se ve en pantalla
+     (DOM.depthPip), nunca si la textura se dibuja. */
   appState.depthFrameId = (appState.depthFrameId || 0) + 1;
 
   let mask = (results && results.segmentationMask) ? results.segmentationMask : null;
@@ -3884,17 +4099,8 @@ function renderDepthMap(results, landmarks) {
 function renderFaceCamera(landmarks) {
   if (!DOM.faceCanvas || !DOM.facePip) return;
 
-  if (!appState.trackingConfig.showFaceCamera) {
-    if (!DOM.facePip.classList.contains('hidden')) {
-      DOM.facePip.classList.add('hidden');
-    }
-    return;
-  }
-
-  if (DOM.facePip.classList.contains('hidden')) {
-    DOM.facePip.classList.remove('hidden');
-  }
-
+  /* Igual que el depth: el seguimiento facial se dibuja SIEMPRE (de acá salen
+     los landmarks del cursor y el encuadre). El parpadeo sólo esconde el MONITOR. */
   const canvas = DOM.faceCanvas;
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
@@ -4008,7 +4214,13 @@ function isTrackingNeeded() {
     appState.trackingConfig.showDepthMap ||
     appState.renderConfig.faceEnabled ||
     appState.trackingConfig.showFaceCamera ||
-    appState.renderConfig.cutoutEnabled
+    appState.renderConfig.cutoutEnabled ||
+    // El shader maestro muestrea el depth en TODOS los frames: mientras esté
+    // activo la inferencia tiene que correr, aunque los monitores PiP estén
+    // apagados por el parpadeo aleatorio.
+    Boolean(appState.masterOutputShader && appState.masterOutputShader.active) ||
+    appState.pipCycleVisible.face ||
+    appState.pipCycleVisible.depth
   );
   if (visualTrackingActive) return true;
 
@@ -4170,12 +4382,10 @@ function onPoseResults(results) {
   if (appState.renderConfig.flowfieldEnabled || appState.trackingConfig.flowField) {
     renderFlowFieldOverlay(landmarks);
   }
-  if (appState.renderConfig.depthEnabled || appState.trackingConfig.showDepthMap) {
-    renderDepthMap(results, landmarks);
-  }
-  if (appState.renderConfig.faceEnabled || appState.trackingConfig.showFaceCamera) {
-    renderFaceCamera(landmarks);
-  }
+  // SIEMPRE: el depth map y el seguimiento facial son ENTRADAS del shader maestro
+  // (u_depthTexture) y del cursor. Lo que parpadea es el MONITOR, no el dibujo.
+  renderDepthMap(results, landmarks);
+  renderFaceCamera(landmarks);
 
   // 3. Control del Cursor de Juego (Solo si NO se está usando el mouse)
   if (appState.isUsingMouse) return;
@@ -4244,6 +4454,11 @@ function loadTrackingConfigFromStorage() {
     const saved = localStorage.getItem('sincretismo_tracking_config');
     if (saved) {
       const parsed = JSON.parse(saved);
+      /* MIGRACION de grosores: los valores viejos venian en px "nominales"
+         (4 = 1 px real dibujado). Ahora el slider vale px reales, asi que un
+         valor viejo > 5 se convierte una sola vez (los nuevos nunca superan 5/7). */
+      if (Number(parsed.boneWidth) > 5) parsed.boneWidth = Math.max(0.25, Number(parsed.boneWidth) * 0.25);
+      if (Number(parsed.pointRadius) > 7) parsed.pointRadius = Math.max(0.5, Number(parsed.pointRadius) * 0.25);
       appState.trackingConfig = { ...appState.trackingConfig, ...parsed };
       console.log('[TRACKING] Configuración cargada de localStorage:', appState.trackingConfig);
     }
@@ -4473,12 +4688,179 @@ const PARTICLE_FONT_FAMILIES = {
 // preferencia de PARTÍCULAS / SHADER ASCII / COLORES sobrevivía al recargar.
 var visualConfigReady = false;
 
+// ============================================================================
+// MASTER RDM · panel de control del patrón de fondo del SHADER DEL MASTER OUTPUT
+// ----------------------------------------------------------------------------
+// El fondo de las cajas de palabras y del contenedor del haiku dejó de ser un FBM:
+// ahora es el patrón del shader "rdmf" de jpShadereditor (autor jpupper), un campo
+// de RUIDO ALEATORIO POR CAPAS. Los deslizadores son EXACTAMENTE los uniforms de
+// FORMA del shader original (cnt, ite_scale, speedx, speedy, speedrot, speedrdm,
+// sm1, sm2, e_force) en su escala física, más la PRESENCIA (cuánto tapa al fondo
+// anterior) y el COLOR, que arranca en BLANCO.
+// ============================================================================
+// PALETA UNIFICADA: la del GLOBALSTYLE (/globalstyle.html -> global_style.json).
+// Se lee EN VIVO (cada frame), así sigue los cambios de la página de diseño sin
+// recargar. Devuelve los dos acentos en 0..1 para los uniforms del shader.
+function paletaGlobal() {
+  const c = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
+  const hexA = c.borde || c.acento || '#ff000d';
+  const hexB = c.acento2 || c.texto || '#e88f93';
+  return {
+    hexA: hexA,
+    hexB: hexB,
+    a: hexToRgb01(hexA, [1, 0, 0]),
+    b: hexToRgb01(hexB, [0.9, 0.6, 0.6])
+  };
+}
+
+const MASTER_RDM_DEF = {
+  cnt: 11,          // capas (1..20)
+  iteScale: 0.5,    // escala por capa (0..10)
+  speedX: 0.0,      // deriva horizontal (-0.2..0.2)
+  speedY: 0.0,      // deriva vertical (-0.2..0.2)
+  speedRot: 0.0,    // rotación de las capas (-0.02..0.02)
+  speedRnd: 0.5,    // velocidad del random stepped (0..1)
+  sm1: 0.1,         // umbral bajo del smoothstep
+  sm2: 0.86,        // umbral alto del smoothstep
+  force: 0.87,      // fuerza/brillo final (e_force)
+  mix: 1.0,         // presencia: cuánto reemplaza al fondo anterior
+  color: '#ffffff', // color del patrón cuando NO se sigue la paleta
+  seguirPaleta: 1,  // 1 = patrón, marcos y contenedor usan la PALETA GLOBAL
+  camTinte: 0,      // % de tinte de la cámara con la paleta (shader, 0 = original)
+  pipTinte: 60      // % de tinte de los monitores PiP (depth + facial) con la paleta
+};
+
+const MASTER_RDM_PARAMS = [
+  { key: 'cnt',      etq: 'CAPAS',              unid: 'cnt',               min: 1,     max: 20,    step: 1,      dec: 0, desc: 'Cuántas capas de ruido aleatorio se promedian. Más capas = más fino.' },
+  { key: 'iteScale', etq: 'ESCALA POR CAPA',    unid: 'ite_scale',         min: 0,     max: 10,    step: 0.05,   dec: 2, desc: 'Cuánto se agranda el UV en cada capa sucesiva.' },
+  { key: 'speedX',   etq: 'VELOCIDAD HORIZONTAL', unid: 'speedx',          min: -0.2,  max: 0.2,   step: 0.005,  dec: 3, desc: 'Deriva del patrón hacia los costados.' },
+  { key: 'speedY',   etq: 'VELOCIDAD VERTICAL',  unid: 'speedy',           min: -0.2,  max: 0.2,   step: 0.005,  dec: 3, desc: 'Deriva del patrón hacia arriba/abajo.' },
+  { key: 'speedRot', etq: 'ROTACIÓN',           unid: 'speedrot',          min: -0.02, max: 0.02,  step: 0.0005, dec: 4, desc: 'Giro de cada capa con el tiempo.' },
+  { key: 'speedRnd', etq: 'VELOCIDAD DEL RANDOM', unid: 'speedrdm',        min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Qué tan rápido cambia el valor aleatorio de cada capa.' },
+  { key: 'sm1',      etq: 'SMOOTH BAJO',        unid: 'sm1',               min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Umbral inferior del smoothstep: dónde empieza a aparecer el patrón.' },
+  { key: 'sm2',      etq: 'SMOOTH ALTO',        unid: 'sm2',               min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Umbral superior: dónde llega a blanco pleno. Muy cerca de sm1 = bordes duros.' },
+  { key: 'force',    etq: 'FUERZA',             unid: 'e_force',           min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Brillo total del patrón. 0 = fondo negro.' },
+  { key: 'mix',      etq: 'PRESENCIA',          unid: 'u_rdmMix',          min: 0,     max: 1,     step: 0.01,   dec: 2, desc: '1 = el patrón tapa por completo el fondo anterior (palabras Y contenedor del haiku).' },
+  { key: 'camTinte', etq: 'TINTE DE LA CÁMARA', unid: 'u_camPal',          min: 0,     max: 100,   step: 1,      dec: 0, desc: 'Cuánto se pinta la imagen de la cámara con la PALETA GLOBAL (0 = cámara original).' },
+  { key: 'pipTinte', etq: 'TINTE DE LOS MONITORES', unid: 'pip (CSS)',     min: 0,     max: 100,   step: 1,      dec: 0, desc: 'Cuánto se pintan con la PALETA GLOBAL los monitores PiP: DEPTH MAP y BIOMETRÍA FACIAL.' }
+];
+
+function masterRdmState() {
+  if (!appState.masterRdm) appState.masterRdm = { ...MASTER_RDM_DEF };
+  return appState.masterRdm;
+}
+
+// Normaliza la escala física del panel a 0..1 (lo que el shader mapea con mapr).
+function rdNorm(v, lo, hi) {
+  const n = (Number(v) - lo) / (hi - lo);
+  return Math.min(1, Math.max(0, isFinite(n) ? n : 0));
+}
+
+function buildMasterRdmPanel() {
+  const grid = document.getElementById('masterrdm-grid');
+  if (!grid || grid.dataset.listo === '1') return;
+  grid.dataset.listo = '1';
+  const st = masterRdmState();
+
+  MASTER_RDM_PARAMS.forEach(pr => {
+    const item = document.createElement('div');
+    item.className = 'calib-item';
+    item.innerHTML =
+      '<label for="cfg-rdm-' + pr.key + '"><strong>' + pr.etq + '</strong> <small>(' + pr.unid + ')</small>: ' +
+      '<span id="val-rdm-' + pr.key + '">' + st[pr.key] + '</span></label>' +
+      '<input type="range" id="cfg-rdm-' + pr.key + '" min="' + pr.min + '" max="' + pr.max + '" step="' + pr.step + '" value="' + st[pr.key] + '">' +
+      '<small class="item-desc">' + pr.desc + '</small>';
+    grid.appendChild(item);
+    const inp = item.querySelector('input');
+    const val = item.querySelector('#val-rdm-' + pr.key);
+    inp.addEventListener('input', () => {
+      const v = parseFloat(inp.value);
+      masterRdmState()[pr.key] = v;
+      val.textContent = pr.dec ? v.toFixed(pr.dec) : String(v);
+      saveVisualConfigToStorage();
+    });
+  });
+
+  const col = document.createElement('div');
+  col.className = 'calib-item calib-item-inline';
+  col.innerHTML = '<label for="cfg-rdm-color"><strong>COLOR DEL PATRÓN</strong>:</label>' +
+    '<input type="color" id="cfg-rdm-color" class="word-color-swatch" value="' + st.color + '" title="Blanco = tal cual el shader rdmf">';
+  grid.appendChild(col);
+  col.querySelector('input').addEventListener('input', e => {
+    masterRdmState().color = e.target.value;
+    saveVisualConfigToStorage();
+  });
+
+  const palItem = document.createElement('div');
+  palItem.className = 'calib-item';
+  palItem.innerHTML = '<label class="pa-check-label" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">' +
+    '<input type="checkbox" id="cfg-rdm-paleta"' + (st.seguirPaleta ? ' checked' : '') + ' style="margin-top:3px;">' +
+    '<span><strong>SEGUIR PALETA GLOBAL</strong> — el patrón RDM, los marcos de las palabras, el contenedor del haiku y el tinte de la cámara se pintan con la paleta de <em>/globalstyle.html</em> (STEAMPUNK COBRE, etc.).</span></label>';
+  grid.appendChild(palItem);
+  palItem.querySelector('input').addEventListener('change', (e) => {
+    masterRdmState().seguirPaleta = e.target.checked ? 1 : 0;
+    _pipTinteUltimo = '';
+    saveVisualConfigToStorage();
+    if (typeof showToast === 'function') {
+      showToast(e.target.checked ? 'MASTER OUTPUT SHADER: siguiendo la paleta global' : 'MASTER OUTPUT SHADER: colores fijos del shader', 'info');
+    }
+  });
+
+  const rst = document.createElement('div');
+  rst.className = 'calib-item calib-item-inline';
+  rst.innerHTML = '<button type="button" class="cctv-btn" id="cfg-rdm-reset">↺ VALORES ORIGINALES DEL SHADER</button>';
+  grid.appendChild(rst);
+  rst.querySelector('button').addEventListener('click', () => {
+    appState.masterRdm = { ...MASTER_RDM_DEF };
+    syncMasterRdmInputs();
+    saveVisualConfigToStorage();
+    if (typeof showToast === 'function') showToast('↺ MASTER RDM: valores originales del shader rdmf', 'success');
+  });
+
+  syncMasterRdmInputs();
+}
+
+// Los monitores PiP (depth + biometría facial) se pintan con la paleta global con
+// una capa .pip-paleta-tint (mix-blend-mode: color): cambia el TONO y conserva la
+// luminancia, así la imagen sigue siendo legible. Opacidad = TINTE DE LOS MONITORES.
+var _pipTinteUltimo = '';
+function aplicarTintePaletaPips(pal, rdmParams) {
+  const tinte = Math.max(0, Math.min(100, Number(rdmParams && rdmParams.pipTinte) || 0)) / 100;
+  const modo = (rdmParams && (rdmParams.seguirPaleta === 0 || rdmParams.seguirPaleta === false)) ? 0 : 1;
+  const color = (pal && pal.hexB) || '#ffffff';
+  const firma = color + '|' + tinte.toFixed(2) + '|' + modo;
+  if (firma === _pipTinteUltimo) return;
+  _pipTinteUltimo = firma;
+  document.querySelectorAll('.pip-paleta-tint').forEach((el) => {
+    el.style.background = color;
+    el.style.opacity = (tinte * modo).toFixed(3);
+  });
+}
+
+function syncMasterRdmInputs() {
+  if (!document.getElementById('masterrdm-grid')) return;
+  const st = masterRdmState();
+  MASTER_RDM_PARAMS.forEach(pr => {
+    const inp = document.getElementById('cfg-rdm-' + pr.key);
+    const val = document.getElementById('val-rdm-' + pr.key);
+    if (inp) inp.value = st[pr.key];
+    if (val) val.textContent = pr.dec ? Number(st[pr.key]).toFixed(pr.dec) : String(st[pr.key]);
+  });
+  const c = document.getElementById('cfg-rdm-color');
+  if (c) c.value = st.color || '#ffffff';
+  const p = document.getElementById('cfg-rdm-paleta');
+  if (p) p.checked = !(st.seguirPaleta === 0 || st.seguirPaleta === false);
+  _pipTinteUltimo = '';
+}
+
 function saveVisualConfigToStorage() {
   if (!visualConfigReady) return;
   try {
     localStorage.setItem('sincretismo_visual_config', JSON.stringify({
+      particlesRev: PARTICLES_REV,
       ascii: appState.asciiConfig,
       particles: appState.particlesConfig,
+      masterRdm: appState.masterRdm,
       uiColors: appState.uiColors,
       uiPalette: appState.uiPalette
     }));
@@ -4491,9 +4873,25 @@ function loadVisualConfigFromStorage() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.ascii) appState.asciiConfig = { ...appState.asciiConfig, ...parsed.ascii };
-      if (parsed.particles) appState.particlesConfig = { ...appState.particlesConfig, ...parsed.particles };
-      if (parsed.uiColors) appState.uiColors = { ...UI_COLORS, ...parsed.uiColors };
-      if (parsed.uiPalette) appState.uiPalette = parsed.uiPalette;
+      if (parsed.particles) {
+        const merge = { ...appState.particlesConfig, ...parsed.particles };
+        /* REVISION DE PARTICULAS: los tamanos de letra guardados de una version
+           vieja (frase 26/42, centro 38) NO pisan los nuevos: con la revieja el
+           haiku se armaba con letra chica aunque se cambiara el default. */
+        if ((Number(parsed.particlesRev) || 0) < PARTICLES_REV) {
+          merge.fontSizePhrase = appState.particlesConfig.fontSizePhrase;
+          merge.fontSizeCenter = appState.particlesConfig.fontSizeCenter;
+        }
+        appState.particlesConfig = merge;
+      }
+      if (parsed.masterRdm) appState.masterRdm = { ...MASTER_RDM_DEF, ...parsed.masterRdm };
+      /* Si el SERVER ya entregó la paleta (config.json), esa manda: si no, un
+         localStorage viejo con la paleta "matrix" (verde) pisaba la paleta cobre
+         recién guardada y los fondos seguían verdes. */
+      if (!appState._uiFromServer) {
+        if (parsed.uiColors) appState.uiColors = { ...UI_COLORS, ...parsed.uiColors };
+        if (parsed.uiPalette) appState.uiPalette = parsed.uiPalette;
+      }
       console.log('[VISUAL] Configuración visual cargada de localStorage.');
     }
   } catch (e) {}
@@ -4502,6 +4900,7 @@ function loadVisualConfigFromStorage() {
   applyParticlesConfig();
   syncParticlesInputs();
   syncAsciiInputs();
+  syncMasterRdmInputs();
   applyUiColors();
   syncUiColorsInputs();
 }
@@ -4509,6 +4908,30 @@ function loadVisualConfigFromStorage() {
 // ============================================================================
 // PALETAS GLOBALES — aplicar / renderizar / marcar estado
 // ============================================================================
+/* Guarda en el SERVER (config.json) los colores elegidos en la pestaña COLORES,
+   con rebote: así el server sigue siendo la fuente de verdad y no vuelve el verde.
+   Se mandan SIEMPRE modelo/prompt/wordsPool porque POST /config los reescribe
+   (si faltan, el server pone el modelo por defecto). */
+function guardarPaletaEnServidor() {
+  clearTimeout(window._paletaPend);
+  window._paletaPend = setTimeout(() => {
+    try {
+      const cfg = appState.config || {};
+      const payload = {
+        ollamaModel: cfg.ollamaModel || DEFAULT_CONFIG.ollamaModel,
+        systemPrompt: cfg.systemPrompt || DEFAULT_CONFIG.systemPrompt,
+        uiColors: appState.uiColors,
+        uiPalette: appState.uiPalette
+      };
+      if (Array.isArray(cfg.wordsPool) && cfg.wordsPool.length) payload.wordsPool = cfg.wordsPool;
+      sbFetch('/config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
+    } catch (e) {}
+  }, 900);
+}
+
 function applyUiPalette(paletteId) {
   const pal = getPaletteById(paletteId);
   appState.uiPalette = pal.id;
@@ -4516,6 +4939,8 @@ function applyUiPalette(paletteId) {
   applyUiColors();
   syncUiColorsInputs();
   updatePaletteUi();
+  appState._uiFromServer = true;   // la eleccion manda (no la pisa el localStorage)
+  guardarPaletaEnServidor();
 }
 
 function markPaletteCustom() {
@@ -4835,17 +5260,17 @@ function applyParticlesConfig() {
   const root = document.documentElement;
   root.style.setProperty('--word-font-size', `${p.fontSize}px`);
   // Tamaño por ESTADO: centro (girando/transformando) y frase final (+ auxiliares)
-  root.style.setProperty('--word-font-size-center', `${Number(p.fontSizeCenter) || 38}px`);
-  root.style.setProperty('--word-font-size-phrase', `${Number(p.fontSizePhrase) || 26}px`);
+  root.style.setProperty('--word-font-size-center', `${Number(p.fontSizeCenter) || 52}px`);
+  root.style.setProperty('--word-font-size-phrase', `${Number(p.fontSizePhrase) || 62}px`);
   root.style.setProperty('--word-font-family', PARTICLE_FONT_FAMILIES[p.fontFamily] || PARTICLE_FONT_FAMILIES.organic);
   root.style.setProperty('--word-color', p.color);
   root.style.setProperty('--word-outline', `${p.outline}px`);
+  root.style.setProperty('--word-stroke-width', `${Math.max(1, p.outline || 1.5)}px`);
+  root.style.setProperty('--word-outline-color', '#000000');
   if (p.outlineGlow !== false) {
-    root.style.setProperty('--word-outline-color', p.color);
-    root.style.setProperty('--word-glow', `0 2px 10px rgba(0, 0, 0, 0.8), 0 0 18px ${p.color}`);
+    root.style.setProperty('--word-glow', `-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 14px ${p.color}`);
   } else {
-    root.style.setProperty('--word-outline-color', 'rgba(4, 8, 18, 0.85)');
-    root.style.setProperty('--word-glow', '0 2px 10px rgba(0, 0, 0, 0.75)');
+    root.style.setProperty('--word-glow', '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 10px rgba(0, 0, 0, 0.9)');
   }
   appState.maxFloatingWords = Math.max(3, Number(p.maxWords) || 9);
   saveVisualConfigToStorage();
@@ -4955,13 +5380,16 @@ function applyRenderLayers() {
   }
 
   // 6. Monitores PiP (sincronizados con Tab Tracking)
+  //    OJO: la VISIBILIDAD de los monitores la maneja el PARPADEO ALEATORIO
+  //    (updatePipAutoCycle): acá sólo se sincroniza el flag de capa. Si acá se
+  //    hiciera toggle con r.depthEnabled/r.faceEnabled, el monitor quedaría fijo.
   if (DOM.depthPip) {
     t.showDepthMap = r.depthEnabled;
-    DOM.depthPip.classList.toggle('hidden', !r.depthEnabled);
+    DOM.depthPip.classList.toggle('hidden', !appState.pipCycleVisible.depth);
   }
   if (DOM.facePip) {
     t.showFaceCamera = r.faceEnabled;
-    DOM.facePip.classList.toggle('hidden', !r.faceEnabled);
+    DOM.facePip.classList.toggle('hidden', !appState.pipCycleVisible.face);
   }
 
   // 8. Filtros Analógicos CCTV (Scanlines & Viñeta)
@@ -6387,7 +6815,7 @@ async function requestOllamaHijack(words) {
 Conceptos cibernéticos correspondientes: ${coldJoined}
 
 Misión poética:
-Escribe un poema en formato HAIKU de EXACTAMENTE 3 versos (separados por \\n) concebido e inspirado ENTERAMENTE ALREDEDOR del significado de estos tres conceptos:
+Escribe un poema en formato HAIKU de EXACTAMENTE 3 versos (SON 3 ORACIONES: NI UNA MÁS, NUNCA 4) (separados por \\n) concebido e inspirado ENTERAMENTE ALREDEDOR del significado de estos tres conceptos:
 - Verso 1: debe construirse en torno a la idea de "${coldList[0]}", integrando la palabra en MAYÚSCULAS.
 - Verso 2: debe construirse en torno a la idea de "${coldList[1]}", integrando la palabra en MAYÚSCULAS.
 - Verso 3: debe construirse en torno a la idea de "${coldList[2]}", integrando la palabra en MAYÚSCULAS y expresando una revelación íntima en primera persona.
@@ -6397,6 +6825,7 @@ REGLAS DE ORO:
 1. El haiku debe formarse de manera directa y coherente ALREDEDOR de los conceptos elegidos. Prohibido usar frases genéricas desconectadas o hablar de nieblas, bosques o madrugadas si no guardan relación con las palabras.
 2. Cada verso debe tener sentido sintáctico natural e impecable en español.
 3. Los 3 versos deben encadenarse como una sola reflexión armónica.
+4. CONTEO OBLIGATORIO: EXACTAMENTE 3 ORACIONES (una por verso). Cada verso cierra con UN solo punto final: nada de dos frases dentro del mismo verso. Si te aparece una cuarta oración, fundila en la tercera con una coma. El sistema recorta cualquier cuarta oración.
 
 Responde ÚNICAMENTE un objeto JSON:
 {
@@ -6516,6 +6945,53 @@ function hasDegenerativeRepetition(text) {
   return tokenRepeat.test(text) || subRepeat.test(text);
 }
 
+// ============================================================================
+// REGLA DURA: EL HAIKU SON SIEMPRE 3 ORACIONES (nunca 4)
+// ----------------------------------------------------------------------------
+// El modelo a veces devuelve 4 versos, o un verso con dos oraciones adentro.
+// Acá se cuenta por ORACIÓN (cada tramo que cierra en . ! ? … ) y, si sobran,
+// los sobrantes se funden hasta quedar EXACTAMENTE 3: primero los que están
+// dentro del MISMO verso (así los 3 términos no se descolocan) y, si no
+// alcanza, se fusionan los dos últimos. Al fusionar, el punto del primero pasa
+// a coma: dos oraciones se convierten en UNA.
+// Si hay menos de 3 no se toca nada: el chequeo de 3 versos ya recompone.
+// ============================================================================
+function fusionarDosOraciones(a, b) {
+  const izq = String(a || '').trim().replace(/[.!?…]+$/, '');
+  const der = String(b || '').trim();
+  if (!izq) return der;
+  if (!der) return izq;
+  return izq + ', ' + der;
+}
+
+function normalizarHaikuTresOraciones(texto) {
+  const crudo = String(texto == null ? '' : texto).replace(/\r/g, '').trim();
+  if (!crudo) return crudo;
+
+  const versos = crudo.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!versos.length) return crudo;
+
+  const piezas = [];
+  versos.forEach((v, idx) => {
+    const trozos = v.split(/(?<=[.!?…])["'»”]?\s+/).map(s => s.trim()).filter(Boolean);
+    (trozos.length ? trozos : [v]).forEach(t => piezas.push({ txt: t, verso: idx }));
+  });
+
+  while (piezas.length > 3) {
+    let idx = -1;
+    for (let i = piezas.length - 2; i >= 0; i--) {
+      if (piezas[i].verso === piezas[i + 1].verso) { idx = i; break; }
+    }
+    if (idx < 0) idx = piezas.length - 2;
+    const fusion = fusionarDosOraciones(piezas[idx].txt, piezas[idx + 1].txt);
+    const versoOrigen = piezas[idx].verso;
+    piezas.splice(idx, 2, { txt: fusion, verso: versoOrigen });
+  }
+
+  if (piezas.length < 3) return crudo;
+  return piezas.map(p => p.txt).join('\n');
+}
+
 function cleanSpeechText(s) {
   if (Array.isArray(s)) {
     s = s.map(item => String(item || '').trim()).filter(Boolean).join('\n');
@@ -6534,7 +7010,8 @@ function cleanSpeechText(s) {
   }
 
   if (str.length > 10 && !hasDegenerativeRepetition(str)) {
-    return str;
+    // REGLA DURA: el haiku sale SIEMPRE con 3 oraciones (nunca 4).
+    return normalizarHaikuTresOraciones(str);
   }
   return null;
 }
@@ -7013,9 +7490,64 @@ function updateIdleCta() {
   if (Date.now() - appState.lastUserActivity >= IDLE_CTA_DELAY_MS) showIdleCta();
 }
 
+// ============================================================================
+// CICLO AUTOMÁTICO DE 15 SEGUNDOS PARA BIOMETRÍA Y DEPTH MAP
+// ============================================================================
+// ============================================================================
+// PARPADEO ALEATORIO DE LOS MONITORES PiP (BIOMETRÍA FACIAL + DEPTH MAP)
+// Cada monitor tiene su PROPIO reloj: se prende por Y segundos y se apaga por Z,
+// con Y y Z sorteados en cada vuelta entre PIP_RANDOM_MIN_S y PIP_RANDOM_MAX_S
+// (5 a 30 s). No se sincronizan entre sí: a veces coinciden, a veces no.
+// ============================================================================
+function pipRandomMs() {
+  const s = PIP_RANDOM_MIN_S + Math.random() * (PIP_RANDOM_MAX_S - PIP_RANDOM_MIN_S);
+  return Math.round(s * 1000);
+}
+
+function setPipVisible(which, visible, now) {
+  if (appState.pipCycleVisible[which] === visible) return;
+  appState.pipCycleVisible[which] = visible;
+  const pip = (which === 'depth') ? DOM.depthPip : DOM.facePip;
+  if (pip) pip.classList.toggle('hidden', !visible);
+  // Cada cambio de estado sortea CUÁNTO dura este tramo (prendido o apagado).
+  appState.pipNextToggleAt[which] = now + pipRandomMs();
+  if (visible) {
+    updatePoseSegmentation();
+    triggerPoseInference();
+  }
+}
+
+function updatePipAutoCycle(now) {
+  if (appState.pipCycleDisabledByUser) return;
+
+  ['face', 'depth'].forEach((which) => {
+    const proximo = appState.pipNextToggleAt[which];
+    if (!proximo) {
+      // Primer arranque: arranca apagado y sortea cuándo aparece. El desfase
+      // inicial es distinto por monitor (y sorteado) para que no se prendan los
+      // dos juntos la primera vez; después cada uno sigue su propio reloj.
+      const desfase = pipRandomMs() * (which === 'depth' ? (0.25 + 0.75 * Math.random()) : 1);
+      appState.pipNextToggleAt[which] = now + Math.round(desfase);
+      return;
+    }
+    if (now >= proximo) setPipVisible(which, !appState.pipCycleVisible[which], now);
+  });
+
+  // Si el monitor facial está en su tramo visible y la cámara transmite pero no
+  // hay landmarks (modo mouse, nadie en cuadro): se dibuja el encuadre igual.
+  if (appState.pipCycleVisible.face && DOM.faceCanvas && DOM.video && DOM.video.readyState >= 2) {
+    if (!appState.lastLandmarks || appState.lastLandmarks.length === 0) {
+      renderFaceCamera([]);
+    }
+  }
+}
+
 function mainLoop(currentTimestamp) {
   const dt = Math.min((currentTimestamp - lastTimestamp) / 1000, 0.1);
   lastTimestamp = currentTimestamp;
+
+  // Requerimiento 2: Ciclo de aparición/desaparición cada 15s de los carteles PiP
+  updatePipAutoCycle(currentTimestamp);
 
   // 1. Suavizado (Lerp) del Cursor: Instantáneo si es mouse, calibrado si es cámara
   const lerpFactor = appState.isUsingMouse ? 0.65 : (appState.trackingConfig.smoothingFactor || 0.45);
@@ -7374,6 +7906,9 @@ function setupEventListeners() {
     });
   });
 
+  // Panel MASTER RDM (patrón de fondo del shader del master output)
+  buildMasterRdmPanel();
+
   // Botón Expandir / Reducir System Prompt
   const btnToggleExpand = document.getElementById('btn-toggle-prompt-expand');
   if (btnToggleExpand) {
@@ -7535,7 +8070,9 @@ function setupEventListeners() {
       input.addEventListener('input', (e) => {
         appState.uiColors[colorKey] = e.target.value;
         markPaletteCustom();
-        applyUiColors();
+        appState._uiFromServer = true;
+        applyUiColors();            // ya guarda en localStorage
+        guardarPaletaEnServidor();  // y en config.json del server
       });
     }
   });
@@ -7588,7 +8125,7 @@ function setupEventListeners() {
 
   if (DOM.cfgTrackBoneWidth) {
     DOM.cfgTrackBoneWidth.addEventListener('input', (e) => {
-      appState.trackingConfig.boneWidth = parseInt(e.target.value, 10);
+      appState.trackingConfig.boneWidth = parseFloat(e.target.value);
       if (DOM.valTrackBoneWidth) DOM.valTrackBoneWidth.textContent = e.target.value;
       saveTrackingConfigToStorage();
     });
@@ -7603,7 +8140,7 @@ function setupEventListeners() {
 
   if (DOM.cfgTrackPointRadius) {
     DOM.cfgTrackPointRadius.addEventListener('input', (e) => {
-      appState.trackingConfig.pointRadius = parseInt(e.target.value, 10);
+      appState.trackingConfig.pointRadius = parseFloat(e.target.value);
       if (DOM.valTrackPointRadius) DOM.valTrackPointRadius.textContent = e.target.value;
       saveTrackingConfigToStorage();
     });
@@ -7702,6 +8239,7 @@ function setupEventListeners() {
   // Cierre de monitores PiP
   if (DOM.btnCloseDepthPip) {
     DOM.btnCloseDepthPip.addEventListener('click', () => {
+      appState.pipCycleDisabledByUser = true;
       appState.trackingConfig.showDepthMap = false;
       if (DOM.depthPip) DOM.depthPip.classList.add('hidden');
       if (DOM.cfgTrackDepth) DOM.cfgTrackDepth.checked = false;
@@ -7712,6 +8250,7 @@ function setupEventListeners() {
 
   if (DOM.btnCloseFacePip) {
     DOM.btnCloseFacePip.addEventListener('click', () => {
+      appState.pipCycleDisabledByUser = true;
       appState.trackingConfig.showFaceCamera = false;
       if (DOM.facePip) DOM.facePip.classList.add('hidden');
       if (DOM.cfgTrackFace) DOM.cfgTrackFace.checked = false;
@@ -8309,8 +8848,8 @@ function setupEventListeners() {
         showOpenPose: false,
         drawBones: true,
         drawLandmarks: true,
-        boneWidth: 4,
-        pointRadius: 5,
+        boneWidth: 0.5,
+        pointRadius: 0.75,
         minConfidence: 0.5,
         colorTheme: 'cyberpunk',
         bodyCollision: true,

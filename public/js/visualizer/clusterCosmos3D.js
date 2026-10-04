@@ -11,10 +11,10 @@ const CLUSTER_RED_RAMP = [
   0xe01010, 0xc41a1a, 0xff5252, 0x990000
 ];
 
-/** Deja la primera letra en mayúscula (el banco de palabras viene en minúsculas). */
+/** Deja el texto en mayúsculas (requerimiento: todo en mayúsculas). */
 function capitalizeFirst(str) {
   const s = String(str ?? '');
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  return s.toUpperCase();
 }
 import { clusterManager } from '../engine/clusterManager.js';
 import { soundFX } from '../audio/soundFX.js';
@@ -315,14 +315,13 @@ const neuronFragmentShader = `
     vec3 somaColor = mix(dimBase, coreGlow, nucleus * 0.75);
 
     // Filamentos sinápticos activos (chispas que recorren la neurona)
-    // Usamos rojo bio-eléctrico intenso con sutil acento coral fuego (sin blanco puro)
-    vec3 sparkColor = mix(uElectricColor, vec3(1.0, 0.32, 0.25), sparks * 0.45);
+    vec3 sparkColor = mix(uElectricColor, uCoreColor, sparks * 0.45);
     somaColor += sparkColor * sparks * (0.22 + act * 0.95);
 
-    // Vaina de mielina / membrana exterior (fresnel bioluminiscente rojizo)
+    // Vaina de mielina / membrana exterior
     somaColor += uBaseColor * fresnel * (0.20 + act * 0.75);
 
-    // Respuesta a interacción hover: destello sináptico bio-eléctrico carmesí (no blanco/cyan)
+    // Respuesta a interacción hover: destello sináptico bio-eléctrico
     if (uHover > 0.01) {
       somaColor += uElectricColor * (sparks * 0.65 + fresnel * 0.60) * uHover;
     }
@@ -336,18 +335,11 @@ const neuronFragmentShader = `
       somaColor += vec3(1.0, 0.25, 0.05) * fresnel * 1.2 * uIsOrder;
     }
 
-    // LLEGADA DE UN IMPULSO: destello breve de la membrana. A proposito MUCHO mas
-    // suave que el planeta seleccionado (que ademas enciende rayos y corona).
+    // LLEGADA DE UN IMPULSO: destello breve de la membrana
     if (uGlow > 0.01) {
       float g = clamp(uGlow, 0.0, 1.4);
       somaColor += uElectricColor * (0.45 * fresnel + 0.28 * sparks + 0.18) * g;
     }
-
-    // Garantía estricta anti-blanco: limitar canales verde y azul para que la neurona siempre
-    // preserve su identidad de sinapsis bio-eléctrica carmesí sin deslavarse a blanco
-    somaColor.g = min(somaColor.g, 0.26);
-    somaColor.b = min(somaColor.b, 0.26);
-    somaColor = min(somaColor, vec3(1.15, 0.26, 0.26));
 
     // Opacidad orgánica: translúcida en reposo, densa y brillante al disparar
     float finalAlpha = clamp(0.20 + act * 0.65 + uIsOrder * 0.04 + uHover * 0.25 + clamp(uGlow, 0.0, 1.4) * 0.22, 0.0, 0.95);
@@ -390,13 +382,9 @@ const macroGanglionFragmentShader = `
     float coreNucleus = pow(1.0 - fresnel, 2.0);
 
     vec3 color = mix(uBaseColor * 0.45, uCoreColor, coreNucleus);
-    vec3 sparkColor = mix(uBaseColor, vec3(1.0, 0.35, 0.25), sparks * 0.5);
+    vec3 sparkColor = mix(uBaseColor, uCoreColor, sparks * 0.5);
     color += sparkColor * sparks * 1.35;
     color += uBaseColor * fresnel * 1.4;
-
-    color.g = min(color.g, 0.28);
-    color.b = min(color.b, 0.28);
-    color = min(color, vec3(1.2, 0.28, 0.28));
 
     gl_FragColor = vec4(color, 0.92);
   }
@@ -446,31 +434,85 @@ const fondoCellVertex = `
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
   }
 `;
-/* Membranas celulares: bandas finas del ruido + nucleos suaves. Muy tenue. */
-const fondoCellFragment = glslNoiseCommon + `
+/* ==========================================================================
+   FONDO RDM: el mismo patron del shader "rdmf" de jpShadereditor que usa
+   cambiapalabras (MASTER OUTPUT SHADER), portado a vec3 y muestreado con la
+   DIRECCION de la esfera (mapa equirectangular del cielo). Como el patron queda
+   fijo en el MUNDO, cuando la camara gira el patron gira con ella.
+   Los colores salen de la PALETA GLOBAL (global_style.json): uColorA (acento
+   primario, celdas) y uColorB (secundario, crestas).
+   ========================================================================== */
+const fondoCellFragment = `
   uniform float uTime;
   uniform float uIntensity;
   uniform vec3 uColorA;
   uniform vec3 uColorB;
+  uniform float uRdmCnt;        // capas (fisico 1..20)
+  uniform float uRdmIteScale;   // escala por capa (0..10)
+  uniform float uRdmSpeedRnd;   // velocidad del random (0..1)
+  uniform float uRdmSm1;
+  uniform float uRdmSm2;
+  uniform float uRdmForce;
   varying vec3 vDir;
 
-  float fbm4(vec3 p) {
-    float s = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 4; i++) { s += a * snoise(p); p *= 2.02; a *= 0.5; }
-    return s;
+  float rdMap(float v, float lo, float hi) { return lo + (hi - lo) * v; }
+  mat2 rdRotate2d(float a) { return mat2(cos(a), -sin(a), sin(a), cos(a)); }
+  mat2 rdScale2d(vec2 sc) { return mat2(sc.x, 0.0, 0.0, sc.y); }
+  float rdHash(vec2 p, float t) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43000.3 + t);
+  }
+
+  /* Ruido SUAVE en vez del ruido por CELDA (floor): antes cada celda devolvia un
+     valor constante y el fondo se veia como CUADRADOS PLANOS (los "cuadrados
+     rojos"). Ahora se interpolan los 4 vertices de la celda -> manchas suaves y
+     continuas, sin bordes rectos. */
+  float rdRandom(vec2 st, float t) {
+    vec2 i = floor(st.xy), f = fract(st.xy);
+    vec2 u = f * f * (3.0 - 2.0 * f);                      // suavizado entre celdas
+    float a = rdHash(i, t);
+    float b = rdHash(i + vec2(1.0, 0.0), t);
+    float c = rdHash(i + vec2(0.0, 1.0), t);
+    float d = rdHash(i + vec2(1.0, 1.0), t);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+  }
+
+  // Patron RDM (port del shader rdmf): promedio de uRdmCnt capas de ruido
+  // aleatorio con fase, rotacion y escala propias. Devuelve 0..1.
+  float rdmPattern(vec2 uv, float tiempo) {
+    int mcnt = int(floor(uRdmCnt));
+    if (mcnt < 1) mcnt = 1;
+    float mite = uRdmIteScale;
+    float mspeedrdm = uRdmSpeedRnd;
+    vec3 dib = vec3(1.0);
+    for (int i = 1; i < 10; i++) {
+      float fase = float(i) * 6.2831853 / float(mcnt);
+      vec2 uv2 = uv;
+      uv2 -= vec2(0.5); uv2 *= rdRotate2d(0.02 * tiempo); uv2 += vec2(0.5);
+      uv2 -= vec2(0.5); uv2 *= rdScale2d(vec2(mite * float(i))); uv2 += vec2(0.5);
+      float e = rdRandom(uv2 * mite * float(i), tiempo * mspeedrdm + fase);
+      dib += vec3(e);
+    }
+    dib /= (float(mcnt) + 1.0);
+    dib = smoothstep(uRdmSm1, max(uRdmSm2, uRdmSm1 + 0.001), dib);
+    return clamp(dib.r * uRdmForce, 0.0, 1.0);
   }
 
   void main() {
-    vec3 p = vDir * 2.35;
-    float t = uTime * 0.035;
-    float n = fbm4(p + vec3(t * 0.6, t * 0.22, -t));
-    float membrana = smoothstep(0.26, 0.0, abs(n));          // paredes de las celulas
-    float nucleo = smoothstep(0.32, 1.0, fbm4(p * 1.7 + vec3(-t * 0.4, t * 0.5, t * 0.3)));
+    vec3 dir = normalize(vDir);
+    // Mapa equirectangular de la esfera: la direccion (fija en el mundo) es la UV.
+    vec2 uvSky = vec2(atan(dir.z, dir.x) * 0.15915494 + 0.5, dir.y * 0.5 + 0.5);
+    uvSky *= vec2(4.0, 2.6);
+
+    float pat = rdmPattern(uvSky, uTime);
+    /* EDGE: banda fina donde el patron cruza el nivel medio. Dibuja el CONTORNO de
+       las manchas (como un mapa topografico) en vez del relleno cuadrado. */
+    float edge = 1.0 - smoothstep(0.0, 0.10, abs(pat - 0.5));
+    float membrana = smoothstep(0.30, 0.95, pat);            // relleno suave
+    float nucleo = smoothstep(0.70, 1.0, pat);               // crestas
     float resp = 0.82 + 0.18 * sin(uTime * 0.11);            // respiracion muy lenta
     float m = uIntensity * resp;
-    vec3 col = uColorA * (membrana * 0.90) + uColorB * (nucleo * 0.40);
-    float alpha = (membrana * 0.88 + nucleo * 0.22) * m;
+    vec3 col = uColorA * (membrana * 0.55) + uColorB * (nucleo * 0.35) + uColorB * (edge * 0.55);
+    float alpha = (membrana * 0.55 + nucleo * 0.20 + edge * 0.55) * m;
     gl_FragColor = vec4(col * m, alpha);
   }
 `;
@@ -497,6 +539,10 @@ export class ClusterCosmos3D {
       pelotitaColor: '#ffd6d6', pelotitaElec: 100, pulsoVel: 100,
       rayosVel: 100, llegadaGlowPct: 100,
       fondoIntensidad: 100, fondoVel: 100,
+      /* PATRON RDM DEL FONDO: cada uniform se maneja por separado (%, 100 = como esta).
+         Pedido: "poder manejar cada valor del uniform del fondo por separado". */
+      fondoRdmCnt: 100, fondoRdmIteScale: 100, fondoRdmSpeedRnd: 100,
+      fondoRdmSm1: 100, fondoRdmSm2: 100, fondoRdmForce: 100,
       camAnimVel: 100, camWarpVel: 100, camSeguirDist: 58, camManualVel: 100, camGiroPct: 100
     };
     this.AJUSTES_MIN = {
@@ -505,6 +551,8 @@ export class ClusterCosmos3D {
       pelotitaElec: 0, pulsoVel: 0,
       rayosVel: 0, llegadaGlowPct: 0,
       fondoIntensidad: 0, fondoVel: 0,
+      fondoRdmCnt: 0, fondoRdmIteScale: 0, fondoRdmSpeedRnd: 0,
+      fondoRdmSm1: 0, fondoRdmSm2: 0, fondoRdmForce: 0,
       camAnimVel: 0, camWarpVel: 0, camSeguirDist: 0, camManualVel: 0, camGiroPct: 0
     };
     this.AJUSTES_TEXTO = ['pelotitaColor'];   // claves NO numericas (color hex)
@@ -514,6 +562,8 @@ export class ClusterCosmos3D {
       pelotitaElec: 300, pulsoVel: 400,
       rayosVel: 400, llegadaGlowPct: 300,
       fondoIntensidad: 300, fondoVel: 400,
+      fondoRdmCnt: 300, fondoRdmIteScale: 300, fondoRdmSpeedRnd: 300,
+      fondoRdmSm1: 300, fondoRdmSm2: 300, fondoRdmForce: 300,
       camAnimVel: 400, camWarpVel: 400, camSeguirDist: 220, camManualVel: 400, camGiroPct: 400
     };
     this.ajustes = this.leerAjustesTexto();
@@ -528,6 +578,9 @@ export class ClusterCosmos3D {
     this.pulsoMs = 0;
     this.fondoMs = 0;
     this.fondo = { intensidad: 1, vel: 1 };
+    // Valores BASE de fabrica de cada uniform del patron RDM del fondo: el panel los
+    // mueve en % sobre esto (100% = como estaba).
+    this.RDM_BASE = { cnt: 11, iteScale: 0.5, speedRnd: 0.5, sm1: 0.12, sm2: 0.58, force: 0.95 };
     // VELOCIDAD DE LOS RAYOS (independiente del pulso de las pelotitas) y efecto de
     // LLEGADA de un impulso a un planeta: halo sutil + pico de brillo + rayos mas lentos.
     // Cada rig de rayos acumula su PROPIO tiempo (rig.tMs) para poder frenarse solo.
@@ -580,11 +633,23 @@ export class ClusterCosmos3D {
     this.warpTime = 0;
     this.warpDuration = 1.4;
 
+    // Modo Idle Continuo (Requerimiento 3)
+    this.lastUserInteraction = performance.now();
+    this.idleDwellTimer = 0;
+    this.idleCategoryIndex = 0;
+    this.isIdleCruising = false;
+
     this.followYaw = 0;
     this.followPitch = 0.25;
     this.followDistance = 58;
     this._prevPlanetPos = new THREE.Vector3();
     this._followInitialized = false;
+
+    // 2D Trajectory & Flight Tracking
+    this.originNode = null;
+    this.lastLandedNode = null;
+    this.isTraveling = false;
+    this.travelProgress = 1.0;
 
     // Continuous Spaceship Flight / Neural Travel
     this.isContinuousFlying = false;
@@ -744,6 +809,14 @@ export class ClusterCosmos3D {
     if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
       document.fonts.ready.then(() => { try { this.forzarRedibujoTextos(); } catch (e) {} });
     }
+    if (document.fonts && typeof document.fonts.addEventListener === 'function') {
+      document.fonts.addEventListener('loadingdone', () => { try { this.forzarRedibujoTextos(); } catch (e) {} });
+    }
+    window.addEventListener('globalstyle:applied', () => {
+      try {
+        this.aplicarColoresEsferas();
+      } catch (e) {}
+    });
   }
 
   /**
@@ -799,7 +872,16 @@ export class ClusterCosmos3D {
         uTime: { value: 0 },
         uIntensity: { value: 1 },
         uColorA: { value: new THREE.Color(0x3d0009) },
-        uColorB: { value: new THREE.Color(0x1c0004) }
+        uColorB: { value: new THREE.Color(0x1c0004) },
+        // Patron RDM de fondo. OJO: el rdmf divide por (cnt+1), asi que con
+        // sm2 alto el cielo sale CASI NEGRO (medido: media 1.19/255 con sm2 0.86).
+        // Estos valores lo dejan VISIBLE como celulas sin tapar las neuronas.
+        uRdmCnt: { value: 11 },
+        uRdmIteScale: { value: 0.5 },
+        uRdmSpeedRnd: { value: 0.5 },
+        uRdmSm1: { value: 0.12 },
+        uRdmSm2: { value: 0.58 },
+        uRdmForce: { value: 0.95 }
       },
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -824,12 +906,36 @@ export class ClusterCosmos3D {
     const k = this.fondo.intensidad;
     if (this.bgCellMat) {
       this.bgCellMat.uniforms.uIntensity.value = k;
+      /* PATRON RDM: cada uniform con su propio control (panel P -> pestana FONDO). */
+      const pct = (clave) => Math.max(0, Number(a[clave] === undefined ? 100 : a[clave]) || 0) / 100;
+      const B = this.RDM_BASE;
+      const u = this.bgCellMat.uniforms;
+      if (u.uRdmCnt)      u.uRdmCnt.value      = Math.max(1, Math.min(9, B.cnt * pct('fondoRdmCnt')));
+      if (u.uRdmIteScale) u.uRdmIteScale.value = Math.max(0.01, B.iteScale * pct('fondoRdmIteScale'));
+      if (u.uRdmSpeedRnd) u.uRdmSpeedRnd.value = B.speedRnd * pct('fondoRdmSpeedRnd');
+      if (u.uRdmSm1)      u.uRdmSm1.value      = Math.min(0.99, B.sm1 * pct('fondoRdmSm1'));
+      if (u.uRdmSm2)      u.uRdmSm2.value      = Math.min(1.0, B.sm2 * pct('fondoRdmSm2'));
+      if (u.uRdmForce)    u.uRdmForce.value    = Math.min(2.0, B.force * pct('fondoRdmForce'));
       this.bgCellMat.visible = k > 0.001;
+      // PATRON RDM + PALETA GLOBAL: el fondo del universo cumple la misma
+      // seleccion de colores que cambiapalabras (global_style.json). Se lee en
+      // vivo: si cambias la paleta en /globalstyle.html, el 3D la sigue.
+      const col = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
+      const cA = col.clusterEsfera || col.acento || '#ff000d';
+      const cB = col.clusterNucleo || col.acento2 || '#9a000d';
+      try {
+        this.bgCellMat.uniforms.uColorA.value.set(cA);
+        this.bgCellMat.uniforms.uColorB.value.set(cB);
+      } catch (e) {}
     }
     if (this.bgStars) {
       this.bgStars.visible = k > 0.001;
       if (this.bgStarMat && this.bgStarMat.uniforms.uColor) {
-        this.bgStarMat.uniforms.uColor.value.setRGB(1.0 * k, 0.42 * k, 0.42 * k);
+        // Las estrellas tambien salen de la paleta (pelotita / texto), atenuadas.
+        const col = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
+        const cE = col.clusterPelotita || col.texto || '#ffd6d6';
+        try { this.bgStarMat.uniforms.uColor.value.set(cE).multiplyScalar(k); }
+        catch (e) { this.bgStarMat.uniforms.uColor.value.setRGB(1.0 * k, 0.42 * k, 0.42 * k); }
       }
     }
     return { intensidad: a.fondoIntensidad, velocidad: a.fondoVel };
@@ -1049,11 +1155,27 @@ export class ClusterCosmos3D {
       const cz = Math.sin(angle) * ringRadius;
 
       const clusterCenter = new THREE.Vector3(cx, cy, cz);
-      // PALETA UNIFICADA ROJO/NEGRO: la categoría conserva su identidad por
-      // índice en una rampa monócroma roja (ya no usa cluster.color).
-      const hexColor = CLUSTER_RED_RAMP[idx % CLUSTER_RED_RAMP.length];
-      const colorHex = '#' + hexColor.toString(16).padStart(6, '0');
-      const colorObj = new THREE.Color(hexColor);
+      const gs = window.GlobalStyleConfig;
+      const col = (gs && gs.colores) || {};
+      const baseEsferaHex = col.clusterEsfera || col.acento || null;
+      let colorObj;
+      let colorHex;
+      if (baseEsferaHex) {
+        colorObj = new THREE.Color(baseEsferaHex);
+        if (clusterCount > 1) {
+          const hsl = { h: 0, s: 0, l: 0 };
+          colorObj.getHSL(hsl);
+          const shiftL = ((idx % 3) - 1) * 0.06;
+          colorObj.setHSL(hsl.h, hsl.s, Math.max(0.15, Math.min(0.85, hsl.l + shiftL)));
+        }
+        colorHex = '#' + colorObj.getHexString();
+      } else {
+        const hexColor = CLUSTER_RED_RAMP[idx % CLUSTER_RED_RAMP.length];
+        colorHex = '#' + hexColor.toString(16).padStart(6, '0');
+        colorObj = new THREE.Color(hexColor);
+      }
+      const nucleoColorObj = new THREE.Color(col.clusterNucleo || col.acento2 || '#9a000d');
+      const pelotitaColorObj = new THREE.Color(col.clusterPelotita || col.acento || '#ffd6d6');
 
       const systemGroup = new THREE.Group();
       systemGroup.position.copy(clusterCenter);
@@ -1066,7 +1188,7 @@ export class ClusterCosmos3D {
         uniforms: {
           uTime: { value: 0 },
           uBaseColor: { value: colorObj },
-          uCoreColor: { value: new THREE.Color(0x9a000d) },
+          uCoreColor: { value: nucleoColorObj },
           uBreathePhase: { value: Math.random() * Math.PI * 2 },
           uActivity: { value: 0.6 },
           uIsOrder: { value: 0.0 },
@@ -1125,8 +1247,8 @@ export class ClusterCosmos3D {
           uniforms: {
             uTime: { value: 0 },
             uBaseColor: { value: colorObj },
-            uCoreColor: { value: new THREE.Color(0xaa0412) },
-            uElectricColor: { value: new THREE.Color(0xff000d) },
+            uCoreColor: { value: nucleoColorObj },
+            uElectricColor: { value: pelotitaColorObj },
             uBreathePhase: { value: Math.random() * Math.PI * 2 },
             uActivity: { value: 0.04 }, // REPOSO DORMIDO BASAL
             uIsOrder: { value: 0.0 },
@@ -1172,10 +1294,13 @@ export class ClusterCosmos3D {
         // Posición global de la neurona
         const worldPos = new THREE.Vector3().addVectors(clusterCenter, localPos);
 
+        const upperWord = String(w || '').toUpperCase();
+        const upperCluster = String(cluster.name || '').toUpperCase();
         const wordNode = {
           isClusterCenter: false,
-          word: w,
-          clusterName: cluster.name,
+          word: upperWord,
+          label: upperWord,
+          clusterName: upperCluster,
           color: colorHex,
           position: worldPos,
           localPos: localPos,
@@ -1427,9 +1552,13 @@ export class ClusterCosmos3D {
    * El color se aplica YA a las que estan en escena; el pulso lo hace el loop frame a frame.
    */
   aplicarPelotitas() {
-    const hex = /^#[0-9a-f]{6}$/i.test(String(this.ajustes.pelotitaColor || ''))
-      ? String(this.ajustes.pelotitaColor).toLowerCase()
-      : '#ffd6d6';
+    const gs = window.GlobalStyleConfig;
+    const col = (gs && gs.colores) || {};
+    const hex = (col.clusterPelotita)
+      ? col.clusterPelotita
+      : (/^#[0-9a-f]{6}$/i.test(String(this.ajustes.pelotitaColor || ''))
+        ? String(this.ajustes.pelotitaColor).toLowerCase()
+        : '#ffd6d6');
     this.pelotita = {
       color: new THREE.Color(hex),
       elec: Math.max(0, Math.min(3, (Number(this.ajustes.pelotitaElec) || 0) / 100))
@@ -1515,18 +1644,118 @@ export class ClusterCosmos3D {
 
     sprite.scale.set(Math.max(0.0001, res.worldWidth), Math.max(0.0001, res.worldHeight), 1);
     d.pct = pct;
+    d.baseWidth = Math.max(0.0001, res.worldWidth);
+    d.baseHeight = Math.max(0.0001, res.worldHeight);
     return true;
   }
 
-  /** Fuerza a re-dibujar TODOS los carteles (cambio de fuente, etc.). */
+  /**
+   * Aplica los colores del DISENO GLOBAL (GLOBALSTYLE) a las esferas, núcleos, pelotitas y carteles 3D
+   */
+  aplicarColoresEsferas() {
+    const gs = window.GlobalStyleConfig;
+    const col = (gs && gs.colores) || {};
+    const baseHex = col.clusterEsfera || col.acento || '#ff000d';
+    const coreHex = col.clusterNucleo || col.acento2 || '#9a000d';
+    const elecHex = col.clusterPelotita || col.acento || '#ffd6d6';
+
+    const baseColor = new THREE.Color(baseHex);
+    const coreColor = new THREE.Color(coreHex);
+    const elecColor = new THREE.Color(elecHex);
+
+    if (this.pelotita) {
+      this.pelotita.color = elecColor.clone();
+    }
+    (this.actionPotentials || []).forEach((ap) => {
+      if (ap.mesh && ap.mesh.material && ap.mesh.material.color) {
+        ap.mesh.material.color.copy(elecColor);
+      }
+    });
+    (this.orderBridges || []).forEach((b) => {
+      if (b.pulseMesh && b.pulseMesh.material && b.pulseMesh.material.color) {
+        b.pulseMesh.material.color.copy(elecColor);
+      }
+    });
+    (this.halosLlegada || []).forEach((h) => {
+      if (h.sprite && h.sprite.material && h.sprite.material.color) {
+        h.sprite.material.color.copy(elecColor);
+      }
+    });
+
+    (this.neuronMaterials || []).forEach((mat) => {
+      if (mat.uniforms) {
+        if (mat.uniforms.uBaseColor) mat.uniforms.uBaseColor.value.copy(baseColor);
+        if (mat.uniforms.uCoreColor) mat.uniforms.uCoreColor.value.copy(coreColor);
+        if (mat.uniforms.uElectricColor) mat.uniforms.uElectricColor.value.copy(elecColor);
+      }
+    });
+
+    (this.wordNodes || []).forEach((node) => {
+      if (node.axonLine && node.axonLine.material && node.axonLine.material.color) {
+        node.axonLine.material.color.copy(baseColor);
+      }
+    });
+
+    (this.rayRigs || []).forEach((rig) => {
+      if (rig.material && rig.material.uniforms) {
+        if (rig.material.uniforms.uColorCore) rig.material.uniforms.uColorCore.value.copy(coreColor);
+        if (rig.material.uniforms.uColorRay) rig.material.uniforms.uColorRay.value.copy(baseColor);
+        if (rig.material.uniforms.uColorSpark) rig.material.uniforms.uColorSpark.value.copy(elecColor);
+      }
+      (rig.arcLines || []).forEach((line, a) => {
+        if (line.material && line.material.color) {
+          line.material.color.copy((a % 3 === 0) ? elecColor : ((a % 2 === 0) ? baseColor : coreColor));
+        }
+      });
+    });
+
+    this.forzarRedibujoTextos();
+  }
+
+  /** Fuerza a re-dibujar TODOS los carteles (cambio de fuente, paleta, etc.). */
   forzarRedibujoTextos() {
     if (!this.scene) return 0;
     let n = 0;
     this.scene.traverse((obj) => {
       if (obj.isSprite && obj.userData && obj.userData.kind) { obj.userData.pct = -1; n++; }
     });
-    this.aplicarTodo();
+    this.refrescarTamanoTextos();
     return n;
+  }
+
+  /**
+   * Fuente de los carteles del 3D. Sale del DISENO GLOBAL (GLOBALSTYLE) si esta
+   * cargado: asi la tipografia del cúmulo se elige desde un solo lugar.
+   */
+  fuenteCarteles() {
+    try {
+      const gs = window.GlobalStyleConfig;
+      if (gs && gs.fuente) return '"' + gs.fuente + '", monospace';
+      if (window.GS_FONT_FAMILY) return window.GS_FONT_FAMILY;
+    } catch (e) {}
+    return '"Share Tech Mono", monospace';
+  }
+
+  /** Colores sincronizados con el DISENO GLOBAL (GLOBALSTYLE) */
+  coloresCarteles(colorHex) {
+    const gs = window.GlobalStyleConfig;
+    const col = (gs && gs.colores) || {};
+    const borde = col.clusterCajaBorde || col.borde || colorHex || '#ff000d';
+    const texto = col.texto || '#ffffff';
+    const acento = col.clusterEsfera || col.acento || colorHex || '#ff000d';
+    let fondo = 'rgba(0, 0, 0, 0.88)';
+    if (col.clusterCajaFill) {
+      if (window.GlobalStyle && typeof window.GlobalStyle.hexARgba === 'function') {
+        const op = (gs && gs.contenedores && gs.contenedores.opacidadPanel != null) ? gs.contenedores.opacidadPanel : 0.88;
+        fondo = window.GlobalStyle.hexARgba(col.clusterCajaFill, op);
+      } else {
+        fondo = col.clusterCajaFill;
+      }
+    } else if (col.panel && window.GlobalStyle && typeof window.GlobalStyle.hexARgba === 'function') {
+      const op = (gs && gs.contenedores && gs.contenedores.opacidadPanel != null) ? gs.contenedores.opacidadPanel : 0.90;
+      fondo = window.GlobalStyle.hexARgba(col.panel, op);
+    }
+    return { borde, texto, acento, fondo };
   }
 
   /** Altura de mundo de un cartel segun su % (kind: word | title | badge). */
@@ -1547,14 +1776,15 @@ export class ClusterCosmos3D {
 
   /** Lienzo de una etiqueta de palabra. worldH = altura FINAL en unidades de la escena. */
   dibujarPalabraCanvas(wordText, colorHex, worldH) {
-    const text = capitalizeFirst(String(wordText || '').trim());
+    const text = String(wordText || '').trim().toUpperCase();
     const canvasHeight = this.lienzoAltoParaMundo(worldH);
     const f = canvasHeight / 2;                      // 40px de lienzo -> tipografia 20px
     const padX = Math.round(f * 0.7);
+    const c = this.coloresCarteles(colorHex);
 
     const measureCanvas = document.createElement('canvas');
     const measureCtx = measureCanvas.getContext('2d');
-    measureCtx.font = 'bold ' + f + 'px "Share Tech Mono", "VT323", monospace';
+    measureCtx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
     const textWidth = Math.max(Math.round(f), Math.ceil(measureCtx.measureText(text).width));
     const canvasWidth = Math.max(Math.round(f * 3), textWidth + padX * 2);
 
@@ -1563,20 +1793,25 @@ export class ClusterCosmos3D {
     canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d');
 
-    // El contenedor es solo la palabra y el marco rojo alrededor
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
-    ctx.fillRect(1, 1, canvasWidth - 2, canvasHeight - 2);
+    // 3) Requerimiento: El fondo de las palabras en cluster las que están encima de cada palabra no tienen relleno.
+    // Se elimina ctx.fillRect para que el fondo sea completamente transparente y no tape el cosmos/planetas.
 
-    // Marco rojo alrededor
-    ctx.strokeStyle = '#ff0000';
-    ctx.lineWidth = Math.max(1, f * 0.1);
+    // Marco con el borde de globalstyle (solo trazo exterior, sin relleno de fondo)
+    ctx.strokeStyle = c.borde;
+    ctx.lineWidth = Math.max(1, f * 0.08);
     ctx.strokeRect(1, 1, canvasWidth - 2, canvasHeight - 2);
 
-    // Las letras NO tienen glow
-    ctx.font = 'bold ' + f + 'px "Share Tech Mono", "VT323", monospace';
+    // Letras en MAYÚSCULAS con tipografía global y color de texto de GlobalStyle
+    ctx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
+
+    // Contorno oscuro suave para legibilidad perfecta contra el cosmos sin relleno de fondo
+    ctx.lineWidth = Math.max(2, f * 0.12);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.strokeText(text, canvasWidth / 2, canvasHeight / 2);
+
+    ctx.fillStyle = c.texto;
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     ctx.fillText(text, canvasWidth / 2, canvasHeight / 2);
@@ -1586,14 +1821,22 @@ export class ClusterCosmos3D {
 
   createWordSprite(wordText, colorHex, pct) {
     const p = (pct === undefined || pct === null) ? this.ajustes.cartelPalabraPct : Number(pct);
-    const res = this.dibujarPalabraCanvas(wordText, colorHex, this.mundoDePct('word', p));
+    const upperText = String(wordText || '').trim().toUpperCase();
+    const res = this.dibujarPalabraCanvas(upperText, colorHex, this.mundoDePct('word', p));
 
     const texture = new THREE.CanvasTexture(res.canvas);
     texture.minFilter = THREE.LinearFilter;
     const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, opacity: 0.0 });
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(Math.max(0.0001, res.worldWidth), Math.max(0.0001, res.worldHeight), 1);
-    sprite.userData = { kind: 'word', text: capitalizeFirst(String(wordText || '').trim()), colorHex: colorHex, pct: Math.round(p) };
+    sprite.userData = {
+      kind: 'word',
+      text: upperText,
+      colorHex: colorHex,
+      pct: Math.round(p),
+      baseWidth: Math.max(0.0001, res.worldWidth),
+      baseHeight: Math.max(0.0001, res.worldHeight)
+    };
     return sprite;
   }
 
@@ -1602,28 +1845,40 @@ export class ClusterCosmos3D {
     const text = String(titleText || '').toUpperCase();
     const canvasHeight = this.lienzoAltoParaMundo(worldH);
     const f = canvasHeight / 4.2667;                 // 128px de lienzo -> tipografia 30px
-    const inset = Math.round(canvasHeight * 0.125);
+    const c = this.coloresCarteles(colorHex);
 
     const measureCanvas = document.createElement('canvas');
     const measureCtx = measureCanvas.getContext('2d');
-    measureCtx.font = 'bold ' + f + 'px "Share Tech Mono", "VT323", monospace';
+    measureCtx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
     const textWidth = Math.ceil(measureCtx.measureText(text).width);
-    const canvasWidth = Math.max(Math.round(canvasHeight * 4), textWidth + inset * 2 + Math.round(f * 1.2));
+
+    // ANCHO AJUSTADO AL TEXTO: envuelve exactamente la palabra con padding horizontal equilibrado
+    const padX = Math.round(f * 0.95);
+    const canvasWidth = Math.max(Math.round(f * 2.4), textWidth + padX * 2);
 
     const canvas = document.createElement('canvas');
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d');
 
-    ctx.strokeStyle = '#ff0000';
-    ctx.lineWidth = Math.max(1, f * 0.1);
-    ctx.strokeRect(inset, inset, canvasWidth - inset * 2, canvasHeight - inset * 2);
+    const insetY = Math.round(canvasHeight * 0.12);
+    const insetX = 2;
+    const boxW = canvasWidth - insetX * 2;
+    const boxH = canvasHeight - insetY * 2;
+
+    // Requerimiento 1: Las palabras que están arriba de las categorías tienen fondo negro puro
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(insetX, insetY, boxW, boxH);
+
+    ctx.strokeStyle = c.borde;
+    ctx.lineWidth = Math.max(1.5, f * 0.1);
+    ctx.strokeRect(insetX, insetY, boxW, boxH);
 
     // Sin glow en las letras
-    ctx.font = 'bold ' + f + 'px "Share Tech Mono", "VT323", monospace';
+    ctx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = c.texto;
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     ctx.fillText(text, canvasWidth / 2, canvasHeight / 2);
@@ -1637,7 +1892,7 @@ export class ClusterCosmos3D {
 
     const texture = new THREE.CanvasTexture(res.canvas);
     texture.minFilter = THREE.LinearFilter;
-    const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, opacity: 0.85 });
+    const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, opacity: 1.0 });
     const sprite = new THREE.Sprite(mat);
     sprite.scale.set(Math.max(0.0001, res.worldWidth), Math.max(0.0001, res.worldHeight), 1);
     sprite.userData = { kind: 'title', text: String(titleText || ''), colorHex: colorHex, pct: Math.round(p) };
@@ -1651,10 +1906,11 @@ export class ClusterCosmos3D {
     const fontHeader = Math.max(9, f * 0.524);
     const inset = Math.round(canvasHeight * 0.0714);
     const upper = String(wordText || '').toUpperCase();
+    const c = this.coloresCarteles('#ff000d');
 
     const measureCanvas = document.createElement('canvas');
     const measureCtx = measureCanvas.getContext('2d');
-    measureCtx.font = '900 ' + f + 'px "Share Tech Mono", "VT323", monospace';
+    measureCtx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
     const textWidth = Math.ceil(measureCtx.measureText(upper).width);
 
     const canvasWidth = Math.max(Math.round(canvasHeight * 3.657), textWidth + inset * 2 + f);
@@ -1663,20 +1919,23 @@ export class ClusterCosmos3D {
     canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d');
 
-    ctx.strokeStyle = '#ff000d';
+    ctx.fillStyle = c.fondo;
+    ctx.fillRect(inset, inset, canvasWidth - inset * 2, canvasHeight - inset * 2);
+
+    ctx.strokeStyle = c.acento;
     ctx.lineWidth = Math.max(1, canvasHeight * 0.0214);
     ctx.strokeRect(inset, inset, canvasWidth - inset * 2, canvasHeight - inset * 2);
 
-    ctx.font = 'bold ' + fontHeader + 'px "Share Tech Mono", monospace';
+    ctx.font = 'bold ' + fontHeader + 'px ' + this.fuenteCarteles();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ff000d';
+    ctx.fillStyle = c.acento;
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     ctx.fillText('\u26a1 ORDEN CEREBRAL #0' + orderIndex + ' // SICRE2', canvasWidth / 2, canvasHeight * 0.30);
 
-    ctx.font = '900 ' + f + 'px "Share Tech Mono", "VT323", monospace';
-    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
+    ctx.fillStyle = c.texto;
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
     ctx.fillText(upper, canvasWidth / 2, canvasHeight * 0.657);
@@ -1834,6 +2093,10 @@ export class ClusterCosmos3D {
     this.flightProgress = 0.0;
     this.flightDuration = 22.0;
     this.flightNodes = matchedNodes;
+    this.isTraveling = true;
+    this.travelProgress = 0.0;
+    this.originNode = this.followingNode || this.lastLandedNode || matchedNodes[0];
+    this.targetNode = matchedNodes[0];
 
     soundFX.playActivate();
   }
@@ -2132,6 +2395,19 @@ export class ClusterCosmos3D {
       rig.material.uniforms.uTime.value = timeSec;
       rig.material.uniforms.uIntensity.value = rig.intensity;
 
+      // Color dinámico de rayos según el planeta activo y paleta global (Requerimiento 5a)
+      const gs = window.GlobalStyleConfig;
+      const col = (gs && gs.colores) || {};
+      const baseHex = col.clusterEsfera || col.acento || '#00f0ff';
+      const nodeColHex = (rig.activeNode && (rig.activeNode.color || (rig.activeNode.cluster && rig.activeNode.cluster.color))) || baseHex;
+      const nodeColor = new THREE.Color(nodeColHex);
+      const coreColor = new THREE.Color(col.clusterNucleo || col.acento2 || '#ffffff');
+      const elecColor = new THREE.Color(col.clusterPelotita || '#ffd6d6');
+
+      if (rig.material.uniforms.uColorRay) rig.material.uniforms.uColorRay.value.copy(nodeColor);
+      if (rig.material.uniforms.uColorCore) rig.material.uniforms.uColorCore.value.copy(coreColor);
+      if (rig.material.uniforms.uColorSpark) rig.material.uniforms.uColorSpark.value.copy(elecColor);
+
       // Escalar y rotar planos de corona
       rig.planes.forEach((pl, i) => {
         pl.scale.set(coronaSize, coronaSize, 1);
@@ -2148,6 +2424,10 @@ export class ClusterCosmos3D {
       const arcCount = rig.arcLines.length;
       for (let a = 0; a < arcCount; a++) {
         const line = rig.arcLines[a];
+        if (line && line.material && line.material.color) {
+          const lCol = (a % 3 === 0) ? elecColor : ((a % 2 === 0) ? nodeColor : coreColor);
+          line.material.color.copy(lCol);
+        }
         const dir = rig.arcDirs[a];
         const posAttr = line.geometry.attributes.position;
         const posArray = posAttr.array;
@@ -2233,6 +2513,53 @@ export class ClusterCosmos3D {
     this.updateNeuralField(dt, now);
     this.updateRayGlowSystem(dt, now);
     this.updateHalosLlegada(dt);
+    this.updateAlienNavHUD(dt, now);
+
+    // =========================================================================
+    // MODO IDLE: Navegación lenta continua de categoría en categoría (Requerimiento 3)
+    // =========================================================================
+    const isManualInput = (this.keys.KeyW || this.keys.KeyS || this.keys.KeyA || this.keys.KeyD || 
+                           this.keys.KeyQ || this.keys.KeyE || this.keys.Space || this.keys.ShiftLeft || 
+                           this.isMouseDown);
+    if (isManualInput) {
+      this.lastUserInteraction = now;
+      this.isIdleCruising = false;
+    }
+
+    const idleElapsed = now - (this.lastUserInteraction || 0);
+    const isIdle = idleElapsed > 4500 && !isManualInput;
+
+    if (isIdle) {
+      const categoryNodes = (this.wordNodes || []).filter(n => n.isClusterCenter && n.mesh);
+      if (categoryNodes.length > 0) {
+        if (this.isWarping) {
+          // El viaje suave lento hacia la categoría está en curso
+        } else if (this.followingNode) {
+          // Órbita lenta continua alrededor de la categoría para revelar todas sus palabras
+          this.followYaw += dt * 0.00020;
+          this.idleDwellTimer = (this.idleDwellTimer || 0) + (dt / 1000);
+
+          // Tras 8.5 segundos de exhibición orbital pausada, transita lentamente a la siguiente categoría
+          if (this.idleDwellTimer >= 8.5) {
+            this.idleDwellTimer = 0;
+            const currIdx = categoryNodes.findIndex(cn => cn === this.followingNode || cn.clusterId === this.followingNode.clusterId);
+            const nextIdx = (currIdx >= 0 ? (currIdx + 1) : 0) % categoryNodes.length;
+            const nextCategory = categoryNodes[nextIdx];
+            this.warpToNode(nextCategory, true); // true = viaje lento cinemático (6.5s)
+          }
+        } else {
+          // Sin objetivo actual: arranca el tour cinemático lento tras 1.8 segundos
+          this.idleDwellTimer = (this.idleDwellTimer || 0) + (dt / 1000);
+          if (this.idleDwellTimer >= 1.8) {
+            this.idleDwellTimer = 0;
+            this.idleCategoryIndex = (this.idleCategoryIndex || 0) % categoryNodes.length;
+            this.warpToNode(categoryNodes[this.idleCategoryIndex], true);
+          }
+        }
+      }
+    } else {
+      this.idleDwellTimer = 0;
+    }
 
     // 1. Vuelo continuo entre neuronas (si está activo)
     if (this.isContinuousFlying && this.flightSpline) {
@@ -2265,7 +2592,10 @@ export class ClusterCosmos3D {
     } else if (this.isWarping && this.targetNode && this.targetNode.mesh) {
       this.warpTime += dt * 0.001 * (this.cam ? this.cam.warpVel : 1);   // velocidad de warp (panel P)
       const t = Math.min(1.0, this.warpTime / this.warpDuration);
-      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      this.travelProgress = t;
+      this.isTraveling = true;
+      // Interpolación suave C2 (smootherstep: aceleración y frenado suaves en los extremos)
+      const ease = t * t * t * (t * (6 * t - 15) + 10);
 
       const targetPos = new THREE.Vector3();
       this.targetNode.mesh.getWorldPosition(targetPos);
@@ -2273,6 +2603,7 @@ export class ClusterCosmos3D {
       // Compensación de movimiento orbital durante la transición
       if (this._followInitialized && this._prevPlanetPos) {
         const delta = new THREE.Vector3().subVectors(targetPos, this._prevPlanetPos);
+        if (this.warpStartPos) this.warpStartPos.add(delta);
         this.camera.position.add(delta);
       }
       this._prevPlanetPos.copy(targetPos);
@@ -2285,23 +2616,29 @@ export class ClusterCosmos3D {
       );
       const desiredPos = targetPos.clone().add(camOffset);
 
-      const posLerp = Math.max(0.06, ease * 0.18);
-      this.camera.position.lerp(desiredPos, posLerp);
+      if (this.warpStartPos) {
+        this.camera.position.lerpVectors(this.warpStartPos, desiredPos, ease);
+      } else {
+        this.camera.position.lerp(desiredPos, Math.max(0.08, ease * 0.25));
+      }
 
-      // Orientar suavemente hacia el planeta
+      // Orientar suavemente hacia el planeta mediante slerp continuo de cuaterniones
       const m = new THREE.Matrix4();
       m.lookAt(this.camera.position, targetPos, this.camera.up);
       const targetQuat = new THREE.Quaternion().setFromRotationMatrix(m);
-      this.camera.quaternion.slerp(targetQuat, Math.max(0.08, ease * 0.22));
+      this.camera.quaternion.slerp(targetQuat, Math.min(1.0, 0.08 + ease * 0.22));
 
       this.yaw = this.camera.rotation.y;
       this.pitch = this.camera.rotation.x;
 
-      if (t >= 1.0 || this.camera.position.distanceTo(desiredPos) < 1.2) {
+      if (t >= 1.0) {
         this.isWarping = false;
+        this.isTraveling = false;
+        this.travelProgress = 1.0;
         this.camera.position.copy(desiredPos);
-        this.camera.lookAt(targetPos);
         this._prevPlanetPos.copy(targetPos);
+        this.lastLandedNode = this.targetNode;
+        this.followingNode = this.targetNode;
       }
 
     // 3. Transición a vista panorámica (Overview)
@@ -2349,8 +2686,13 @@ export class ClusterCosmos3D {
       );
       const desiredPos = targetPos.clone().add(camOffset);
 
-      this.camera.position.lerp(desiredPos, 0.16);
-      this.camera.lookAt(targetPos);
+      this.camera.position.lerp(desiredPos, 0.14);
+
+      // Orientación fluida continua sin sacudidas ni saltos bruscos
+      const mFollow = new THREE.Matrix4();
+      mFollow.lookAt(this.camera.position, targetPos, this.camera.up);
+      const followQuat = new THREE.Quaternion().setFromRotationMatrix(mFollow);
+      this.camera.quaternion.slerp(followQuat, 0.16);
 
       this.yaw = this.camera.rotation.y;
       this.pitch = this.camera.rotation.x;
@@ -2420,15 +2762,36 @@ export class ClusterCosmos3D {
     }
   }
 
-  warpToNode(node) {
+  warpToNode(node, isSlowIdle = false) {
     if (!node || !node.mesh) return;
+    const prev = this.followingNode || this.lastLandedNode;
+    if (prev && prev !== node) {
+      this.originNode = prev;
+    } else {
+      let minDist = Infinity;
+      let closest = null;
+      const camPos = this.camera ? this.camera.position : new THREE.Vector3();
+      for (let i = 0; i < (this.wordNodes || []).length; i++) {
+        const n = this.wordNodes[i];
+        if (n === node || n.isClusterCenter || !n.mesh) continue;
+        const d = camPos.distanceTo(n.mesh.position);
+        if (d < minDist) {
+          minDist = d;
+          closest = n;
+        }
+      }
+      this.originNode = closest || prev;
+    }
     this.targetNode = node;
-    this.followingNode = node;
+    this.followingNode = null;
     this.isContinuousFlying = false;
     this.flightSpline = null;
     this.isWarping = true;
+    this.isTraveling = true;
+    this.travelProgress = 0.0;
     this.warpTime = 0;
-    this.warpDuration = 1.4;
+    this.warpDuration = isSlowIdle ? 6.5 : 1.4;
+    this.warpStartPos = this.camera ? this.camera.position.clone() : new THREE.Vector3();
 
     const targetPos = new THREE.Vector3();
     node.mesh.getWorldPosition(targetPos);
@@ -2523,7 +2886,8 @@ export class ClusterCosmos3D {
 
       // Opacidad de la etiqueta de texto: se PRENDE cerca de la cámara o al buscar, se APAGA al alejarse
       let targetLabelOp = 0.0;
-      if (node.isOrderWord || node === this.followingNode || node === this.targetNode) {
+      const isCurrentClusterWord = (this.followingNode && this.followingNode.isClusterCenter && node.clusterId === this.followingNode.clusterId);
+      if (node.isOrderWord || node === this.followingNode || node === this.targetNode || isCurrentClusterWord) {
         targetLabelOp = 1.0;
       } else if (node.searchExcitation > 0.08) {
         targetLabelOp = Math.min(1.0, node.searchExcitation * 1.5);
@@ -2533,6 +2897,17 @@ export class ClusterCosmos3D {
 
       if (node.labelSprite && node.labelSprite.material) {
         node.labelSprite.material.opacity = THREE.MathUtils.lerp(node.labelSprite.material.opacity, targetLabelOp, 0.14);
+
+        // Escala adaptativa en función de la distancia a la cámara (Requerimiento 2.a):
+        // De lejos conserva su tamaño base para máxima legibilidad panorámica.
+        // Al acercarse la cámara al planeta, se reduce suavemente para no verse desproporcionadamente gigante.
+        const baseW = (node.labelSprite.userData && node.labelSprite.userData.baseWidth) || 12.0;
+        const baseH = (node.labelSprite.userData && node.labelSprite.userData.baseHeight) || 3.0;
+        const distK = Math.min(1.0, Math.max(0.35, Math.pow(Math.max(8.0, dist) / 75.0, 0.72)));
+        const targetW = baseW * distK;
+        const targetH = baseH * distK;
+        node.labelSprite.scale.x = THREE.MathUtils.lerp(node.labelSprite.scale.x, targetW, 0.18);
+        node.labelSprite.scale.y = THREE.MathUtils.lerp(node.labelSprite.scale.y, targetH, 0.18);
       }
 
       // Encender axón hacia el núcleo del cluster
@@ -2682,6 +3057,14 @@ export class ClusterCosmos3D {
         try {
           const msg = JSON.parse(event.data);
           
+          if (msg.type === 'globalstyle:update' || msg.type === 'globalstyle:updated') {
+            if (window.GlobalStyle && typeof window.GlobalStyle.aplicar === 'function') {
+              window.GlobalStyle.aplicar(msg.config);
+            }
+            this.aplicarColoresEsferas();
+            return;
+          }
+
           if (msg.type === 'game3:words_sequence') {
             if (msg.phase === 'word_caught') {
               const wordToCatch = msg.newWord || (Array.isArray(msg.words) ? msg.words[msg.words.length - 1] : null);
@@ -2701,6 +3084,11 @@ export class ClusterCosmos3D {
           } else if (msg.type === 'agent:thought') {
             // Cada token generado por Gemma envía una micro-chispa a través de los puentes
             this.pulseOrderBridgesOnThought();
+          } else if (msg.type === 'globalstyle:update') {
+            if (msg.config && window.GlobalStyle && typeof window.GlobalStyle.aplicar === 'function') {
+              window.GlobalStyle.aplicar(msg.config);
+            }
+            this.aplicarColoresEsferas();
           } else if (msg.type === 'game3:state_reset' || msg.type === 'game3:flight_reset') {
             console.log('[COSMOS 3D] 🔄 Evento reset recibido de Game 3. Volviendo a reposo.');
             this.resetOrders();
@@ -2889,7 +3277,13 @@ export class ClusterCosmos3D {
   }
 
   setupEvents() {
+    const markInteraction = () => {
+      this.lastUserInteraction = performance.now();
+      this.isIdleCruising = false;
+    };
+
     window.addEventListener('keydown', (e) => {
+      markInteraction();
       if (this.keys.hasOwnProperty(e.code)) {
         this.keys[e.code] = true;
         if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ShiftLeft'].includes(e.code)) {
@@ -2900,10 +3294,12 @@ export class ClusterCosmos3D {
     });
 
     window.addEventListener('keyup', (e) => {
+      markInteraction();
       if (this.keys.hasOwnProperty(e.code)) this.keys[e.code] = false;
     });
 
     this.container.addEventListener('mousedown', (e) => {
+      markInteraction();
       if (e.button === 0) {
         this.isMouseDown = true;
         this.lastMouse.x = e.clientX;
@@ -2912,11 +3308,13 @@ export class ClusterCosmos3D {
     });
 
     window.addEventListener('mouseup', () => {
+      markInteraction();
       this.isMouseDown = false;
     });
 
     window.addEventListener('mousemove', (e) => {
       if (this.isMouseDown) {
+        markInteraction();
         const sens = 0.0035 * ((this.cam && this.cam.giro !== undefined) ? this.cam.giro : 1);
         const dx = e.clientX - this.lastMouse.x;
         const dy = e.clientY - this.lastMouse.y;
@@ -2940,6 +3338,7 @@ export class ClusterCosmos3D {
 
     // Zoom con rueda de ratón (acercar/alejar de planeta seguido o vuelo)
     this.container.addEventListener('wheel', (e) => {
+      markInteraction();
       e.preventDefault();
       if (this.followingNode) {
         this.followDistance = Math.max(20, Math.min(220, this.followDistance + e.deltaY * 0.05));
@@ -2950,6 +3349,7 @@ export class ClusterCosmos3D {
     }, { passive: false });
 
     this.container.addEventListener('click', (e) => {
+      markInteraction();
       const hitNode = this.getRaycastNode(e);
       if (hitNode) {
         this.warpToNode(hitNode);
@@ -3074,11 +3474,11 @@ export class ClusterCosmos3D {
           targetEl.textContent = `CÚMULO: ${node.name.toUpperCase()}`;
           targetEl.style.color = node.color || '#ff000d';
         } else {
-          targetEl.textContent = `${node.word.toUpperCase()} [${node.clusterName}]`;
+          targetEl.textContent = `${node.word.toUpperCase()} [${String(node.clusterName || '').toUpperCase()}]`;
           targetEl.style.color = node.color || '#f7555d';
         }
       } else {
-        targetEl.textContent = 'Ninguno (Clic para enfocar neurona)';
+        targetEl.textContent = 'NINGUNO (CLIC PARA ENFOCAR NEURONA)';
         targetEl.style.color = '#b89496';
       }
     }
@@ -3114,6 +3514,1025 @@ export class ClusterCosmos3D {
       clearInterval(this._bibliotecaTimer);
       this._bibliotecaTimer = null;
     }
+  }
+
+  // ============================================================================
+  // MONITOR ALIENÍGENA 2D, GIROSCÓPIO CIBERNÉTICO & VELOCIDAD 3D
+  // Requerimientos 5c, 5d, 5f
+  // ============================================================================
+  initAlienNavHUD() {
+    this.alienHUD = {
+      container: document.getElementById('alien-nav-hud'),
+      canvasVelX: document.getElementById('canvas-vel-x'),
+      canvasVelY: document.getElementById('canvas-vel-y'),
+      canvasVelZ: document.getElementById('canvas-vel-z'),
+      valVelX: document.getElementById('val-vel-x'),
+      valVelY: document.getElementById('val-vel-y'),
+      valVelZ: document.getElementById('val-vel-z'),
+      canvasGyro: document.getElementById('canvas-alien-gyro'),
+      textGyro: document.getElementById('alien-gyro-text'),
+      lastCamPos: this.camera ? this.camera.position.clone() : new THREE.Vector3(),
+      smoothVel: new THREE.Vector3(),
+      displacement2D: 0,
+      gridOffset: { x: 0, y: 0 }
+    };
+
+    this.semanticTreeHUD = {
+      container: document.getElementById('semantic-tree-hud'),
+      canvas: document.getElementById('canvas-semantic-tree'),
+      activeWord: document.getElementById('semantic-active-word'),
+      activePrefix: document.getElementById('semantic-active-prefix'),
+      statusBadge: document.getElementById('semantic-status-badge'),
+      activeCluster: document.getElementById('semantic-active-cluster'),
+      valDelta: document.getElementById('semantic-tree-delta'),
+      footerText: document.getElementById('semantic-tree-footer-text')
+    };
+  }
+
+  getActiveTrajectoryState() {
+    let isTraveling = false;
+    let originNode = this.originNode;
+    let destNode = this.targetNode || this.followingNode;
+    let progress = 1.0;
+    let status = 'CÁMARA POSADA';
+
+    // A) En vuelo continuo de cámara
+    if (this.isContinuousFlying && this.flightNodes && this.flightNodes.length > 0) {
+      const nCount = this.flightNodes.length;
+      const stepProg = 1.0 / nCount;
+      const currentTargetIdx = Math.min(nCount - 1, Math.floor(this.flightProgress / stepProg));
+      const segmentProgress = (this.flightProgress - currentTargetIdx * stepProg) / stepProg;
+      const prevIdx = currentTargetIdx > 0 ? currentTargetIdx - 1 : 0;
+
+      originNode = (currentTargetIdx === 0) ? (this.originNode || this.flightNodes[0]) : this.flightNodes[prevIdx];
+      destNode = this.flightNodes[currentTargetIdx];
+      progress = Math.max(0, Math.min(1, segmentProgress));
+      isTraveling = true;
+      status = 'RECORRIENDO RUTA';
+
+    // B) En warp entre planetas
+    } else if (this.isWarping && this.targetNode && !this.targetNode.isClusterCenter) {
+      destNode = this.targetNode;
+      if (!originNode || originNode === destNode) {
+        originNode = this.lastLandedNode;
+      }
+      progress = Math.min(1.0, this.warpTime / this.warpDuration);
+      isTraveling = true;
+      status = 'WARP EN TRAYECTORIA';
+
+    // C) Posado en órbita siguiendo el planeta
+    } else if (this.followingNode && !this.followingNode.isClusterCenter) {
+      destNode = this.followingNode;
+      originNode = this.followingNode;
+      progress = 1.0;
+      isTraveling = false;
+      status = 'CÁMARA POSADA // ÓRBITA';
+
+    // D) Fallback a palabra más cercana si vuela libre
+    } else {
+      let minDist = Infinity;
+      let closest = null;
+      const camPos = this.camera ? this.camera.position : new THREE.Vector3();
+      for (let i = 0; i < (this.wordNodes || []).length; i++) {
+        const n = this.wordNodes[i];
+        if (n.isClusterCenter || !n.mesh) continue;
+        const d = camPos.distanceTo(n.mesh.position);
+        if (d < minDist) {
+          minDist = d;
+          closest = n;
+        }
+      }
+      destNode = closest;
+      originNode = closest;
+      progress = 1.0;
+      isTraveling = false;
+      status = 'VUELO LIBRE';
+    }
+
+    if (originNode && !originNode.mesh) originNode = null;
+    if (destNode && !destNode.mesh) destNode = null;
+
+    return {
+      isTraveling,
+      originNode,
+      destNode,
+      progress,
+      status
+    };
+  }
+
+  getActiveTouringWordNode() {
+    const traj = this.getActiveTrajectoryState();
+    return {
+      node: traj.destNode || traj.originNode,
+      status: traj.status
+    };
+  }
+
+  updateAlienNavHUD(dt, now) {
+    if (!this.alienHUD || !this.semanticTreeHUD) {
+      this.initAlienNavHUD();
+      if (!this.alienHUD) return;
+    }
+    const hud = this.alienHUD;
+    const sHud = this.semanticTreeHUD;
+
+    const dtSec = Math.max(0.001, dt * 0.001);
+
+    // 1. Calcular velocidad real de la cámara (delta entre fotogramas)
+    const currentCamPos = this.camera ? this.camera.position : new THREE.Vector3();
+    const deltaPos = currentCamPos.clone().sub(hud.lastCamPos);
+    hud.lastCamPos.copy(currentCamPos);
+
+    const instantVel = deltaPos.clone().divideScalar(dtSec);
+    // Mezclar con this.velocity si estuviera volando manualmente
+    if (this.velocity && this.velocity.lengthSq() > 0.001) {
+      instantVel.add(this.velocity.clone().divideScalar(dtSec));
+    }
+    // Suavizado lerp de la velocidad para que las flechas se muevan fluidas
+    hud.smoothVel.lerp(instantVel, 0.20);
+
+    const vx = hud.smoothVel.x;
+    const vy = hud.smoothVel.y;
+    const vz = hud.smoothVel.z;
+
+    const distDelta = Math.sqrt(deltaPos.x * deltaPos.x + deltaPos.z * deltaPos.z);
+    hud.displacement2D += distDelta;
+    hud.gridOffset.x = (hud.gridOffset.x + deltaPos.x * 0.4) % 20;
+    hud.gridOffset.y = (hud.gridOffset.y + deltaPos.z * 0.4) % 20;
+
+    // Paleta de colores globales
+    const gs = window.GlobalStyleConfig;
+    const col = (gs && gs.colores) || {};
+    const primaryHex = col.acento || '#c85a32';
+    const secondaryHex = col.acento2 || '#dca876';
+
+    // 2. Renderizar Vectores 3D Normalizados: Rotación, Velocidad y Posición con Flecha 3D (Requerimiento 2)
+    if (hud.container && !hud.container.classList.contains('hud-hidden')) {
+      // Vector 1: Rotación (Dirección 3D a la que apunta la cámara, normalizado)
+      const rotDir = new THREE.Vector3();
+      if (this.camera) this.camera.getWorldDirection(rotDir);
+      this.renderVector3DBox(hud.canvasVelX, hud.valVelX, rotDir, 'rot', primaryHex, now);
+
+      // Vector 2: Velocidad 3D de la cámara (normalizado con flecha 3D y magnitud en texto)
+      this.renderVector3DBox(hud.canvasVelY, hud.valVelY, hud.smoothVel, 'vel', secondaryHex, now);
+
+      // Vector 3: Posición 3D de la cámara respecto al origen cósmico (normalizado con flecha 3D y distancia en texto)
+      const camPos = this.camera ? this.camera.position.clone() : new THREE.Vector3();
+      this.renderVector3DBox(hud.canvasVelZ, hud.valVelZ, camPos, 'pos', primaryHex, now);
+
+      this.renderAlienGyro(hud.canvasGyro, hud.textGyro, primaryHex, secondaryHex, now);
+    }
+
+    // 3. Resolver estado de trayectoria y palabras (Requerimiento: trayectoria 2D y palabras aledañas)
+    const traj = this.getActiveTrajectoryState();
+
+    // 4. Renderizar Panel de Trayectoria & Palabras Aledañas 2D (esquina inferior derecha)
+    if (sHud && (!sHud.container || !sHud.container.classList.contains('hud-hidden'))) {
+      if (traj.isTraveling && traj.originNode && traj.destNode && traj.originNode !== traj.destNode) {
+        if (sHud.statusBadge) sHud.statusBadge.textContent = traj.status;
+        if (sHud.activeCluster) {
+          sHud.activeCluster.textContent = `DE: ${(traj.originNode.label || '').toUpperCase()} ➔ A: ${(traj.destNode.label || '').toUpperCase()}`;
+        }
+        if (sHud.activePrefix) sHud.activePrefix.textContent = 'RUMBO:';
+        if (sHud.activeWord) {
+          sHud.activeWord.textContent = (traj.destNode.label || '').toUpperCase();
+        }
+        if (sHud.valDelta) {
+          sHud.valDelta.textContent = `VUELO: ${(traj.progress * 100).toFixed(0)}%`;
+        }
+        if (sHud.footerText) {
+          sHud.footerText.textContent = 'TRAYECTORIA INTERPLANETARIA // PALABRAS ALEDAÑAS';
+        }
+      } else {
+        const activeNode = traj.destNode || traj.originNode;
+        if (sHud.statusBadge) sHud.statusBadge.textContent = traj.status;
+        if (sHud.activeCluster) {
+          const cName = activeNode && activeNode.cluster ? (activeNode.cluster.label || activeNode.cluster.id) : 'SISTEMA';
+          sHud.activeCluster.textContent = `CÚMULO: ${String(cName).toUpperCase()}`;
+        }
+        if (sHud.activePrefix) sHud.activePrefix.textContent = 'EN ÓRBITA:';
+        if (sHud.activeWord) {
+          sHud.activeWord.textContent = activeNode ? (activeNode.label || '').toUpperCase() : '---';
+        }
+        if (sHud.valDelta) {
+          sHud.valDelta.textContent = `Δ: ${(hud.displacement2D || 0).toFixed(1)}`;
+        }
+        if (sHud.footerText) {
+          sHud.footerText.textContent = 'VECINDAD SEMÁNTICA // PALABRAS ALEDAÑAS';
+        }
+      }
+
+      this.renderTrajectoryRadar2D(sHud.canvas, traj, primaryHex, secondaryHex, now);
+    }
+  }
+
+  renderVector3DBox(canvas, valEl, rawVec, type, accentColor, now) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Fondo y marco táctico con micro-esquinas cibernéticas
+    ctx.strokeStyle = 'rgba(255, 0, 13, 0.28)';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(3, 3, w - 6, h - 6);
+
+    // Esquinas tácticas
+    ctx.strokeStyle = 'rgba(220, 168, 118, 0.40)';
+    ctx.lineWidth = 1;
+    const bLen = 5;
+    ctx.beginPath();
+    ctx.moveTo(3, 3 + bLen); ctx.lineTo(3, 3); ctx.lineTo(3 + bLen, 3);
+    ctx.moveTo(w - 3 - bLen, 3); ctx.lineTo(w - 3, 3); ctx.lineTo(w - 3, 3 + bLen);
+    ctx.moveTo(3, h - 3 - bLen); ctx.lineTo(3, h - 3); ctx.lineTo(3 + bLen, h - 3);
+    ctx.moveTo(w - 3 - bLen, h - 3); ctx.lineTo(w - 3, h - 3); ctx.lineTo(w - 3, h - 3 - bLen);
+    ctx.stroke();
+
+    // Etiqueta de tipo en esquina superior izquierda
+    ctx.fillStyle = 'rgba(220, 168, 118, 0.70)';
+    ctx.font = 'bold 7px monospace';
+    ctx.textAlign = 'left';
+    const tagText = type === 'rot' ? 'VEC·ROT 3D' : (type === 'vel' ? 'VEC·VEL 3D' : 'VEC·POS 3D');
+    ctx.fillText(tagText, 7, 13);
+
+    // Manejo de valores y magnitudes
+    const vec = (rawVec && typeof rawVec.length === 'function') ? rawVec.clone() : new THREE.Vector3();
+    const mag = vec.length();
+
+    if (valEl) {
+      if (type === 'rot') {
+        const pDeg = Math.round((this.camera ? this.camera.rotation.x : 0) * 180 / Math.PI);
+        const yDeg = Math.round((this.camera ? this.camera.rotation.y : 0) * 180 / Math.PI);
+        valEl.textContent = `P:${pDeg}° Y:${yDeg}°`;
+        valEl.style.color = accentColor;
+      } else if (type === 'vel') {
+        valEl.textContent = `${mag.toFixed(1)} u/s`;
+        valEl.style.color = mag > 0.05 ? accentColor : '#888';
+      } else if (type === 'pos') {
+        valEl.textContent = `${Math.round(mag)} u`;
+        valEl.style.color = accentColor;
+      }
+    }
+
+    // Normalizar vector (o dejar en 0 si está en reposo)
+    const norm = mag > 0.001 ? vec.clone().divideScalar(mag) : new THREE.Vector3(0, 0, 0);
+
+    // Proyección 3D Isométrica / Tridimensional en el lienzo 2D
+    const cosT = Math.cos(0.60); // rotación azimutal ~34°
+    const sinT = Math.sin(0.60);
+    const cosP = Math.cos(0.44); // inclinación cenital ~25°
+    const sinP = Math.sin(0.44);
+
+    const R = 30; // radio de la esfera de referencia
+
+    function project3D(x, y, z, scale) {
+      const rx = (x * cosT - z * sinT) * scale;
+      const rz = (x * sinT + z * cosT);
+      const ry = (-y * cosP + rz * sinP) * scale;
+      return { px: cx + rx, py: cy + ry, depth: rz };
+    }
+
+    // 1. Disco ecuatorial 3D (plano XZ, piso de referencia)
+    ctx.strokeStyle = 'rgba(220, 168, 118, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let a = 0; a <= 24; a++) {
+      const ang = (a / 24) * Math.PI * 2;
+      const pt = project3D(Math.cos(ang), 0, Math.sin(ang), R);
+      if (a === 0) ctx.moveTo(pt.px, pt.py); else ctx.lineTo(pt.px, pt.py);
+    }
+    ctx.stroke();
+
+    // 2. Ejes 3D cardinales tenues (+X, +Y, +Z)
+    ctx.lineWidth = 0.8;
+    // Eje Y (arriba)
+    const yAx = project3D(0, 1, 0, R * 0.40);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(yAx.px, yAx.py); ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.font = '6px monospace';
+    ctx.fillText('+Y', yAx.px + 2, yAx.py);
+
+    // Eje X (lateral)
+    const xAx = project3D(1, 0, 0, R * 0.40);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(xAx.px, xAx.py); ctx.stroke();
+
+    // Eje Z (frontal)
+    const zAx = project3D(0, 0, 1, R * 0.40);
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(zAx.px, zAx.py); ctx.stroke();
+
+    // Centro / Origen
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
+
+    // 3. Si la magnitud es nula o casi nula (ej. velocidad en reposo)
+    if (mag < 0.05 && type === 'vel') {
+      const pulseR = 2.5 + Math.sin(now * 0.005) * 1.0;
+      ctx.strokeStyle = 'rgba(220, 168, 118, 0.40)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, pulseR, 0, Math.PI * 2); ctx.stroke();
+      return;
+    }
+
+    // 4. Vector 3D Normalizado: punto de destino y sombra sobre el piso
+    const tip3D = project3D(norm.x, norm.y, norm.z, R);
+    const floor3D = project3D(norm.x, 0, norm.z, R);
+
+    // Sombra proyectada en el plano base (XZ)
+    ctx.strokeStyle = 'rgba(220, 168, 118, 0.28)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(floor3D.px, floor3D.py);
+    ctx.stroke();
+
+    // Línea de altura vertical desde el piso hacia la punta
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.beginPath();
+    ctx.moveTo(floor3D.px, floor3D.py);
+    ctx.lineTo(tip3D.px, tip3D.py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 5. Cuerpo / asta de la flecha 3D
+    const shaftFraction = 0.68;
+    const shaftEnd3D = project3D(norm.x * shaftFraction, norm.y * shaftFraction, norm.z * shaftFraction, R);
+
+    ctx.save();
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 3.2;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(shaftEnd3D.px, shaftEnd3D.py);
+    ctx.stroke();
+    ctx.restore();
+
+    // 6. Cabeza de la Flecha 3D (Cono / Pirámide tridimensional)
+    const upRef = Math.abs(norm.y) < 0.92 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const perp1 = new THREE.Vector3().crossVectors(norm, upRef).normalize();
+    const perp2 = new THREE.Vector3().crossVectors(norm, perp1).normalize();
+
+    const baseCenter = norm.clone().multiplyScalar(0.68);
+    const headRadius = 0.20;
+
+    const baseVertices = [];
+    const facetCount = 4;
+    for (let f = 0; f < facetCount; f++) {
+      const fAng = (f / facetCount) * Math.PI * 2 + (Math.PI / 4);
+      const v = baseCenter.clone()
+        .addScaledVector(perp1, Math.cos(fAng) * headRadius)
+        .addScaledVector(perp2, Math.sin(fAng) * headRadius);
+      baseVertices.push(project3D(v.x, v.y, v.z, R));
+    }
+
+    // Dibujar las 4 facetas triangulares del cono 3D con sombreado volumétrico
+    for (let f = 0; f < facetCount; f++) {
+      const vA = baseVertices[f];
+      const vB = baseVertices[(f + 1) % facetCount];
+
+      const avgDepth = (vA.depth + vB.depth + tip3D.depth) / 3;
+      const shade = Math.max(0.45, Math.min(1.0, 0.70 + avgDepth * 0.30));
+
+      ctx.fillStyle = accentColor;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.8;
+      ctx.globalAlpha = shade;
+
+      ctx.beginPath();
+      ctx.moveTo(tip3D.px, tip3D.py);
+      ctx.lineTo(vA.px, vA.py);
+      ctx.lineTo(vB.px, vB.py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 1.0;
+    }
+
+    // Punta luminosa de la flecha 3D
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(tip3D.px, tip3D.py, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  renderAlienGyro(canvas, textEl, primaryHex, secondaryHex, now) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const pitch = this.camera ? this.camera.rotation.x : 0;
+    const yaw = this.camera ? this.camera.rotation.y : 0;
+    const roll = this.camera ? this.camera.rotation.z : 0;
+
+    const pDeg = Math.round(pitch * 180 / Math.PI);
+    const yDeg = Math.round(yaw * 180 / Math.PI);
+    const rDeg = Math.round(roll * 180 / Math.PI);
+
+    if (textEl) {
+      textEl.textContent = `P: ${pDeg}° · Y: ${yDeg}° · R: ${rDeg}°`;
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // 1. Anillo Exterior Alienígena (Yaw Ring - radio ampliado a 60px)
+    ctx.save();
+    ctx.rotate(yaw);
+    ctx.strokeStyle = primaryHex;
+    ctx.lineWidth = 1.8;
+    ctx.shadowColor = primaryHex;
+    ctx.shadowBlur = 8;
+
+    // Arcos alienígenas segmentados
+    const segments = 12;
+    const radiusOut = 60;
+    for (let i = 0; i < segments; i++) {
+      const startA = (i * (Math.PI * 2 / segments)) + 0.05;
+      const endA = ((i + 1) * (Math.PI * 2 / segments)) - 0.15;
+      ctx.beginPath();
+      ctx.arc(0, 0, radiusOut, startA, endA);
+      ctx.stroke();
+
+      // Marcas / Runas alienígenas en cada sector
+      const tickA = startA + 0.08;
+      const tx1 = Math.cos(tickA) * (radiusOut - 6);
+      const ty1 = Math.sin(tickA) * (radiusOut - 6);
+      const tx2 = Math.cos(tickA) * (radiusOut + 6);
+      const ty2 = Math.sin(tickA) * (radiusOut + 6);
+      ctx.beginPath();
+      ctx.moveTo(tx1, ty1);
+      ctx.lineTo(tx2, ty2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 2. Anillo Medio Gimbal (Pitch Ring - radio 44px)
+    ctx.save();
+    ctx.rotate(roll);
+    ctx.scale(1.0, Math.cos(pitch) * 0.75 + 0.25);
+    ctx.strokeStyle = secondaryHex;
+    ctx.lineWidth = 2.0;
+    ctx.shadowColor = secondaryHex;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(0, 0, 44, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Cruz interna del horizonte artificial
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-38, 0); ctx.lineTo(-14, 0);
+    ctx.moveTo(14, 0);  ctx.lineTo(38, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    // 3. Retículo Central de Roll (Giro Z - radio 22px)
+    ctx.save();
+    ctx.rotate(roll);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Punteros del visor más grandes
+    ctx.fillStyle = primaryHex;
+    ctx.beginPath();
+    ctx.moveTo(0, -25); ctx.lineTo(-5, -18); ctx.lineTo(5, -18); ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Aguja de barrido alienígena
+    const sweepA = (now * 0.0015) % (Math.PI * 2);
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(sweepA) * 60, Math.sin(sweepA) * 60);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  renderTrajectoryRadar2D(canvas, traj, primaryHex, secondaryHex, now) {
+    if (!canvas || !this.wordNodes || this.wordNodes.length === 0) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const gs = window.GlobalStyleConfig;
+    const fontFam = (gs && gs.fuente) ? `"${gs.fuente}", monospace` : '"Space Mono", monospace';
+
+    // 1. Grilla y fondo táctico de radar cósmico
+    ctx.save();
+    const offX = (this.alienHUD ? this.alienHUD.gridOffset.x : 0);
+    const offY = (this.alienHUD ? this.alienHUD.gridOffset.y : 0);
+    ctx.strokeStyle = 'rgba(200, 90, 50, 0.08)';
+    ctx.lineWidth = 1;
+    for (let x = (offX % 24) - 24; x < w + 24; x += 24) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (let y = (offY % 24) - 24; y < h + 24; y += 24) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+
+    // Esquinas tácticas (Steampunk brackets)
+    ctx.strokeStyle = 'rgba(220, 168, 118, 0.35)';
+    ctx.lineWidth = 1.2;
+    const bLen = 8;
+    ctx.beginPath(); ctx.moveTo(6, 6 + bLen); ctx.lineTo(6, 6); ctx.lineTo(6 + bLen, 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w - 6 - bLen, 6); ctx.lineTo(w - 6, 6); ctx.lineTo(w - 6, 6 + bLen); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(6, h - 6 - bLen); ctx.lineTo(6, h - 6); ctx.lineTo(6 + bLen, h - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w - 6 - bLen, h - 6); ctx.lineTo(w - 6, h - 6); ctx.lineTo(w - 6, h - 6 - bLen); ctx.stroke();
+
+    // =========================================================================
+    // MODO A: EN TRAYECTORIA ENTRE PLANETAS (Vuelo/Warp de Planeta A a Planeta B)
+    // =========================================================================
+    if (traj.isTraveling && traj.originNode && traj.destNode && traj.originNode !== traj.destNode && traj.originNode.mesh && traj.destNode.mesh) {
+      // Coordenadas ampliadas para el lienzo de 420x280
+      const P0 = { x: 65, y: 215 };
+      const P1 = { x: 355, y: 65 };
+      const Pctrl = { x: 195, y: 85 };
+
+      function bezierPt(t) {
+        const inv = 1 - t;
+        return {
+          x: inv * inv * P0.x + 2 * inv * t * Pctrl.x + t * t * P1.x,
+          y: inv * inv * P0.y + 2 * inv * t * Pctrl.y + t * t * P1.y
+        };
+      }
+      function bezierTan(t) {
+        return {
+          x: 2 * (1 - t) * (Pctrl.x - P0.x) + 2 * t * (P1.x - Pctrl.x),
+          y: 2 * (1 - t) * (Pctrl.y - P0.y) + 2 * t * (P1.y - Pctrl.y)
+        };
+      }
+
+      // 1. Resplandor difuso del corredor de vuelo ampliado
+      ctx.strokeStyle = 'rgba(200, 90, 50, 0.14)';
+      ctx.lineWidth = 20;
+      ctx.beginPath();
+      ctx.moveTo(P0.x, P0.y);
+      ctx.quadraticCurveTo(Pctrl.x, Pctrl.y, P1.x, P1.y);
+      ctx.stroke();
+
+      // 2. Doble carril guía hiperespacial (guías paralelas punteadas)
+      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = 'rgba(220, 168, 118, 0.28)';
+      ctx.setLineDash([4, 4]);
+      [-6, 6].forEach(offset => {
+        ctx.beginPath();
+        for (let s = 0; s <= 24; s++) {
+          const st = s / 24;
+          const pt = bezierPt(st);
+          const tan = bezierTan(st);
+          const len = Math.hypot(tan.x, tan.y) || 1;
+          const nx = -tan.y / len;
+          const ny = tan.x / len;
+          const rx = pt.x + nx * offset;
+          const ry = pt.y + ny * offset;
+          if (s === 0) ctx.moveTo(rx, ry); else ctx.lineTo(rx, ry);
+        }
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+
+      // 3. Tramo recorrido (haz sólido de cobre con resplandor)
+      const prog = Math.max(0.001, Math.min(1.0, traj.progress));
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = primaryHex;
+      ctx.shadowColor = primaryHex;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      for (let s = 0; s <= 28; s++) {
+        const st = (s / 28) * prog;
+        const pt = bezierPt(st);
+        if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // 4. Tramo restante (corredor punteado animado hacia el destino)
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = 'rgba(220, 168, 118, 0.55)';
+      ctx.setLineDash([6, 5]);
+      ctx.lineDashOffset = -now * 0.025;
+      ctx.beginPath();
+      for (let s = 0; s <= 28; s++) {
+        const st = prog + (s / 28) * (1.0 - prog);
+        const pt = bezierPt(st);
+        if (s === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 5. Flechas guía / chevrons (>>) a lo largo de la curva
+      [0.28, 0.68].forEach(ct => {
+        const cp = bezierPt(ct);
+        const ctTan = bezierTan(ct);
+        const cAngle = Math.atan2(ctTan.y, ctTan.x);
+        ctx.save();
+        ctx.translate(cp.x, cp.y);
+        ctx.rotate(cAngle);
+        ctx.strokeStyle = 'rgba(255, 225, 198, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-5, -4); ctx.lineTo(3, 0); ctx.lineTo(-5, 4);
+        ctx.moveTo(1, -4); ctx.lineTo(9, 0); ctx.lineTo(1, 4);
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 6. Pulso de fotones viajando periódicamente por la ruta
+      const pulseT = (now * 0.0008) % 1.0;
+      const pulsePt = bezierPt(pulseT);
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(pulsePt.x, pulsePt.y, 3.0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // =========================================================================
+      // PALABRAS ALEDAÑAS (Nodos más grandes y etiquetas legibles)
+      // =========================================================================
+      const posA = new THREE.Vector3();
+      const posB = new THREE.Vector3();
+      traj.originNode.mesh.getWorldPosition(posA);
+      traj.destNode.mesh.getWorldPosition(posB);
+
+      const dirAB = posB.clone().sub(posA);
+      const lenAB = dirAB.length();
+      const unitAB = dirAB.clone().normalize();
+
+      const aledanos = [];
+      for (let i = 0; i < (this.wordNodes || []).length; i++) {
+        const n = this.wordNodes[i];
+        if (n === traj.originNode || n === traj.destNode || n.isClusterCenter || !n.mesh) continue;
+        const pN = new THREE.Vector3();
+        n.mesh.getWorldPosition(pN);
+
+        const vA = pN.clone().sub(posA);
+        const proj = vA.dot(unitAB);
+        const u = lenAB > 0.001 ? proj / lenAB : 0.5;
+
+        const closestPt = posA.clone().add(unitAB.clone().multiplyScalar(Math.max(0, Math.min(lenAB, proj))));
+        const distToSegment = pN.distanceTo(closestPt);
+
+        // Signo perpendicular en el espacio 3D
+        const perp = vA.clone().sub(unitAB.clone().multiplyScalar(proj));
+        const crossY = unitAB.clone().cross(perp).y;
+        const side = crossY >= 0 ? 1 : -1;
+
+        aledanos.push({ node: n, u, dist: distToSegment, side });
+      }
+
+      // Tomar las 6 palabras aledañas más cercanas a la trayectoria
+      aledanos.sort((a, b) => a.dist - b.dist);
+      const topAledanos = aledanos.slice(0, 6);
+
+      topAledanos.forEach((item, idx) => {
+        // Clampear u entre 0.12 y 0.88 para distribuirlas a lo largo del corredor
+        const uClamped = Math.max(0.12, Math.min(0.88, item.u));
+        const curvePt = bezierPt(uClamped);
+        const tan = bezierTan(uClamped);
+        const tLen = Math.hypot(tan.x, tan.y) || 1;
+        const nx = -tan.y / tLen;
+        const ny = tan.x / tLen;
+
+        // Alternar lado si se agrupan demasiado
+        const sideSign = (idx % 2 === 0) ? -1 : 1;
+        const offsetDist = Math.max(38, Math.min(85, 34 + idx * 7.5 + item.dist * 0.12));
+        let wx = curvePt.x + nx * (sideSign * offsetDist);
+        let wy = curvePt.y + ny * (sideSign * offsetDist);
+
+        // Clampear dentro de los límites del lienzo ampliado
+        wx = Math.max(35, Math.min(w - 35, wx));
+        wy = Math.max(26, Math.min(h - 26, wy));
+
+        // Detección de proximidad con la nave/sonda en vuelo
+        const isProximity = Math.abs(prog - uClamped) < 0.13;
+
+        // Línea conectora punteada entre la trayectoria y la palabra aledaña
+        ctx.strokeStyle = isProximity ? primaryHex : 'rgba(220, 168, 118, 0.38)';
+        ctx.lineWidth = isProximity ? 2.0 : 1.2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(curvePt.x, curvePt.y);
+        ctx.lineTo(wx, wy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (isProximity) {
+          // Pulso de proximidad / escaneo en la palabra aledaña
+          const pingR = 7 + (now * 0.015) % 12;
+          ctx.strokeStyle = primaryHex;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.arc(wx, wy, pingR, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // Nodo punto de la palabra aledaña más grande
+        const dotCol = item.node.color || secondaryHex;
+        ctx.fillStyle = dotCol;
+        ctx.beginPath();
+        ctx.arc(wx, wy, isProximity ? 6.5 : 5.0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(wx, wy, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Distancia métrica sobre la línea conectora
+        const midX = (curvePt.x + wx) / 2;
+        const midY = (curvePt.y + wy) / 2;
+        ctx.fillStyle = isProximity ? '#ffffff' : 'rgba(220, 168, 118, 0.85)';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Δ${Math.round(item.dist * 0.1)}`, midX, midY - 3);
+
+        // Etiqueta tipográfica de la palabra aledaña ampliada
+        ctx.fillStyle = isProximity ? '#ffffff' : '#edd3be';
+        ctx.font = (isProximity ? 'bold 12px ' : '10.5px ') + fontFam;
+        ctx.textAlign = wx > curvePt.x ? 'left' : 'right';
+        const labelX = wx > curvePt.x ? wx + 8 : wx - 8;
+        ctx.fillText((item.node.label || '').toUpperCase(), labelX, wy + 3.5);
+      });
+
+      // =========================================================================
+      // NAVE / SONDA EN VUELO (Tamaño ampliado y efectos nítidos)
+      // =========================================================================
+      const probePt = bezierPt(prog);
+      const probeTan = bezierTan(prog);
+      const probeAngle = Math.atan2(probeTan.y, probeTan.x);
+
+      ctx.save();
+      ctx.translate(probePt.x, probePt.y);
+      ctx.rotate(probeAngle);
+
+      // Estela de plasma del propulsor
+      const flamePulse = 0.6 + 0.4 * Math.sin(now * 0.03);
+      ctx.fillStyle = `rgba(255, 180, 80, ${flamePulse})`;
+      ctx.beginPath();
+      ctx.moveTo(-6, 0);
+      ctx.lineTo(-15, -4);
+      ctx.lineTo(-20 * flamePulse, 0);
+      ctx.lineTo(-15, 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Fuselaje cibernético de la nave / sonda ampliado
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = secondaryHex;
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(13, 0);
+      ctx.lineTo(-7, -7);
+      ctx.lineTo(-4, 0);
+      ctx.lineTo(-7, 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Haz de radar frontal
+      ctx.strokeStyle = 'rgba(220, 168, 118, 0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 20, -Math.PI / 5, Math.PI / 5);
+      ctx.stroke();
+
+      ctx.restore();
+
+      // Porcentaje de progreso flotante sobre la nave
+      ctx.fillStyle = secondaryHex;
+      ctx.font = 'bold 9.5px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round(prog * 100)}%`, probePt.x, probePt.y - 14);
+
+      // =========================================================================
+      // ANCLAS: PLANETA DE ORIGEN Y PLANETA DE DESTINO AMPLIADOS
+      // =========================================================================
+      // Planeta de Origen
+      ctx.fillStyle = '#8f634b';
+      ctx.beginPath(); ctx.arc(P0.x, P0.y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 90, 50, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(P0.x, P0.y, 13, 0, Math.PI * 2); ctx.stroke();
+
+      ctx.fillStyle = '#8f634b';
+      ctx.font = `8px ${fontFam}`;
+      ctx.textAlign = 'left';
+      ctx.fillText('ORIGEN', P0.x - 16, P0.y + 18);
+      ctx.fillStyle = '#edd3be';
+      ctx.font = `bold 11px ${fontFam}`;
+      ctx.fillText((traj.originNode.label || '').toUpperCase(), P0.x - 16, P0.y + 32);
+
+      // Planeta de Destino
+      const destPulse = 1.0 + 0.25 * Math.sin(now * 0.008);
+      ctx.strokeStyle = primaryHex;
+      ctx.lineWidth = 2.4;
+      ctx.shadowColor = primaryHex;
+      ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(P1.x, P1.y, 10 * destPulse, 0, Math.PI * 2); ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.strokeStyle = secondaryHex;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(P1.x, P1.y, 16, 0, Math.PI * 2); ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(P1.x, P1.y, 4.5, 0, Math.PI * 2); ctx.fill();
+
+      // Retículo de mira táctica en el destino
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(P1.x - 22, P1.y); ctx.lineTo(P1.x - 17, P1.y);
+      ctx.moveTo(P1.x + 17, P1.y); ctx.lineTo(P1.x + 22, P1.y);
+      ctx.moveTo(P1.x, P1.y - 22); ctx.lineTo(P1.x, P1.y - 17);
+      ctx.moveTo(P1.x, P1.y + 17); ctx.lineTo(P1.x, P1.y + 22);
+      ctx.stroke();
+
+      ctx.fillStyle = secondaryHex;
+      ctx.font = `8px ${fontFam}`;
+      ctx.textAlign = 'right';
+      ctx.fillText('DESTINO', P1.x + 12, P1.y - 22);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold 12.5px ${fontFam}`;
+      ctx.fillText((traj.destNode.label || '').toUpperCase(), P1.x + 12, P1.y - 10);
+
+    // =========================================================================
+    // MODO B: CÁMARA POSADA / ORBITANDO (Planeta activo en centro y aledaños)
+    // =========================================================================
+    } else {
+      const activeNode = traj.destNode || traj.originNode;
+      if (!activeNode || !activeNode.mesh) {
+        ctx.fillStyle = 'rgba(237, 211, 190, 0.45)';
+        ctx.font = `12px ${fontFam}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('[EN BUSCA DE PLANETA...]', w / 2, h / 2);
+        ctx.restore();
+        return;
+      }
+
+      const cx = w / 2;
+      const cy = h / 2;
+
+      // Anillos orbitales concéntricos ampliados
+      ctx.strokeStyle = 'rgba(220, 168, 118, 0.16)';
+      [55, 110].forEach(r => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // Buscar palabras aledañas respecto al planeta activo
+      const activePos = activeNode.mesh.position;
+      const neighbors = [];
+      for (let i = 0; i < (this.wordNodes || []).length; i++) {
+        const n = this.wordNodes[i];
+        if (n === activeNode || n.isClusterCenter || !n.mesh) continue;
+        const d = activePos.distanceTo(n.mesh.position);
+        const sameCluster = (n.clusterId && n.clusterId === activeNode.clusterId);
+        const semanticDist = sameCluster ? d * 0.75 : d;
+        neighbors.push({ node: n, dist: d, semanticDist });
+      }
+      neighbors.sort((a, b) => a.semanticDist - b.semanticDist);
+      const topNeighbors = neighbors.slice(0, 6);
+
+      const R_ORBIT = 100;
+      const baseAngle = (now * 0.0003) + (this.camera ? -this.camera.rotation.y * 0.5 : 0);
+
+      topNeighbors.forEach((item, j) => {
+        const angle = baseAngle + (j * (Math.PI * 2 / topNeighbors.length)) - Math.PI / 2;
+        const nx = cx + Math.cos(angle) * R_ORBIT;
+        const ny = cy + Math.sin(angle) * R_ORBIT;
+
+        // Conector dendrítico
+        ctx.strokeStyle = 'rgba(220, 168, 118, 0.38)';
+        ctx.lineWidth = 1.3;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(nx, ny);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Chispa sináptica viajera
+        const sparkT = (now * 0.0012 + j * 0.18) % 1.0;
+        const sx = cx + (nx - cx) * sparkT;
+        const sy = cy + (ny - cy) * sparkT;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Nodo aledaño ampliado
+        const nCol = item.node.color || secondaryHex;
+        ctx.fillStyle = nCol;
+        ctx.beginPath();
+        ctx.arc(nx, ny, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(nx, ny, 7.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Distancia
+        const midX = (cx + nx) / 2;
+        const midY = (cy + ny) / 2;
+        ctx.fillStyle = secondaryHex;
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Δ${Math.round(item.dist * 0.1)}`, midX, midY - 3);
+
+        // Etiqueta ampliada
+        ctx.fillStyle = '#edd3be';
+        ctx.font = `bold 11px ${fontFam}`;
+        ctx.textAlign = nx >= cx ? 'left' : 'right';
+        const labelX = nx >= cx ? nx + 8 : nx - 8;
+        ctx.fillText((item.node.label || '').toUpperCase(), labelX, ny + 3.5);
+      });
+
+      // Sonda en órbita alrededor del planeta activo
+      const probeOrbAngle = (now * 0.0015) + (this.camera ? -this.camera.rotation.y : 0);
+      const probeOrbX = cx + Math.cos(probeOrbAngle) * 55;
+      const probeOrbY = cy + Math.sin(probeOrbAngle) * 55;
+
+      ctx.save();
+      ctx.translate(probeOrbX, probeOrbY);
+      ctx.rotate(probeOrbAngle + Math.PI / 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = secondaryHex;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(7, 0); ctx.lineTo(-5, -4.5); ctx.lineTo(-3, 0); ctx.lineTo(-5, 4.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Planeta central posado ampliado
+      const rootPulse = 1.0 + Math.sin(now * 0.006) * 0.20;
+      ctx.strokeStyle = primaryHex;
+      ctx.lineWidth = 2.4;
+      ctx.shadowColor = primaryHex;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 11 * rootPulse, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.strokeStyle = secondaryHex;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Etiqueta destacada del planeta central
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold 13.5px ${fontFam}`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = primaryHex;
+      ctx.shadowBlur = 8;
+      ctx.fillText((activeNode.label || '').toUpperCase(), cx, cy + 32);
+    }
+
+    ctx.restore();
   }
 
   updateClusterNavButtons() {

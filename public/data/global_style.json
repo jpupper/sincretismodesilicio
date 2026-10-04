@@ -1,0 +1,36 @@
+{
+  "fuente": "VT323",
+  "colores": {
+    "fondo": "#0c0705",
+    "panel": "#1b0f0a",
+    "panel2": "#2a170f",
+    "borde": "#c85a32",
+    "acento": "#d46238",
+    "acento2": "#dca876",
+    "texto": "#edd3be",
+    "textoDim": "#8f634b",
+    "clusterEsfera": "#c85a32",
+    "clusterNucleo": "#8a3318",
+    "clusterPelotita": "#ffe2c8",
+    "clusterCajaFill": "#1b0f0a",
+    "clusterCajaBorde": "#c85a32",
+    "logFondo": "#0c0705",
+    "logTexto": "#edd3be",
+    "logAcento": "#d46238",
+    "logPanel": "#1b0f0a",
+    "cambiaFondo": "#0c0705",
+    "cambiaHud": "#1b0f0a",
+    "cambiaAcento": "#d46238",
+    "cambiaPalabra": "#dca876"
+  },
+  "contenedores": {
+    "radio": 10,
+    "bordeAncho": 1,
+    "padding": 16,
+    "blur": 10,
+    "opacidadPanel": 0.85,
+    "sombra": 18
+  },
+  "guardado": 1791084446741,
+  "escala": 1.28
+}

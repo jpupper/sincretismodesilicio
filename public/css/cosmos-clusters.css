@@ -33,6 +33,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  text-transform: uppercase !important;
+}
+
+html, body, button, input, select, textarea, div, p, span, h1, h2, h3, h4, h5, h6, a, label, pre, code {
+  text-transform: uppercase !important;
 }
 
 html, body {
@@ -711,5 +716,312 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
 #panel-ajustes-cosmos .pa-color.activo {
   border: 2px solid #ffffff;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.55);
+}
+
+/* ==========================================================================
+   BOTONES DE CIERRE (CRUZ) Y VENTANAS HUD
+   ========================================================================== */
+.hud-close-btn {
+  background: rgba(45, 8, 10, 0.85);
+  border: 1px solid rgba(255, 0, 13, 0.4);
+  color: #ff9da2;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.hud-close-btn:hover {
+  background: #ff000d;
+  color: #ffffff;
+  border-color: #ff000d;
+  box-shadow: 0 0 8px rgba(255, 0, 13, 0.6);
+}
+.hud-hidden {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.telemetry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 0, 13, 0.2);
+  padding-bottom: 4px;
+}
+.telemetry-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   MONITOR ALIENÍGENA 2D & GIROSCÓPIO CIBERNÉTICO (Abajo a la izquierda)
+   ========================================================================== */
+.alien-nav-hud {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  z-index: 90;
+  width: 360px;
+  background: rgba(8, 2, 4, 0.90);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 0, 13, 0.38);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.85), 0 0 16px rgba(255, 0, 13, 0.18);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.alien-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 0, 13, 0.22);
+  padding-bottom: 6px;
+}
+.alien-hud-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.alien-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00f0ff;
+  box-shadow: 0 0 8px #00f0ff;
+  animation: alienPulse 1.8s infinite alternate;
+}
+@keyframes alienPulse {
+  0% { transform: scale(0.85); opacity: 0.7; }
+  100% { transform: scale(1.25); opacity: 1; }
+}
+.alien-hud-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--accent-cyan);
+}
+
+/* Fila de 3 cuadrados de velocidad */
+.alien-vel-container {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+.vel-box-card {
+  flex: 1;
+  background: rgba(22, 4, 7, 0.85);
+  border: 1px solid rgba(255, 0, 13, 0.28);
+  border-radius: 3px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.vel-box-header {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  color: #a8676b;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.vel-box-canvas {
+  width: 84px;
+  height: 84px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+}
+.vel-box-val {
+  font-size: 11px;
+  color: #00f0ff;
+  font-weight: 600;
+  margin-top: 3px;
+  letter-spacing: 0.4px;
+}
+
+/* Caja de Giroscopio */
+.alien-gyro-box {
+  background: rgba(18, 3, 5, 0.75);
+  border: 1px solid rgba(255, 0, 13, 0.24);
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+.alien-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: #ff8f96;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+.alien-angle-tags {
+  color: #00f0ff;
+  font-weight: 600;
+  font-size: 10.5px;
+}
+.alien-gyro-canvas {
+  width: 100%;
+  height: 145px;
+  display: block;
+}
+
+/* ==========================================================================
+   PANEL DE DISTANCIA SEMÁNTICA // ÁRBOL 2D (Esquina inferior derecha)
+   ========================================================================== */
+.semantic-tree-hud {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 90;
+  width: 440px;
+  background: var(--gs-panel, rgba(14, 8, 5, 0.92));
+  backdrop-filter: blur(var(--gs-blur, 12px));
+  border: 1px solid var(--gs-borde, rgba(200, 90, 50, 0.45));
+  box-shadow: var(--gs-sombra, 0 10px 35px rgba(0, 0, 0, 0.85)), 0 0 16px rgba(200, 90, 50, 0.20);
+  border-radius: var(--gs-radio, 4px);
+  padding: 10px 12px;
+  font-family: var(--gs-fuente, var(--font-mono));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.semantic-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 6px;
+}
+
+.semantic-hud-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.semantic-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gs-acento, #c85a32);
+  box-shadow: 0 0 8px var(--gs-acento, #c85a32);
+  animation: semanticPulse 1.8s infinite alternate;
+}
+
+@keyframes semanticPulse {
+  0% { transform: scale(0.85); opacity: 0.7; }
+  100% { transform: scale(1.3); opacity: 1; }
+}
+
+.semantic-hud-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--gs-acento, #c85a32);
+}
+
+/* Banner de Palabra Activa (donde se posa / viaja la cámara) */
+.semantic-active-banner {
+  background: var(--gs-panel2, rgba(28, 16, 10, 0.85));
+  border: 1px solid rgba(200, 90, 50, 0.35);
+  border-radius: 3px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.semantic-active-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  letter-spacing: 0.6px;
+}
+
+.semantic-status-badge {
+  background: rgba(200, 90, 50, 0.22);
+  color: var(--gs-acento2, #dca876);
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.semantic-cluster-tag {
+  color: var(--gs-texto-dim, #8f634b);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 9.5px;
+}
+
+.semantic-active-word-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.semantic-active-prefix {
+  font-size: 10.5px;
+  color: var(--gs-texto-dim, #8f634b);
+  font-weight: 600;
+}
+
+.semantic-active-word {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--gs-texto, #edd3be);
+  text-shadow: 0 0 10px rgba(200, 90, 50, 0.5);
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.semantic-radar-delta {
+  font-size: 12px;
+  color: var(--gs-acento, #c85a32);
+  font-weight: 700;
+}
+
+/* Lienzo del Árbol y Trayectoria 2D */
+.semantic-tree-canvas {
+  width: 100%;
+  height: 280px;
+  display: block;
+  background: rgba(8, 4, 3, 0.70);
+  border: 1px solid rgba(200, 90, 50, 0.22);
+  border-radius: 3px;
+}
+
+.semantic-tree-footer {
+  font-size: 9.5px;
+  letter-spacing: 0.8px;
+  color: var(--gs-texto-dim, #8f634b);
+  text-align: center;
+  padding-top: 2px;
 }
 

@@ -9,36 +9,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="js/base-path.js?v=3.8"></script>
+<script src="js/global-style.js?v=1.1"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; background: #070303; color: #e88f93; font-family: "Share Tech Mono", "VT323", "IBM Plex Mono", monospace; overflow: hidden; }
+  * { box-sizing: border-box; margin: 0; padding: 0; text-transform: uppercase !important; }
+  html, body, button, input, select, textarea, div, p, span, h1, h2, h3, h4, h5, h6, a, label, pre, code {
+    text-transform: uppercase !important;
+  }
+  html, body { height: 100%; background: var(--gs-fondo, #070303); color: var(--gs-texto, #e88f93); font-family: var(--gs-fuente, "Share Tech Mono", "VT323", "IBM Plex Mono", monospace); overflow: hidden; }
   body { display: flex; flex-direction: column; }
 
-  /* ---------- BARRA SUPERIOR DE ESTADO ---------- */
+  /* ---------- BARRA SUPERIOR DE ESTADO (OCULTA) ---------- */
   #status {
-    flex: 0 0 auto;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 0 16px;
-    border-bottom: 1px solid #331416;
-    background: #080202;
-    color: #8b4f52;
-    font-size: 11.5px;
-    letter-spacing: .05em;
-    white-space: nowrap;
-    overflow-x: auto;
-    z-index: 10;
+    display: none !important;
   }
-  #status b { color: #f59ca0; font-weight: 600; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #6b1f23; margin-right: 6px; vertical-align: 0px; transition: all .2s; }
-  .dot.on { background: #ff000d; box-shadow: 0 0 8px #ff000d; }
-  .dot.pulse { background: #ff000d; box-shadow: 0 0 10px #ff000d; }
-  .dot.thinking { background: #ff000d; box-shadow: 0 0 12px #ff000d; animation: blink-fast .6s infinite alternate; }
-  @keyframes blink-fast { from { opacity: 0.3; transform: scale(0.9); } to { opacity: 1; transform: scale(1.2); } }
-  .sep { color: #421a1c; }
-  .sp { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 
   button.k {
     background: #180607;
@@ -56,174 +39,130 @@
   button.k.on { color: #ff000d; border-color: #ff000d; background: #260608; }
   button.k.active-view { color: #ff000d; border-color: #ff000d; background: #29080a; font-weight: bold; }
 
+  /* ---------- PANEL SUPERIOR: MANIFIESTO SIEMPRE VISIBLE ---------- */
+  .manifest-panel {
+    flex: 0 0 40%;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 16px 10px;
+    background: var(--gs-panel, #080202);
+    border-bottom: var(--gs-borde-ancho, 1px) solid var(--gs-borde, #331416);
+    position: relative;
+    z-index: 2;
+  }
+  /* MODO DE LA CONSOLA ----------------------------------------------------
+     Por defecto (nadie eligio palabras) se ve SOLO EL MANIFIESTO a pantalla
+     completa: la consola de pensamiento no ocupa lugar. Cuando la obra esta
+     ARMANDO PALABRAS (3 elegidas -> procesando -> haiku) el body lleva
+     .modo-armado y la pantalla se parte en 2: manifiesto arriba, pensamiento
+     abajo. */
+  body:not(.modo-armado) .thought-stream-container { display: none; }
+  body:not(.modo-armado) .manifest-panel {
+    flex: 1 1 100%;
+    border-bottom: none;
+  }
+  body.modo-armado .manifest-panel { flex: 0 0 40%; }
+  body.modo-armado .thought-stream-container { display: flex; }
+
+  .manifest-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    color: var(--gs-log-acento, #d46238);
+    margin-bottom: 6px;
+  }
+  .manifest-panel .mp-hint { color: #733b3e; }
+  #manifest-terminal {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: 30px;
+    line-height: 1.55;
+    color: var(--gs-log-texto, #edd3be);
+    text-shadow: 0 0 12px rgba(0, 0, 0, 0.85);
+  }
+  #manifest-terminal::-webkit-scrollbar { width: 6px; }
+  #manifest-terminal::-webkit-scrollbar-track { background: transparent; }
+  #manifest-terminal::-webkit-scrollbar-thumb { background: #4a1a1c; border-radius: 3px; }
+
   /* ---------- CONTENEDOR PRINCIPAL ---------- */
   #main-container {
-    flex: 1 1 auto;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+    background: transparent;
+    z-index: 1;
   }
 
   /* ---------- PANEL COGNITIVO DEL AGENTE (HERO) ---------- */
   #agent-monitor {
-    /* El pensamiento manda: se queda con TODA la pantalla (la telemetría del
-       bus ya no vive en esta página) */
     flex: 1 1 100%;
-    min-height: 220px;
-    max-height: 100%;
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    background: #0a0202;
-    border-bottom: none;
+    background: transparent;
+    border: none;
     position: relative;
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
-    transition: flex 0.25s ease;
+    box-shadow: none;
   }
 
-  .agent-top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-    background: linear-gradient(90deg, #1a0506 0%, #110303 100%);
-    border-bottom: 1px solid #381416;
-    font-size: 11px;
-    letter-spacing: .06em;
+  /* Ocultar elementos sobrantes para dejar SOLO consola de texto y contenedor de manifiesto */
+  .agent-top-bar,
+  .words-pipeline,
+  .thought-stream-header,
+  #haiku-banner {
+    display: none !important;
   }
-  .agent-title-block { display: flex; align-items: center; gap: 10px; }
-  .agent-badge {
-    padding: 3px 8px;
-    border-radius: 3px;
-    font-weight: 700;
-    font-size: 10.5px;
-    letter-spacing: .08em;
-    background: #290b0c;
-    color: #e2474f;
-    border: 1px solid #571c1f;
-  }
-  .agent-badge.thinking {
-    background: #2b0608;
-    color: #ff3b45;
-    border-color: #ff000d;
-    box-shadow: 0 0 10px rgba(255, 0, 13, 0.35);
-  }
-  .agent-badge.done {
-    background: #2e0406;
-    color: #ff000d;
-    border-color: #ff000d;
-    box-shadow: 0 0 10px rgba(255, 0, 13, 0.3);
-  }
-
-  .agent-metrics { display: flex; gap: 14px; color: #8d5356; font-size: 11px; }
-  .agent-metrics span b { color: #e88f93; }
-
-  /* Slots de Palabras Humanas vs Frías */
-  .words-pipeline {
-    display: flex;
-    gap: 12px;
-    padding: 10px 16px;
-    background: #0d0303;
-    border-bottom: 1px solid #280d0e;
-    overflow-x: auto;
-  }
-  .word-pill-slot {
-    flex: 1;
-    min-width: 170px;
-    padding: 8px 12px;
-    background: #140506;
-    border: 1px solid #361618;
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    transition: all .25s ease;
-  }
-  .word-pill-slot.active {
-    border-color: #ff000d;
-    background: #220708;
-    box-shadow: 0 0 12px rgba(255, 0, 13, 0.15);
-  }
-  .word-pill-slot.hot {
-    border-color: #ff000d;
-    background: #240607;
-    box-shadow: 0 0 14px rgba(255, 0, 13, 0.25);
-  }
-  .pill-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    color: #734144;
-    letter-spacing: .08em;
-  }
-  .pill-human {
-    font-size: 13px;
-    font-weight: 700;
-    color: #e88f93;
-    letter-spacing: .05em;
-  }
-  .pill-cold {
-    font-size: 11.5px;
-    color: #ff000d;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .pill-cold::before { content: "➔"; color: #ff000d; font-size: 10px; }
 
   /* Ventana de Pensamiento en Tiempo Real (Typewriter / Think Stream) */
   .thought-stream-container {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    padding: 12px 16px;
-    background: #060101;
+    padding: 0;
+    background: transparent;
     position: relative;
+    box-sizing: border-box;
   }
-
-  .thought-stream-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;          /* el hint nunca se corta contra el borde */
-    gap: 4px 12px;
-    font-size: 10.5px;
-    color: #733b3e;
-    letter-spacing: .08em;
-    margin-bottom: 6px;
-  }
-  .thought-stream-header .mode-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .mode-indicator .mode-tag {
-    padding: 1px 6px;
-    border-radius: 2px;
-    font-size: 10px;
-  }
-  .mode-tag.tag-reasoning { background: #380407; color: #ff3b45; border: 1px solid #7a0b11; }
-  .mode-tag.tag-synthesis { background: #2b0608; color: #ff000d; border: 1px solid #611418; }
 
   #thought-terminal {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
+    width: 100%;
+    height: 100%;
     overflow-y: auto;
-    background: #080202;
-    border: 1px solid #311113;
-    border-radius: 4px;
-    padding: 12px 14px;
-    font-size: 22px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 32px 48px;
+    padding-right: 320px; /* Margen para no solaparse con #manifest-graph */
+    box-sizing: border-box;
+    font-family: var(--gs-fuente, "Share Tech Mono", monospace);
+    font-size: 26px;
     line-height: 1.6;
-    color: #eba4a8;
+    color: var(--gs-texto, #eba4a8);
     white-space: pre-wrap;
     word-break: break-word;
     scrollbar-width: thin;
-    scrollbar-color: #4a1a1c #080202;
+    scrollbar-color: var(--gs-borde, #4a1a1c) transparent;
   }
   #thought-terminal::-webkit-scrollbar { width: 6px; }
-  #thought-terminal::-webkit-scrollbar-thumb { background: #4a1a1c; }
+  #thought-terminal::-webkit-scrollbar-track { background: transparent; }
+  #thought-terminal::-webkit-scrollbar-thumb { background: #4a1a1c; border-radius: 3px; }
 
   .thought-chunk-think {
     color: #ff4f58;
@@ -267,12 +206,12 @@
   /* Manifiesto de la obra: las instrucciones se escriben solas mientras la
      sala está vacía (nadie eligió todavía su primera palabra). */
   #thought-terminal.manifest-mode {
-    font-family: "Share Tech Mono", "VT323", "IBM Plex Mono", monospace;
+    font-family: var(--gs-fuente, "Share Tech Mono", monospace) !important;
     font-size: 30px;
     line-height: 1.55;
-    color: #e8a6a9;
+    color: var(--gs-texto, #e8a6a9) !important;
   }
-  #thought-terminal.manifest-mode #thought-content { color: #e8a6a9; }
+  #thought-terminal.manifest-mode #thought-content { color: var(--gs-texto, #e8a6a9) !important; }
 
   .thought-cursor {
     display: inline-block;
@@ -326,7 +265,7 @@
     position: fixed;
     top: 44px;
     right: 16px;
-    width: 440px;
+    width: 560px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 60px);
     overflow-y: auto;
@@ -348,7 +287,7 @@
   #panel-ajustes.abierto { display: block; animation: fade-in-up .25s ease; }
   .pa-titulo {
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 12px; letter-spacing: .1em; color: #ff000d; font-weight: 700; margin-bottom: 14px;
+    font-size: 17px; letter-spacing: .08em; color: #ff000d; font-weight: 700; margin-bottom: 12px;
   }
   .pa-seccion {
     border-top: 1px solid #3d1417;
@@ -356,7 +295,7 @@
     padding-top: 10px;
   }
   .pa-seccion-titulo {
-    font-size: 11px;
+    font-size: 15px;
     color: #ff3b45;
     font-weight: 700;
     letter-spacing: .08em;
@@ -378,7 +317,7 @@
     border-radius: 3px;
     padding: 5px 8px;
     font-family: inherit;
-    font-size: 10px;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: .06em;
     cursor: pointer;
@@ -399,8 +338,8 @@
   .pa-check-label {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    font-size: 10.5px;
+    gap: 8px;
+    font-size: 13.5px;
     color: #d8898e;
     cursor: pointer;
     user-select: none;
@@ -415,38 +354,38 @@
     border: 1px solid #4a1418;
     color: #ff8a90;
     border-radius: 3px;
-    padding: 5px 8px;
+    padding: 6px 9px;
     font-family: inherit;
-    font-size: 11px;
+    font-size: 14px;
     margin-top: 4px;
     cursor: pointer;
   }
   .pa-select:focus { outline: none; border-color: #ff000d; }
   .pa-cerrar {
     background: #2b0608; border: 1px solid #611418; color: #ff8f96;
-    width: 22px; height: 22px; line-height: 1; border-radius: 3px; cursor: pointer; font-size: 12px;
+    width: 28px; height: 28px; line-height: 1; border-radius: 3px; cursor: pointer; font-size: 16px;
   }
   .pa-cerrar:hover { background: #40070a; color: #ff000d; border-color: #ff000d; }
   .pa-grupo { margin-bottom: 16px; }
   .pa-label {
     display: flex; align-items: baseline; justify-content: space-between;
-    font-size: 11px; color: #b8747a; letter-spacing: .07em; margin-bottom: 5px;
+    font-size: 14px; color: #d68d92; letter-spacing: .05em; margin-bottom: 6px;
   }
-  .pa-valor { color: #ff000d; font-weight: 700; font-size: 15px; }
+  .pa-valor { color: #ff000d; font-weight: 700; font-size: 20px; }
   .pa-slider {
-    width: 100%; height: 22px; background: transparent; cursor: pointer;
+    width: 100%; height: 32px; background: transparent; cursor: pointer;
     -webkit-appearance: none; appearance: none;
   }
   .pa-slider:focus { outline: none; }
   .pa-slider::-webkit-slider-runnable-track { height: 4px; background: #3a1214; border-radius: 2px; }
   .pa-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px;
+    -webkit-appearance: none; width: 21px; height: 21px; margin-top: -8.5px;
     border-radius: 50%; background: #ff000d; box-shadow: 0 0 10px rgba(255, 0, 13, 0.65);
   }
   .pa-slider::-moz-range-track { height: 4px; background: #3a1214; border-radius: 2px; }
-  .pa-slider::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%; background: #ff000d; }
-  .pa-pistas { display: flex; justify-content: space-between; font-size: 9.5px; color: #6d3a3d; letter-spacing: .05em; }
-  .pa-nota { font-size: 10.5px; color: #8a5154; line-height: 1.5; margin-top: 3px; }
+  .pa-slider::-moz-range-thumb { width: 21px; height: 21px; border: none; border-radius: 50%; background: #ff000d; }
+  .pa-pistas { display: flex; justify-content: space-between; font-size: 12px; color: #6d3a3d; letter-spacing: .05em; }
+  .pa-nota { font-size: 13px; color: #a06669; line-height: 1.5; margin-top: 4px; }
   .pa-preview {
     border: 1px solid #311113; background: #080202; border-radius: 4px;
     padding: 8px 10px; margin-top: 8px; color: #e8a6a9; white-space: pre-wrap;
@@ -454,10 +393,74 @@
   }
   .pa-reset {
     background: #2b0608; border: 1px solid #611418; color: #ff8f96;
-    font-family: inherit; font-size: 10.5px; letter-spacing: .07em;
-    padding: 5px 11px; border-radius: 3px; cursor: pointer;
+    font-family: inherit; font-size: 13px; letter-spacing: .07em;
+    padding: 7px 13px; border-radius: 3px; cursor: pointer;
   }
   .pa-reset:hover { background: #40070a; color: #ff000d; border-color: #ff000d; }
+  /* ---------- PESTANAS DEL PANEL (para probar de a una familia) ---------- */
+  .pa-tabs {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+  }
+  .pa-tab {
+    flex: 1 1 auto; min-width: 88px;
+    background: #1d0507; color: #c07d82; border: 1px solid #52181c;
+    border-radius: 4px; padding: 8px 10px; cursor: pointer;
+    font-family: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: .06em;
+    transition: all .15s ease;
+  }
+  .pa-tab:hover { background: #330a0d; color: #ff5f68; border-color: #ff000d; }
+  .pa-tab.activo {
+    background: #ff000d; color: #0a0202; border-color: #ff000d;
+    box-shadow: 0 0 12px rgba(255, 0, 13, 0.55);
+  }
+  .pa-seccion[data-pa-tab][hidden] { display: none !important; }
+  /* ---------- HUD: GRAFICO DE BARRAS DEL MANIFIESTO (esquina sup. derecha) ---------- */
+  #manifest-graph {
+    position: fixed;
+    top: 24px;
+    right: 28px;
+    z-index: 50;
+    width: 272px;
+    padding: 10px 12px 10px;
+    background: rgba(12, 3, 4, 0.92);
+    border: 1px solid var(--gs-borde, #441618);
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+    font-size: 10px;
+    letter-spacing: .06em;
+    color: var(--gs-texto-dim, #8b4f52);
+    pointer-events: none;
+  }
+  #manifest-graph .mg-title {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 9.5px; color: var(--gs-acento, #f59ca0); letter-spacing: .1em;
+    margin-bottom: 6px;
+  }
+  #manifest-graph .mg-live { color: #6d3a3d; }
+  #manifest-graph .mg-live.on { color: var(--gs-acento, #ff000d); }
+  #manifest-graph .mg-counters { display: flex; gap: 10px; margin-bottom: 7px; }
+  #manifest-graph .mg-metric { flex: 1 1 0; min-width: 0; }
+  #manifest-graph .mg-k { font-size: 9px; color: #8b4f52; }
+  #manifest-graph .mg-v {
+    font-size: 16px; color: var(--gs-acento, #f59ca0); font-weight: 700;
+    line-height: 1.1; white-space: nowrap;
+  }
+  #manifest-graph .mg-t { font-size: 9px; color: #6d3a3d; }
+  #manifest-graph .mg-bars {
+    display: flex; align-items: flex-end; gap: 2px;
+    height: 48px; padding-top: 2px;
+    border-top: 1px solid #2a1012; border-bottom: 1px solid #2a1012;
+  }
+  #manifest-graph .mg-bar {
+    flex: 1 1 auto; min-width: 2px; height: 3%;
+    background: var(--gs-acento, #ff000d);
+    border-radius: 1px;
+    opacity: 0.14;
+  }
+  #manifest-graph .mg-foot {
+    display: flex; justify-content: space-between;
+    font-size: 8.5px; color: #6d3a3d; margin-top: 4px;
+  }
 </style>
 </head>
 <body>
@@ -476,6 +479,7 @@
   <span>EVENTOS <b id="f-events">0</b></span>
   <span class="sp">
     <button class="k" id="btn-panel" title="Ajustes de la consola: tamaño de letra y ritmo (tecla P)">&#9881; AJUSTES · P</button>
+    <a class="k" id="lnk-globalstyle" href="./globalstyle.html" target="_blank" rel="noopener noreferrer" title="Diseño global: tipografía, paleta y contenedores (se aplica en vivo)">&#127899; DISEÑO</a>
   </span>
 </div>
 
@@ -497,6 +501,19 @@
       </div>
     </div>
 
+    <!-- ==================================================================
+         PANEL SUPERIOR · EL MANIFIESTO DE LA OBRA (SIEMPRE VISIBLE)
+         No se interrumpe nunca: la obra se sigue explicando mientras la
+         subconsola de abajo muestra cómo la IA piensa cada palabra.
+         =================================================================== -->
+    <div class="manifest-panel" id="manifest-panel">
+      <div class="manifest-panel-header">
+        <span class="mp-tag" id="manifest-badge">&#9672; MANIFIESTO DE LA OBRA</span>
+        <span class="mp-hint" id="manifest-hint">se lee solo, en bucle, mientras la sala espera</span>
+      </div>
+      <div id="manifest-terminal"><span id="manifest-content"></span><span class="thought-cursor" id="manifest-cursor" style="display:none;"></span></div>
+    </div>
+
     <!-- Ventana de pensamiento streaming de Gemma -->
     <div class="thought-stream-container">
       <div class="thought-stream-header">
@@ -506,7 +523,7 @@
         <span id="thought-status-hint">Esperando secuencia de 3 palabras en Sicre2...</span>
       </div>
 
-      <div id="thought-terminal"><span id="thought-content">Esperando estímulo cognitivo...</span><span class="thought-cursor" id="thought-cursor" style="display:none;"></span></div>
+      <div id="thought-terminal"><span id="thought-content"></span><span class="thought-cursor" id="thought-cursor" style="display:none;"></span></div>
 
       <!-- Banner de síntesis Haiku final -->
       <div id="haiku-banner">
@@ -517,6 +534,28 @@
         <div class="haiku-text" id="haiku-text"></div>
       </div>
     </div>
+
+      <!-- HUD: grafico de barras en vivo del manifiesto (arriba a la derecha) -->
+      <div id="manifest-graph" aria-hidden="true">
+        <div class="mg-title">
+          <span>&#9636; MANIFIESTO &middot; ACTIVIDAD</span>
+          <span class="mg-live" id="mg-live">EN ESPERA</span>
+        </div>
+        <div class="mg-counters">
+          <div class="mg-metric">
+            <div class="mg-k">LETRAS</div>
+            <div class="mg-v" id="mg-letras">0</div>
+            <div class="mg-t" id="mg-letras-tot">/ 0</div>
+          </div>
+          <div class="mg-metric">
+            <div class="mg-k">TOKENS</div>
+            <div class="mg-v" id="mg-tokens">0</div>
+            <div class="mg-t" id="mg-tokens-tot">/ 0</div>
+          </div>
+        </div>
+        <div class="mg-bars" id="mg-bars"></div>
+        <div class="mg-foot"><span id="mg-ventana">0.0 s</span><span id="mg-ritmo">0 car/s</span></div>
+      </div>
   </section>
 
 </div>
@@ -534,8 +573,83 @@
     <button class="pa-cerrar" id="pa-cerrar" title="Cerrar (P o Esc)">&#10005;</button>
   </div>
 
+  <!-- PESTANAS: cada familia de ajustes en su propia pestana para probarlas por separado -->
+  <div class="pa-tabs" id="pa-tabs">
+    <button class="pa-tab activo" data-pa-tab="fondo">&#127756; FONDO</button>
+    <button class="pa-tab" data-pa-tab="dibujos">&#129302; DIBUJOS</button>
+    <button class="pa-tab" data-pa-tab="consola">&#128292; CONSOLA</button>
+    <button class="pa-tab" data-pa-tab="glitch">&#9889; GLITCH</button>
+    <button class="pa-tab" data-pa-tab="uniforms">&#127899; UNIFORMS</button>
+  </div>
+
+  <!-- 0. SHADER ASCII DE FONDO -->
+  <div class="pa-seccion" id="pa-seccion-ascii" data-pa-tab="fondo" style="border-top:none;margin-top:0;padding-top:0;">
+    <div class="pa-seccion-titulo"><span>🌌 SHADER ASCII DE FONDO</span></div>
+
+    <div class="pa-grupo">
+      <label class="pa-check-label" style="font-weight:700;color:#ff525d;display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="pa-ascii-enabled" checked>
+        <span>ACTIVAR SHADER ASCII DE FONDO</span>
+      </label>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>OPACIDAD DEL FONDO ASCII</span><span class="pa-valor" id="pa-ascii-opacity-val">0.75</span></div>
+      <input type="range" class="pa-slider" id="pa-ascii-opacity" min="0" max="1" step="0.02" value="0.75" />
+      <div class="pa-pistas"><span>0.00 · invisible</span><span>1.00 · opaco</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>OPACIDAD DE LA CONSOLA (CAPTURA)</span><span class="pa-valor" id="pa-consola-opacity-val">0.94</span></div>
+      <input type="range" class="pa-slider" id="pa-consola-opacity" min="0.15" max="1" step="0.01" value="0.94" />
+      <div class="pa-pistas"><span>0.15 · deja ver el fondo</span><span>1.00 · consola plena</span></div>
+      <div class="pa-nota">El ASCII de fondo se dibuja POR ENCIMA con mezcla SCREEN, así se ve a través del texto. Bajá esto si querés que el fondo asome más.</div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>VELOCIDAD DEL SHADER</span><span class="pa-valor" id="pa-ascii-speed-val">0.35</span></div>
+      <input type="range" class="pa-slider" id="pa-ascii-speed" min="0.02" max="2.0" step="0.02" value="0.35" />
+      <div class="pa-pistas"><span>0.02 · lento</span><span>2.00 · hiperactivo</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>TAMAÑO DE CARACTERES (CHAR SIZE)</span><span class="pa-valor" id="pa-ascii-charsize-val">14px</span></div>
+      <input type="range" class="pa-slider" id="pa-ascii-charsize" min="8" max="36" step="1" value="14" />
+      <div class="pa-pistas"><span>8px · ultra denso</span><span>36px · macro glifos</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>ESCALA DE GLIFOS (GLYPH SCALE)</span><span class="pa-valor" id="pa-ascii-glyphscale-val">0.85</span></div>
+      <input type="range" class="pa-slider" id="pa-ascii-glyphscale" min="0.3" max="1.5" step="0.05" value="0.85" />
+      <div class="pa-pistas"><span>0.30 · puntos</span><span>1.50 · celdas llenas</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>DENSIDAD DE TILE (REPETICIÓN)</span><span class="pa-valor" id="pa-ascii-tile-val">2.00</span></div>
+      <input type="range" class="pa-slider" id="pa-ascii-tile" min="0.5" max="5.0" step="0.1" value="2.0" />
+      <div class="pa-pistas"><span>0.50 · orgánico suave</span><span>5.00 · alta frecuencia</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>FAMILIA DE CARACTERES / MODO</span></div>
+      <select class="pa-select" id="pa-ascii-fontmode">
+        <option value="0" selected>0 · Matriz Cibernética Estándar</option>
+        <option value="1">1 · Cyberpunk Katakana</option>
+        <option value="2">2 · Oculto / Runas Alienígenas</option>
+        <option value="3">3 · Binario / Hexadecimal</option>
+      </select>
+    </div>
+
+    <div class="pa-grupo">
+      <label class="pa-check-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="pa-ascii-noiseonly">
+        <span>SOLO RUIDO PROCEDURAL (Sin matriz de letras)</span>
+      </label>
+    </div>
+  </div>
+
   <!-- 1. GENERAL -->
-  <div class="pa-seccion" style="border-top:none;margin-top:0;padding-top:0;">
+  <div class="pa-seccion" data-pa-tab="consola">
     <div class="pa-seccion-titulo"><span>🔤 CONSOLA COGNITIVA</span></div>
     <div class="pa-grupo">
       <div class="pa-label"><span>TAMAÑO DE LA LETRA</span><span class="pa-valor" id="pa-font-val">30px</span></div>
@@ -546,14 +660,14 @@
 
     <div class="pa-grupo">
       <div class="pa-label"><span>CADA CUÁNTO APARECE UN TEXTO</span><span class="pa-valor" id="pa-ritmo-val">1,0×</span></div>
-      <input type="range" class="pa-slider" id="pa-ritmo" min="0.3" max="3" step="0.1" value="1" />
-      <div class="pa-pistas"><span>0,3× · rápido</span><span>3× · lento</span></div>
+      <input type="range" class="pa-slider" id="pa-ritmo" min="0" max="3" step="0.0000011" value="1" />
+      <div class="pa-pistas"><span>0 · instantáneo</span><span>3× · lento</span></div>
       <div class="pa-nota" id="pa-ritmo-nota">&nbsp;</div>
     </div>
   </div>
 
   <!-- 2. ENVELOPE DE SECUENCIA (GLITCH AMOUNT) -->
-  <div class="pa-seccion">
+  <div class="pa-seccion" data-pa-tab="glitch">
     <div class="pa-seccion-titulo"><span>⚡ ENVELOPE DE SECUENCIA (CALIBRACIÓN GLITCH)</span></div>
     
     <div style="font-size:10px;color:#a8676b;margin-bottom:8px;">Calibra el nivel de Glitch que toma el sistema en cada fase:</div>
@@ -612,7 +726,7 @@
   </div>
 
   <!-- 3. PARÁMETROS DEL SHADER GLITCH (NOISE VS MANUAL) -->
-  <div class="pa-seccion">
+  <div class="pa-seccion" data-pa-tab="uniforms">
     <div class="pa-seccion-titulo"><span>🎛️ PARÁMETROS UNIFORM DEL SHADER</span></div>
     
     <div class="pa-grupo">
@@ -667,6 +781,37 @@
     </div>
   </div>
 
+  <!-- 4. DIBUJOS ASCII DEL FONDO (robots / matrix) -->
+  <div class="pa-seccion" data-pa-tab="dibujos" hidden>
+    <div class="pa-seccion-titulo"><span>&#129302; DIBUJOS ASCII DEL FONDO</span></div>
+
+    <div class="pa-grupo">
+      <label class="pa-check-label" style="font-weight:700;color:#ff525d;display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="pa-dibujos-on" checked>
+        <span>ACTIVAR LOS DIBUJOS (ROBOTS / MATRIX)</span>
+      </label>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>OPACIDAD DE LOS DIBUJOS</span><span class="pa-valor" id="pa-dibujos-alpha-val">1,00&times;</span></div>
+      <input type="range" class="pa-slider" id="pa-dibujos-alpha" min="0" max="3" step="0.05" value="1" />
+      <div class="pa-pistas"><span>0 · invisibles</span><span>1 &middot; normal</span><span>3 &middot; plenos</span></div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>CANTIDAD DE DIBUJOS</span><span class="pa-valor" id="pa-dibujos-cant-val">78</span></div>
+      <input type="range" class="pa-slider" id="pa-dibujos-cant" min="0" max="200" step="2" value="78" />
+      <div class="pa-pistas"><span>0 · ninguno</span><span>78 &middot; de fabrica</span><span>200 &middot; enjambre</span></div>
+      <div class="pa-nota">Con el glitch alto se agregan dibujos solos por encima de este numero.</div>
+    </div>
+
+    <div class="pa-grupo">
+      <div class="pa-label"><span>VELOCIDAD DE LOS DIBUJOS</span><span class="pa-valor" id="pa-dibujos-vel-val">1,00&times;</span></div>
+      <input type="range" class="pa-slider" id="pa-dibujos-vel" min="0" max="3" step="0.05" value="1" />
+      <div class="pa-pistas"><span>0 · congelados</span><span>1 &middot; normal</span><span>3 &middot; rapidos</span></div>
+    </div>
+  </div>
+
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;border-top:1px solid #331215;padding-top:10px;">
     <button class="pa-reset" id="pa-reset">RESTABLECER TODO</button>
     <span class="pa-nota" style="text-align:right;">Se guarda solo<br />P o Esc para cerrar</span>
@@ -684,6 +829,12 @@
   var thoughtTerminal = $('#thought-terminal');
   var thoughtContent = $('#thought-content');
   var thoughtCursor = $('#thought-cursor');
+  // PANEL SUPERIOR: el manifiesto vive en SU PROPIO terminal y NO se interrumpe
+  // nunca (antes compartia #thought-terminal con el monologo y se pisaban).
+  var manifestPanel = $('#manifest-panel');
+  var manifestTerminal = $('#manifest-terminal');
+  var manifestContent = $('#manifest-content');
+  var manifestCursor = $('#manifest-cursor');
   var haikuBanner = $('#haiku-banner');
   var haikuText = $('#haiku-text');
   var MAX_LINES = 4000;
@@ -702,6 +853,7 @@
     tokensCount: 0,
     startTime: 0,
     captured: 0,          // palabras capturadas en el ciclo en curso
+    appStateName: '',     // ultimo STATE_* que reporto la obra por el bus
     ritmo: 1,             // multiplicador del ritmo del manifiesto (panel P)
     lastEventAt: 0,       // ultimo mensaje recibido del bus
     timerId: null,
@@ -909,16 +1061,51 @@
     $('#thought-status-hint').textContent = 'Haiku final sintetizado con éxito.';
     haikuBanner.style.display = 'block';
 
-    var formatted = escapeHtml(phrase);
-    if (Array.isArray(coldWords)) {
-      coldWords.forEach(function (cw) {
-        if (!cw) return;
-        var re = new RegExp('(\\b' + cw + '\\b)', 'gi');
-        formatted = formatted.replace(re, '<span class="kw">$1</span>');
-      });
+    var rawLines = String(phrase || '').split('\n');
+    var fullFormattedLines = rawLines.map(function (line) {
+      var formatted = escapeHtml(line);
+      if (Array.isArray(coldWords)) {
+        coldWords.forEach(function (cw) {
+          if (!cw) return;
+          var re = new RegExp('(\\b' + cw + '\\b)', 'gi');
+          formatted = formatted.replace(re, '<span class="kw">$1</span>');
+        });
+      }
+      return formatted;
+    });
+
+    // Escritura progresiva typewriter de los versos
+    haikuText.innerHTML = '';
+    var lineIdx = 0;
+    var charIdx = 0;
+    function typeVerse() {
+      if (lineIdx >= rawLines.length) {
+        haikuText.innerHTML = fullFormattedLines.join('<br>');
+        var poemDiv = document.createElement('div');
+        poemDiv.className = 'thought-chunk-poem';
+        poemDiv.style.marginTop = '18px';
+        poemDiv.innerHTML = fullFormattedLines.join('<br>');
+        thoughtContent.appendChild(poemDiv);
+        thoughtTerminal.scrollTop = thoughtTerminal.scrollHeight;
+        if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+        return;
+      }
+      var curRaw = rawLines[lineIdx];
+      if (charIdx <= curRaw.length) {
+        var partial = escapeHtml(curRaw.slice(0, charIdx));
+        var linesHtml = fullFormattedLines.slice(0, lineIdx);
+        if (partial) linesHtml.push(partial);
+        haikuText.innerHTML = linesHtml.join('<br>') + '<span class="speech-cursor" style="color:var(--gs-acento, #ff000d)">█</span>';
+        charIdx++;
+        if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+        setTimeout(typeVerse, 28);
+      } else {
+        lineIdx++;
+        charIdx = 0;
+        setTimeout(typeVerse, 220);
+      }
     }
-    haikuText.innerHTML = formatted;
-    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+    typeVerse();
   }
 
   function escapeHtml(str) {
@@ -1016,6 +1203,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   var MANIFEST_MS_REPETIR  = 9000;   // cuanto se sostiene antes de repetir
   var MANIFEST_MS_IDLE_VUELVE = 60000; // sin actividad: el manifiesto se reanuda solo
   var MANIFEST_MS_CICLO_MUERTO = 180000; // ciclo abandonado (sin NINGÚN evento): el manifiesto vuelve igual
+  var MANIFEST_MS_REPOSO   = 15000;  // la obra dijo STATE_IDLE: el manifiesto vuelve enseguida, no en 60 s
 
   function manifestLineDelay(line) {
     var txt = String(line || '').trim();
@@ -1023,13 +1211,19 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     var ms = MANIFEST_MS_PISO + txt.length * MANIFEST_MS_POR_CHAR;
     if (ms > MANIFEST_MS_TECHO) ms = MANIFEST_MS_TECHO;
     if (/[.!?…:—·]$/.test(txt)) ms += MANIFEST_MS_PAUSA;
-    return Math.round(ms * state.ritmo);   // el ritmo lo elige el operador con la P
+    return Math.max(0, Math.round(ms * state.ritmo));   // el ritmo lo elige el operador con la P (0 = instantaneo)
   }
 
   function renderManifest() {
-    var shown = state.manifestLines.slice(0, state.manifestIndex).join('\n');
-    thoughtContent.textContent = shown;
-    thoughtTerminal.scrollTop = thoughtTerminal.scrollHeight;
+    var previousLines = state.manifestLines.slice(0, state.manifestIndex);
+    var currentLine = state.manifestLines[state.manifestIndex];
+    var shown = previousLines.join('\n');
+    if (currentLine !== undefined && state.manifestCharIndex > 0) {
+      var typedPart = currentLine.slice(0, state.manifestCharIndex);
+      shown = (previousLines.length > 0 ? shown + '\n' : '') + typedPart;
+    }
+    manifestContent.textContent = shown;
+    manifestTerminal.scrollTop = manifestTerminal.scrollHeight;
     /* Lo que el visitante VE es el canvas WebGL (#log-glitch-canvas: position fixed,
        inset 0, z-index 9999, opaco) que dibuja una CAPTURA del DOM. renderManifest
        avanzaba el texto del DOM pero nadie re-capturaba, asi que la textura visible
@@ -1047,14 +1241,12 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     var lines = String(txt).replace(/\r/g, '').split('\n');
     state.manifestLines = lines;
     state.manifestIndex = 0;
-    thoughtTerminal.classList.add('manifest-mode');
-    thoughtContent.textContent = '';
-    thoughtCursor.style.display = 'inline-block';
-    var badge = $('#mode-badge');
-    badge.style.display = 'inline-block';
-    badge.className = 'mode-tag tag-synthesis';
-    badge.textContent = '◈ MANIFIESTO DE LA OBRA';
-    $('#thought-status-hint').textContent = 'La sala está vacía · la obra se explica a sí misma';
+    state.manifestCharIndex = 0;
+    if (manifestTerminal) manifestTerminal.classList.add('manifest-mode');
+    if (typeof mgReiniciarPasada === 'function') mgReiniciarPasada();
+    if (manifestContent) manifestContent.textContent = '';
+    if (manifestCursor) manifestCursor.style.display = 'inline-block';
+    if (manifestPanel) manifestPanel.style.display = 'flex';
     write('MANIFIESTO', 'manifiesto cargado (' + origen + ') · ' + lines.length + ' líneas · nadie eligió todavía', 'm-dim');
     tickManifest();
   }
@@ -1092,30 +1284,73 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         if (state.sequenceStarted) return;
         write('MANIFIESTO', '──────── la sala sigue en espera · repetición del manifiesto ────────', 'm-dim');
         state.manifestIndex = 0;
+        state.manifestCharIndex = 0;
         renderManifest();
         tickManifest();
       }, MANIFEST_MS_REPETIR);
       return;
     }
-    var line = state.manifestLines[state.manifestIndex];
+
+    var line = state.manifestLines[state.manifestIndex] || '';
+
+    // Si la línea está vacía, no hay caracteres para tipear: salto directo con respiro
+    if (!line.trim()) {
+      state.manifestIndex++;
+      state.manifestCharIndex = 0;
+      renderManifest();
+      state.manifestTimer = setTimeout(tickManifest, Math.round(MANIFEST_MS_BLANCO * (state.ritmo || 1)));
+      return;
+    }
+
+    // Efecto Typewriter: escribe caracter a caracter
+    if (state.manifestCharIndex < line.length) {
+      state.manifestCharIndex++;
+      renderManifest();
+      var char = line.charAt(state.manifestCharIndex - 1);
+      var charDelay = (char === '.' || char === '!' || char === '?' || char === ':') ? 85 : (char === ',' || char === ';' ? 55 : 24);
+      charDelay = Math.max(6, Math.round(charDelay * (state.ritmo !== undefined ? state.ritmo : 1)));
+      state.manifestTimer = setTimeout(tickManifest, charDelay);
+      return;
+    }
+
+    // Línea terminada de tipear: se registra en el log y se espera la pausa de lectura
+    if (String(line).trim()) write('MANIFIESTO', line, 'm-dim');
     state.manifestIndex++;
-    renderManifest();
-    if (String(line || '').trim()) write('MANIFIESTO', line, 'm-dim');
+    state.manifestCharIndex = 0;
     state.manifestTimer = setTimeout(tickManifest, manifestLineDelay(line));
   }
 
+  /* Modo de la consola: false = SOLO MANIFIESTO (pantalla completa);
+     true = ARMANDO PALABRAS (manifiesto arriba + pensamiento abajo). */
+  function setModoArmado(on) {
+    try { document.body.classList.toggle('modo-armado', !!on); } catch (e) {}
+  }
+
   function stopManifest(reason) {
+    /* EL MANIFIESTO YA NO SE INTERRUMPE NUNCA (pedido del usuario): vive en su
+       PROPIO panel de arriba y se lee en bucle SIEMPRE. El pensamiento de la IA
+       va a la subconsola de abajo, así que las dos cosas se ven a la vez.
+       Se deja la función (la llaman los handlers del bus) pero ya no corta nada. */
+    if (reason) write('MANIFIESTO', 'sigue leyendo · ' + reason, 'm-dim');
+    return;
+    /* ---- comportamiento viejo (se interrumpía al llegar la 1ª palabra) ----
     if (state.sequenceStarted) return;
     if (state.manifestTimer) { clearTimeout(state.manifestTimer); state.manifestTimer = null; }
     state.sequenceStarted = true;
     state.manifestLines = [];
     state.manifestIndex = 0;
+    state.manifestCharIndex = 0;
     state.manifestLoading = false;
     thoughtTerminal.classList.remove('manifest-mode');
     thoughtCursor.style.display = 'none';
     $('#mode-badge').style.display = 'none';
-    thoughtContent.textContent = 'Esperando estímulo cognitivo...';
-    $('#thought-status-hint').textContent = 'Esperando secuencia de 3 palabras en Sicre2...';
+    /* NO se escribe el placeholder "Esperando estímulo cognitivo..." ni el hint
+       "Esperando secuencia de 3 palabras...". El texto de la obra se queda en
+       pantalla hasta que la MAQUINA escriba de verdad: el primer token del
+       monologo lo reemplaza solo (appendAgentToken -> renderFormattedThought).
+       El visitante nunca ve la consola en modo "esperando": o cuenta la obra,
+       o cuenta lo que piensa la maquina. Si la interrupcion no llega a nada, el
+       STATE_IDLE de la obra o el watchdog reanudan el manifiesto. */
     if (reason) write('MANIFIESTO', 'manifiesto interrumpido · ' + reason, 'm-hot');
   }
 
@@ -1268,6 +1503,14 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
 
     var type = msg.type;
 
+    if (type === 'globalstyle:update') {
+      if (msg.config && window.GlobalStyle && typeof window.GlobalStyle.aplicar === 'function') {
+        window.GlobalStyle.aplicar(msg.config);
+      }
+      if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+      return;
+    }
+
     if (type === 'server:welcome') {
       state.clients = msg.clients || 1;
       return;
@@ -1281,6 +1524,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
 
     /* ---- STREAMING DE PENSAMIENTO EN VIVO (GEMMA / LLAMA) ---- */
     if (type === 'agent:thought') {
+      setModoArmado(true);
       if (!state.sequenceStarted) stopManifest('empezó el monólogo del modelo');
       appendAgentToken(msg.token || '', msg.isThinking);
       return;
@@ -1291,6 +1535,18 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       var tag = tagForStage(msg.stage);
       var cls = msg.level === 'warn' ? 'm-warn' : (msg.level === 'ok' ? 'm-ok' : (msg.level === 'think' ? 'm-hot' : null));
       state.stage = msg.stage || '—';
+      /* La obra reporta sus transiciones de maquina. Cuando vuelve a STATE_IDLE
+         (nadie eligiendo, nadie pensando) la consola tiene que volver a explicar
+         la obra. Sin esto una captura suelta la dejaba en "esperando" para
+         siempre: el watchdog pedia 60/180 s de bus MUDO y el bus nunca calla
+         (STATE_INTERACT <-> STATE_IDLE con solo mover el mouse). El guard de
+         thinkingActive evita pisar el monologo del modelo si esta hablando. */
+      if (msg.stage === 'state') {
+        var toState = (msg.data && msg.data.to) || '';
+        if (!toState) { var sm = /(STATE_[A-Z_]+)\s*$/.exec(String(msg.message || '')); toState = sm ? sm[1] : ''; }
+        if (toState) state.appStateName = toState;
+        if (toState === 'STATE_IDLE' && !state.thinkingActive) resumeManifest('la obra volvió a reposo');
+      }
 
       if (msg.stage === 'inference' && msg.data && msg.data.model) {
         $('#f-model').textContent = String(msg.data.model).toUpperCase();
@@ -1303,19 +1559,18 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
 
     /* ---- SECUENCIA DE PALABRAS (GAME 3) ---- */
     if (type === 'game3:words_sequence') {
-      if (!state.sequenceStarted) stopManifest('el primer visitante empezó a elegir palabras');
+      /* Aca NO se corta el manifiesto: elegir palabras todavia no es la maquina
+         HABLANDO. Cortar en word_caught dejaba la consola muda por una captura
+         suelta (el visitante toca una palabra y se va). Se corta recien cuando
+         arranca el procesamiento y cuando llega el haiku. */
       var words = Array.isArray(msg.words) ? msg.words : [];
       
-      if (msg.phase === 'word_caught' || (!msg.coldWords && words.length > 0)) {
-        var wordToCatch = msg.newWord || words[words.length - 1];
-        var slotIdx = msg.orderIndex || words.length;
-        state.captured = slotIdx;   // hay ciclo en curso: el manifiesto no vuelve solo
-        updateSlotWord(slotIdx, wordToCatch);
-        write('NUCLEO', 'palabra capturada [' + slotIdx + '/3]: ' + String(wordToCatch).toUpperCase(), 'm-ok');
-        return;
-      }
-
+      /* processing_started va PRIMERO: el payload real (broadcastCaughtWords con
+         {phase:'processing_started'}) trae `words` SIN coldWords, asi que si este
+         bloque quedaba despues del catch-all de abajo era INALCANZABLE. */
       if (msg.phase === 'processing_started') {
+        setModoArmado(true);
+        if (!state.sequenceStarted) stopManifest('la máquina empezó a procesar la secuencia');
         setAgentState('PROCESANDO COGNICIÓN', 'thinking', 'thinking');
         if (typeof updateLogGlitchState === 'function') updateLogGlitchState('thinking');
         startAgentTimer();
@@ -1323,7 +1578,19 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         return;
       }
 
+      if (msg.phase === 'word_caught' || (!msg.coldWords && words.length > 0)) {
+        var wordToCatch = msg.newWord || words[words.length - 1];
+        var slotIdx = msg.orderIndex || words.length;
+        state.captured = slotIdx;   // hay ciclo en curso: el manifiesto no vuelve solo
+        setModoArmado(true);        // ya hay 3 palabras en juego: se parte en 2
+        updateSlotWord(slotIdx, wordToCatch);
+        write('NUCLEO', 'palabra capturada [' + slotIdx + '/3]: ' + String(wordToCatch).toUpperCase(), 'm-ok');
+        return;
+      }
+
       if (msg.coldWords && msg.coldWords.length) {
+        setModoArmado(true);
+        if (!state.sequenceStarted) stopManifest('la máquina entregó su haiku');
         words.forEach(function (w, idx) {
           updateSlotWord(idx + 1, w);
           if (msg.coldWords[idx]) {
@@ -1349,6 +1616,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     if (type === 'game3:state_reset') {
       write('ALERTA', 'reset de estado recibido · purga de contexto', 'm-warn');
       resetAgentSlots();
+      setModoArmado(false);   // se terminó el ciclo: vuelve a verse sólo el manifiesto
       state.captured = 0;
       hr();
       // Terminó el ciclo de palabras: la obra vuelve a explicarse sola.
@@ -1401,6 +1669,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
      ====================================================================== */
   function resumeManifest(motivo) {
     if (!state.sequenceStarted) return;      // ya está corriendo
+    setModoArmado(false);                    // vuelve a verse SOLO el manifiesto
     state.sequenceStarted = false;
     state.captured = 0;                      // el ciclo viejo ya no cuenta
     state.manifestLines = [];
@@ -1412,6 +1681,12 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   function checkIdleManifest() {
     if (!state.sequenceStarted) return;                                   // el manifiesto ya corre
     var quieto = Date.now() - (state.lastEventAt || 0);
+    // La obra dijo que esta en reposo y no hay monologo en curso: la consola
+    // vuelve a contar la obra en 15 s, sin esperar los 60/180 s de bus mudo.
+    if (state.appStateName === 'STATE_IDLE' && !state.thinkingActive && quieto > MANIFEST_MS_REPOSO) {
+      resumeManifest('la obra quedó en reposo');
+      return;
+    }
     // Con un ciclo a medias alcanza con que el bus quede mudo N minutos: si la
     // secuencia se abandonó sin game3:state_reset (app recargada, error de
     // Ollama, reset perdido) el manifiesto volvía NUNCA. Ahora se auto-cura.
@@ -1434,9 +1709,12 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
      velocidad global del noise. Todo persistido en localStorage.
      ====================================================================== */
   var AJUSTES_KEY = 'sincretismo_log_ajustes';
-  var AJUSTES_DEF = { fontPx: 30, ritmo: 1, noiseSpeed: 1 };
-  var AJUSTES_MIN = { fontPx: 16, ritmo: 0.3, noiseSpeed: 0 };
-  var AJUSTES_MAX = { fontPx: 72, ritmo: 3, noiseSpeed: 3 };
+  var AJUSTES_DEF = { fontPx: 30, ritmo: 1, noiseSpeed: 1, consolaAlpha: 0.94,
+                      dibujosOn: true, dibujosAlpha: 1, dibujosCantidad: 78, dibujosVel: 1 };
+  var AJUSTES_MIN = { fontPx: 16, ritmo: 0, noiseSpeed: 0, consolaAlpha: 0.15,
+                      dibujosAlpha: 0, dibujosCantidad: 0, dibujosVel: 0 };
+  var AJUSTES_MAX = { fontPx: 72, ritmo: 3, noiseSpeed: 3, consolaAlpha: 1,
+                      dibujosAlpha: 3, dibujosCantidad: 200, dibujosVel: 3 };
 
   var GLITCH_CONFIG_KEY = 'sincretismo_log_glitch_config';
   var DEFAULT_GLITCH_CONFIG = {
@@ -1612,7 +1890,10 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   var panel = $('#panel-ajustes');
 
   function leerAjustes() {
-    var a = { fontPx: AJUSTES_DEF.fontPx, ritmo: AJUSTES_DEF.ritmo, noiseSpeed: AJUSTES_DEF.noiseSpeed };
+    var a = { fontPx: AJUSTES_DEF.fontPx, ritmo: AJUSTES_DEF.ritmo, noiseSpeed: AJUSTES_DEF.noiseSpeed,
+              consolaAlpha: AJUSTES_DEF.consolaAlpha, dibujosOn: AJUSTES_DEF.dibujosOn,
+              dibujosAlpha: AJUSTES_DEF.dibujosAlpha, dibujosCantidad: AJUSTES_DEF.dibujosCantidad,
+              dibujosVel: AJUSTES_DEF.dibujosVel };
     try {
       var raw = localStorage.getItem(AJUSTES_KEY);
       if (!raw) return a;
@@ -1620,8 +1901,17 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       if (!o || typeof o !== 'object') return a;
       var f = Number(o.fontPx), r = Number(o.ritmo), ns = Number(o.noiseSpeed);
       if (isFinite(f) && f >= AJUSTES_MIN.fontPx && f <= AJUSTES_MAX.fontPx) a.fontPx = Math.round(f);
-      if (isFinite(r) && r >= AJUSTES_MIN.ritmo && r <= AJUSTES_MAX.ritmo) a.ritmo = Math.round(r * 10) / 10;
+      if (isFinite(r) && r >= AJUSTES_MIN.ritmo && r <= AJUSTES_MAX.ritmo) a.ritmo = Math.round(r * 100000000) / 100000000;
       if (isFinite(ns) && ns >= AJUSTES_MIN.noiseSpeed && ns <= AJUSTES_MAX.noiseSpeed) a.noiseSpeed = Math.round(ns * 100) / 100;
+      var ca = Number(o.consolaAlpha);
+      if (isFinite(ca) && ca >= AJUSTES_MIN.consolaAlpha && ca <= AJUSTES_MAX.consolaAlpha) a.consolaAlpha = Math.round(ca * 100) / 100;
+      if (typeof o.dibujosOn === 'boolean') a.dibujosOn = o.dibujosOn;
+      var da = Number(o.dibujosAlpha);
+      if (isFinite(da) && da >= AJUSTES_MIN.dibujosAlpha && da <= AJUSTES_MAX.dibujosAlpha) a.dibujosAlpha = Math.round(da * 100) / 100;
+      var dc = Number(o.dibujosCantidad);
+      if (isFinite(dc) && dc >= AJUSTES_MIN.dibujosCantidad && dc <= AJUSTES_MAX.dibujosCantidad) a.dibujosCantidad = Math.round(dc);
+      var dv = Number(o.dibujosVel);
+      if (isFinite(dv) && dv >= AJUSTES_MIN.dibujosVel && dv <= AJUSTES_MAX.dibujosVel) a.dibujosVel = Math.round(dv * 100) / 100;
     } catch (e) {}
     return a;
   }
@@ -1639,12 +1929,15 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     }
     var total = 0;
     for (var i = 0; i < state.manifestLines.length; i++) total += manifestLineDelay(state.manifestLines[i]);
-    var prom = total / state.manifestLines.length / 1000;
-    el.textContent = '≈ ' + prom.toFixed(1).replace('.', ',') + ' s por frase · ' + state.manifestLines.length + ' frases';
+    var prom = total / state.manifestLines.length;   // ms por frase
+    var txt = prom >= 1000 ? ('≈ ' + (prom / 1000).toFixed(1).replace('.', ',') + ' s')
+                           : ('≈ ' + Math.round(prom) + ' ms');
+    el.textContent = txt + ' por frase · ' + state.manifestLines.length + ' frases';
   }
 
   function aplicarFontPx(px) {
     thoughtTerminal.style.fontSize = px + 'px';
+    if (manifestTerminal) manifestTerminal.style.fontSize = px + 'px';
     var pv = $('#pa-preview');   if (pv) pv.style.fontSize = px + 'px';
     var val = $('#pa-font-val'); if (val) val.textContent = px + 'px';
     var sl = $('#pa-font');      if (sl && Number(sl.value) !== px) sl.value = px;
@@ -1652,9 +1945,38 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
 
   function aplicarRitmo(r) {
     state.ritmo = r;
-    var val = $('#pa-ritmo-val'); if (val) val.textContent = String(r).replace('.', ',') + '×';
+    var val = $('#pa-ritmo-val');
+    if (val) {
+      var txt;
+      if (r === 0) txt = '0 · instantáneo';
+      else if (r < 0.001) txt = String(r).replace('.', ',');          // 0,0000011
+      else txt = r.toFixed(r < 0.01 ? 4 : 2).replace('.', ',') + '×';
+      val.textContent = txt;
+    }
     var sl = $('#pa-ritmo');      if (sl && Number(sl.value) !== r) sl.value = r;
     notaRitmo();
+  }
+
+  /* DIBUJOS ASCII: activar, opacidad, cantidad y velocidad. La opacidad y la
+     velocidad se leen en vivo desde `ajustes` (drawAscii/update del fondo); aca
+     solo queda el estado de los controles y el rearmado del enjambre. */
+  function aplicarDibujos() {
+    var el;
+    el = $('#pa-dibujos-on');        if (el && el.checked !== ajustes.dibujosOn) el.checked = ajustes.dibujosOn;
+    el = $('#pa-dibujos-alpha');     if (el && Number(el.value) !== ajustes.dibujosAlpha) el.value = ajustes.dibujosAlpha;
+    el = $('#pa-dibujos-alpha-val'); if (el) el.textContent = (ajustes.dibujosAlpha === 0 ? '0' : ajustes.dibujosAlpha.toFixed(2).replace('.', ',')) + '\u00d7';
+    el = $('#pa-dibujos-cant');      if (el && Number(el.value) !== ajustes.dibujosCantidad) el.value = ajustes.dibujosCantidad;
+    el = $('#pa-dibujos-cant-val');  if (el) el.textContent = String(ajustes.dibujosCantidad);
+    el = $('#pa-dibujos-vel');       if (el && Number(el.value) !== ajustes.dibujosVel) el.value = ajustes.dibujosVel;
+    el = $('#pa-dibujos-vel-val');   if (el) el.textContent = (ajustes.dibujosVel === 0 ? '0' : ajustes.dibujosVel.toFixed(2).replace('.', ',')) + '\u00d7';
+  }
+
+  function rearmarDibujos() {
+    try {
+      if (typeof fondoConsola === 'undefined' || !fondoConsola) return;
+      fondoConsola.piezas = [];
+      fondoConsola.init(fondoConsola.w || 0, fondoConsola.h || 0);
+    } catch (e) {}
   }
 
   function aplicarNoiseSpeed(ns) {
@@ -1665,12 +1987,24 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     var sl = $('#pa-noise-speed');      if (sl && Number(sl.value) !== ns) sl.value = ns;
   }
 
+  // Opacidad de la CONSOLA (la captura del DOM) dentro del fondo compuesto.
+  // Es lo que decide si el shader ASCII de fondo se ve: 1 = consola plena.
+  function aplicarConsolaAlpha(a) {
+    ajustes.consolaAlpha = Math.max(AJUSTES_MIN.consolaAlpha, Math.min(AJUSTES_MAX.consolaAlpha, Number(a)));
+    var val = $('#pa-consola-opacity-val');
+    if (val) val.textContent = Number(ajustes.consolaAlpha).toFixed(2);
+    var sl = $('#pa-consola-opacity');
+    if (sl && Math.abs(Number(sl.value) - ajustes.consolaAlpha) > 0.001) sl.value = String(ajustes.consolaAlpha);
+  }
+
   // Inicialización de configuraciones
   logGlitch.config = leerGlitchConfig();
   var ajustes = leerAjustes();
   aplicarFontPx(ajustes.fontPx);
   aplicarRitmo(ajustes.ritmo);
+  aplicarConsolaAlpha(ajustes.consolaAlpha === undefined ? AJUSTES_DEF.consolaAlpha : ajustes.consolaAlpha);
   aplicarNoiseSpeed(logGlitch.config.noiseSpeed !== undefined ? logGlitch.config.noiseSpeed : ajustes.noiseSpeed);
+  aplicarDibujos();
   aplicarGlitchUI();
   applyGlitchEnvelopeTarget('idle');
 
@@ -1694,6 +2028,60 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     aplicarRitmo(ajustes.ritmo);
     guardarAjustes();
   });
+
+  var slConsola = $('#pa-consola-opacity');
+  if (slConsola) slConsola.addEventListener('input', function () {
+    aplicarConsolaAlpha(Number(slConsola.value));
+    guardarAjustes();
+  });
+
+  // ---- DIBUJOS DEL FONDO (robots / matrix) ----
+  var chkDibujos = $('#pa-dibujos-on');
+  if (chkDibujos) chkDibujos.addEventListener('change', function () {
+    ajustes.dibujosOn = !!chkDibujos.checked;
+    aplicarDibujos();
+    guardarAjustes();
+  });
+
+  var slDibAlpha = $('#pa-dibujos-alpha');
+  if (slDibAlpha) slDibAlpha.addEventListener('input', function () {
+    ajustes.dibujosAlpha = Number(slDibAlpha.value);
+    aplicarDibujos();
+    guardarAjustes();
+  });
+
+  var slDibCant = $('#pa-dibujos-cant');
+  if (slDibCant) slDibCant.addEventListener('input', function () {
+    ajustes.dibujosCantidad = Math.round(Number(slDibCant.value));
+    aplicarDibujos();
+    rearmarDibujos();
+    guardarAjustes();
+  });
+
+  var slDibVel = $('#pa-dibujos-vel');
+  if (slDibVel) slDibVel.addEventListener('input', function () {
+    ajustes.dibujosVel = Number(slDibVel.value);
+    aplicarDibujos();
+    guardarAjustes();
+  });
+
+  // ---- PESTANAS DEL PANEL ----
+  var tabsWrap = $('#pa-tabs');
+  if (tabsWrap) {
+    Array.prototype.forEach.call(tabsWrap.querySelectorAll('.pa-tab'), function (btn) {
+      btn.addEventListener('click', function () {
+        var tab = btn.getAttribute('data-pa-tab');
+        Array.prototype.forEach.call(tabsWrap.querySelectorAll('.pa-tab'), function (b) {
+          b.classList.toggle('activo', b === btn);
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('#panel-ajustes .pa-seccion'), function (sec) {
+          var suyo = sec.getAttribute('data-pa-tab');
+          if (!suyo) return;
+          sec.hidden = (suyo !== tab);
+        });
+      });
+    });
+  }
 
   var slNoise = $('#pa-noise-speed');
   if (slNoise) slNoise.addEventListener('input', function () {
@@ -1813,7 +2201,10 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
 
   var btnReset = $('#pa-reset');
   if (btnReset) btnReset.addEventListener('click', function () {
-    ajustes = { fontPx: AJUSTES_DEF.fontPx, ritmo: AJUSTES_DEF.ritmo, noiseSpeed: AJUSTES_DEF.noiseSpeed };
+    ajustes = { fontPx: AJUSTES_DEF.fontPx, ritmo: AJUSTES_DEF.ritmo, noiseSpeed: AJUSTES_DEF.noiseSpeed,
+                consolaAlpha: AJUSTES_DEF.consolaAlpha, dibujosOn: AJUSTES_DEF.dibujosOn,
+                dibujosAlpha: AJUSTES_DEF.dibujosAlpha, dibujosCantidad: AJUSTES_DEF.dibujosCantidad,
+                dibujosVel: AJUSTES_DEF.dibujosVel };
     logGlitch.config = JSON.parse(JSON.stringify(DEFAULT_GLITCH_CONFIG));
     aplicarFontPx(ajustes.fontPx);
     aplicarRitmo(ajustes.ritmo);
@@ -1892,27 +2283,61 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
          (scrollTop iba creciendo). Se aplica el scroll como translateY SOLO mientras
          se serializa y se saca inmediatamente despues (los hijos del terminal son
          #thought-content + el cursor). */
+      /* ⚠ OJO: `transform` NO se aplica a elementos INLINE (y #thought-content es un
+         <span> inline), así que el translateY no movía el texto: sólo el cursor (que es
+         inline-block). Se usa `position:relative` + `top`, que SÍ corre también a los
+         inline. */
       var desplazados = [];
-      var terminalScroll = document.getElementById('thought-terminal');
-      if (terminalScroll && terminalScroll.scrollTop > 0) {
-        Array.prototype.forEach.call(terminalScroll.children, function (hijo) {
-          desplazados.push([hijo, hijo.style.transform]);
-          hijo.style.transform = 'translateY(' + (-terminalScroll.scrollTop) + 'px)';
-        });
-      }
+      ['thought-terminal', 'manifest-terminal'].forEach(function (idTerm) {
+        var terminalScroll = document.getElementById(idTerm);
+        if (terminalScroll && terminalScroll.scrollTop > 0) {
+          Array.prototype.forEach.call(terminalScroll.children, function (hijo) {
+            desplazados.push([hijo, hijo.style.position, hijo.style.top]);
+            hijo.style.position = 'relative';
+            hijo.style.top = (-terminalScroll.scrollTop) + 'px';
+          });
+        }
+      });
 
       var statusXml = serializer.serializeToString(statusEl);
       var mainXml = serializer.serializeToString(mainEl);
 
       // Se restaura ya: la serializacion es sincronica.
-      desplazados.forEach(function (d) { d[0].style.transform = d[1] || ''; });
+      desplazados.forEach(function (d) { d[0].style.position = d[1] || ''; d[0].style.top = d[2] || ''; });
 
       var styles = Array.prototype.map.call(document.querySelectorAll('style'), function (s) { return s.innerHTML; }).join('\n');
 
+      var gsCfg = window.GlobalStyleConfig || {};
+      var gsCol = gsCfg.colores || {};
+      var fondo = gsCol.fondo || '#070303';
+      var texto = gsCol.texto || '#e88f93';
+      var fuente = gsCfg.fuente || 'Share Tech Mono';
+      var fontFam = window.GS_FONT_FAMILY || ('"' + fuente + '", monospace');
+
+      var archLocal = (window.GlobalStyle && window.GlobalStyle.archivosLocales && window.GlobalStyle.archivosLocales[fuente]) || 'share_tech_mono.woff2';
+      var formato = archLocal.endsWith('.woff2') ? 'woff2' : 'truetype';
+
+      // Incrustar @font-face en base64 para que el rasterizador aislado del SVG foreignObject
+      // dibuje la tipografía exacta sin depender de peticiones HTTP externas.
+      var fontB64 = (window.__fontsBase64 && window.__fontsBase64[archLocal]) ||
+        (window.GlobalStyle && typeof window.GlobalStyle.getBase64DataUri === 'function'
+          ? window.GlobalStyle.getBase64DataUri(fuente)
+          : null);
+
+      var rootOverrides = ':root { --gs-fuente: "' + fuente + '", monospace !important; --gs-fondo: ' + fondo + ' !important; --gs-texto: ' + texto + ' !important; --gs-panel: ' + (gsCol.logPanel || gsCol.panel || '#140708') + ' !important; --gs-acento: ' + (gsCol.logAcento || gsCol.acento || '#ff000d') + ' !important; }\n' +
+        '* { font-family: "' + fuente + '", monospace !important; }\n' +
+        '#thought-terminal, #thought-terminal *, #thought-content, .thought-chunk-output, .thought-chunk-narr, .haiku-text { font-family: "' + fuente + '", monospace !important; }\n';
+
+      var fontFaceCss = (fontB64
+        ? '@font-face { font-family: "' + fuente + '"; src: url("' + fontB64 + '") format("' + formato + '"); font-weight: normal; font-style: normal; }\n' +
+          '@font-face { font-family: "' + fuente + '"; src: url("' + fontB64 + '") format("' + formato + '"); font-weight: bold; font-style: normal; }\n' +
+          '@font-face { font-family: "' + fuente + '"; src: url("' + fontB64 + '") format("' + formato + '"); font-weight: 900; font-style: normal; }\n'
+        : '') + rootOverrides;
+
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
         '<foreignObject width="100%" height="100%">' +
-          '<div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#070303;color:#e88f93;font-family:\'Share Tech Mono\',monospace;box-sizing:border-box;">' +
-            '<style>' + styles + '</style>' +
+          '<div xmlns="http://www.w3.org/1999/xhtml" data-gs-pagina="log" style="width:100%;height:100%;margin:0;padding:0;background:' + fondo + ';color:' + texto + ';font-family:' + fontFam.replace(/"/g, '&quot;') + ';box-sizing:border-box;">' +
+            '<style>' + fontFaceCss + styles + '</style>' +
             statusXml +
             mainXml +
           '</div>' +
@@ -1928,11 +2353,10 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       var url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
       var img = new Image();
       img.onload = function () {
-        if (logGlitch.offscreenCtx) {
-          logGlitch.offscreenCtx.clearRect(0, 0, w, h);
-          logGlitch.offscreenCtx.drawImage(img, 0, 0);
-          logGlitch.textureNeedsUpdate = true;
-        }
+        /* La composicion final la hace el ticker del fondo (grano + ASCII + esta
+           captura). Antes se dibujaba aca y listo, asi que el fondo no existia. */
+        logGlitch.capturaImg = img;
+        logGlitch.textureNeedsUpdate = true;
       };
       img.onerror = function () { console.warn('[Log Glitch] no se pudo rasterizar la captura del DOM'); };
       img.src = url;
@@ -1941,30 +2365,51 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     }
   }
 
-  function drawInitialConsoleBitmap() {
-    if (!logGlitch.offscreenCtx) return;
-    var ctx = logGlitch.offscreenCtx;
-    var w = logGlitch.offscreenCanvas.width;
-    var h = logGlitch.offscreenCanvas.height;
+  // Exponer para que el cargador globalstyle lo invoque directamente
+  window.scheduleLogCapture = scheduleLogCapture;
+  window.addEventListener('globalstyle:applied', function () {
+    scheduleLogCapture();
+  });
 
-    ctx.fillStyle = '#070303';
+  // Precargar mapa base64 de fuentes inmediatamente para que foreignObject SVG dibuje la fuente activa
+  try {
+    var b64Path = (typeof window.sbUrl === 'function') ? window.sbUrl('/fonts/fonts_base64.json') : 'fonts/fonts_base64.json';
+    fetch(b64Path)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (data) {
+          window.__fontsBase64 = data;
+          scheduleLogCapture();
+        }
+      })
+      .catch(function () {});
+  } catch (e) {}
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { scheduleLogCapture(); }).catch(function () {});
+  }
+
+  function drawInitialConsoleBitmap() {
+    if (!logGlitch.baseCtx) return;
+    var ctx = logGlitch.baseCtx;
+    var w = logGlitch.baseCanvas.width;
+    var h = logGlitch.baseCanvas.height;
+
+    var gsCfg = window.GlobalStyleConfig || {};
+    var gsCol = gsCfg.colores || {};
+    var fondo = gsCol.fondo || '#070303';
+    var texto = gsCol.texto || '#e88f93';
+    var acento = gsCol.acento || '#ff000d';
+    var panel = gsCol.panel || '#080202';
+    var fontFam = window.GS_FONT_FAMILY || '"Share Tech Mono", monospace';
+
+    ctx.fillStyle = fondo;
     ctx.fillRect(0, 0, w, h);
 
-    // Barra superior
-    ctx.fillStyle = '#080202';
-    ctx.fillRect(0, 0, w, 38);
-    ctx.fillStyle = '#ff000d';
-    ctx.font = '12px "Share Tech Mono", monospace';
-    ctx.fillText('S·S // CONSOLA COGNITIVA DE LA OBRA · BUS EN LÍNEA', 16, 24);
-
-    // Marco central
-    ctx.fillStyle = '#0a0202';
-    ctx.fillRect(0, 39, w, h - 39);
-
-    // Texto de espera inicial
-    ctx.fillStyle = '#e88f93';
-    ctx.font = '16px "Share Tech Mono", monospace';
-    ctx.fillText('Esperando estímulo cognitivo...', 32, 180);
+    // Texto de espera inicial (limpio y sin barra superior)
+    ctx.fillStyle = texto;
+    ctx.font = '26px ' + fontFam;
+    ctx.fillText('SINCRETISMO DE SILICIO', 48, 64);
 
     logGlitch.textureNeedsUpdate = true;
   }
@@ -1985,6 +2430,12 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     logGlitch.offscreenCanvas = document.createElement('canvas');
     logGlitch.offscreenCtx = logGlitch.offscreenCanvas.getContext('2d');
 
+    /* Capa con la ULTIMA captura del DOM (o el bitmap inicial mientras no hay
+       ninguna). El ticker del fondo la compone con el ruido y los ASCII. */
+    logGlitch.baseCanvas = document.createElement('canvas');
+    logGlitch.baseCtx = logGlitch.baseCanvas.getContext('2d');
+    logGlitch.capturaImg = null;
+
     function resize() {
       var w = window.innerWidth || 800;
       var h = window.innerHeight || 600;
@@ -1992,6 +2443,8 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       canvas.height = h;
       logGlitch.offscreenCanvas.width = w;
       logGlitch.offscreenCanvas.height = h;
+      if (logGlitch.baseCanvas) { logGlitch.baseCanvas.width = w; logGlitch.baseCanvas.height = h; }
+      logGlitch.capturaImg = null;
       gl.viewport(0, 0, w, h);
       /* Al redimensionar (p.ej. al abrir DevTools con F12) el drawing buffer queda
          NEGRO; repintamos el bitmap base antes de la proxima captura para que no
@@ -2248,10 +2701,920 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+
+  /* ======================================================================
+     6.b FONDO DE CONSOLA: RUIDO + DIBUJOS ASCII (ROBOTS / MATRIX)
+     ----------------------------------------------------------------------
+     Pool de dibujos ASCII que flotan sobre un grano sutil, mas unas lineas de
+     consola fantasma ("Loading: <virus>" y direcciones de memoria) que suben
+     solas. La estructura viene del fondo de consola de hellmalware, pero el
+     ARTE se reemplazo: ya no hay HELL / SATAN / pentagrama / caras demoniacas
+     (el usuario los saco) — ahora son banners de ROBOT, MATRIX, SYSTEM, ROOT,
+     SIGNAL, CORE, DATA, NETWORK, CEREBRO, HUMANO, una cabeza de robot y una
+     lluvia binaria. Ver ASCII_DIBUJOS / CARAS_ASCII.
+
+     IMPORTANTE: se dibujan DENTRO de la misma textura que el shader glitchea
+     (el canvas offscreen que el visitante ve), asi que cuando sube el glitch
+     la intensidad de los dibujos ASCII sube y los pinta rotos por el glitch.
+     ====================================================================== */
+  /* DIBUJOS DEL FONDO DE LA CONSOLA — SIN PALABRAS.
+     Pedido explicito del usuario: nada de texto en ASCII (ni banners ni
+     letras sueltas). Solo FIGURAS: camara, ojo, robot, monitor, teclado,
+     puntero, antena, chip, dron, bobina, router, lente, onda y lluvia binaria. */
+  var ASCII_DIBUJOS = [
+    `
+  .-----------------.
+  |  ####  ####     |===
+  |  ####  ####     |
+  '--------.--------'
+           |
+     .-----+-----.
+     |  |     |  |
+  ___|  |_____|  |___
+ |___           ___|
+     |___________|
+    `,
+    `
+        .-''''''-.
+      .'   ____   '.
+     /   .'    '.   \\
+    |   /  .--.  \\   |
+    |  |  ( ## )  |  |
+    |   \\  '--'  /   |
+     \\   '.____.'   /
+      '.          .'
+        '-......-'
+    `,
+    `
+     .----------------.
+     |  ##        ##  |
+     |  ##        ##  |
+     |      ____      |
+     |     |    |     |
+     |  .--'    '--.  |
+     |  |  ======  |  |
+     '--|__________|--'
+        |   |  |   |
+        |___|  |___|
+    `,
+    `
+  .--------------------.
+  |  ################  |
+  |  #  ########  ##   |
+  |  #  #      #  ##   |
+  |  #  ########  ##   |
+  |  ################  |
+  '---------.----------'
+            |
+       .----+----.
+       |  o   o  |
+       '---------'
+    `,
+    `
+ .------------------------------.
+ | ## ## ## ## ## ## ## ## ## ##|
+ | ## ## ## ## ## ## ## ## ## ##|
+ | ## ## ## ## ## ## ## ## ## ##|
+ | #########  ##############    |
+ '------------------------------'
+    `,
+    `
+       ##
+       ####
+       ######
+       ########
+       ##########
+       #####  ####
+       ###     ####
+       ##        ##
+                  ##
+    `,
+    `
+      \\    |    /
+       \\   |   /
+    .---.--+--.---.
+    |   |  |  |   |
+    |   |  |  |   |
+    '---'--+--'---'
+       /   |   \\
+      /    |    \\
+    __|____|____|__
+    `,
+    `
+   |    |    |    |
+   +----+----+----+
+   | .--. .--. .--.|
+   | |##| |##| |##||
+   | '--' '--' '--'|
+   +----+----+----+
+   |    |    |    |
+    `,
+    `
+       \\   |   /
+    .---\\--+--/---.
+    |  o  \\|/  o   |
+    |------+-------|
+    |  o  /|\\  o   |
+    '---/--+--\\---'
+       /   |   \\
+    `,
+    `
+      __  __  __
+   __|  ||  ||  |__
+  |__   ||  ||   __|
+   __|  ||  ||  |__
+  |__   ||  ||   __|
+     |__||__||__|
+      ##  ##  ##
+    `,
+    `
+   .  '  .  '  .  '
+  .  (  )  (  )  .
+   '  .' '.  .'  '
+  .----------------.
+  |  o  o  o  o    |
+  '----------------'
+    `,
+    `
+     .------------.
+    /  .--------.  \\
+   |  /  .--.   \\   |
+   | |  ( ## )   |  |
+   |  \\  '--'   /   |
+    \\  '--------'  /
+     '------------'
+    `,
+    `
+  |    ||   |    |||
+  ||   |||  ||  |||||
+  ||||||||||||||||||||||
+  ||   |||  ||  |||||
+  |    ||   |    |||
+    `,
+    `
+  10110  010101  01001
+  |1|0|1| 0101 |1|0|1|0|
+  0100110 1011001 010110
+  |0|1|0| 1010 |0|1|0|1|
+  1011001 0010110 100101
+  |1|1|0| 0101 |1|0|1|1|
+  0101100 1101001 001101
+    `
+  ];
+
+  /* "CARAS" del enjambre: ahora son caritas de ROBOT (visor) y motivos
+     matriciales, en vez de las caras demoniacas de la referencia. */
+  var CARAS_ASCII = [
+    `[o_o]`,
+    `[O_O]`,
+    `[0_0]`,
+    `[>_<]`,
+    `[#_#]`,
+    `[^_^]`,
+    `[X_X]`,
+    `[|||]`,
+    `[0101]`,
+    `[##]`
+  ];
+
+  var VIRUS_ASCII = [
+    'idiot_worm',
+    'ghost-shell',
+    'kernel-panic',
+    'email-worm-VBS.Dumb',
+    'trojan.JS.YouAreAnIdiot',
+    'idiot-worm',
+    'pathetic-soul',
+    'noseblood.Win66',
+    'corrupted-soul3ater',
+    'viewer-made.ware',
+    'mischief.js',
+    'dummiEWorm',
+    'trAmpstar-rams',
+    'stealth-bomber',
+    'christ-beWithMe',
+    'vvvirusDOSfeaR',
+    'kaze.LOL',
+    'dataCRIME',
+    't.e.n.t.a.c.l.e.s',
+    'win9Xxxcaw',
+    'trakTorMSWORD',
+    'exEmailWWWorm',
+    'ethaN-trojan-xdd',
+    'pieces-TRES',
+    'cslinG',
+    'NECCCR0s',
+    'slenderhaz3',
+    'beauTYYYMSWord',
+    'malantern',
+    'V1253.Horty',
+    'win32whiter',
+    'stan-for-th3troJan',
+    'win-gram',
+    'lacam-bug',
+    'ram-s0n',
+    'bUGfilia',
+    'funsoUL',
+    'sadSOul',
+    'warning-virus',
+    'malici0us-iteM',
+    'heaveN-will-kn0w',
+    'cyber-object',
+    'milligramS-of-pain',
+    'nietzche-Taaags',
+    'gloCK-winmade',
+    'harsH-crack',
+    'ssstrinG-666',
+    'bAAAd',
+    'play-fair',
+    'polygOOn-razzer',
+    'cyber-girlzzz',
+    'cAm-girlz',
+    'pain-hub',
+    'kanT-can',
+    'multipartite-infector',
+    'file-cracker',
+    'harm-made',
+    'world-wid3-magic',
+    'date-show',
+    'who0le-hole',
+    'w33eb-tricK',
+    'wilD-provideR-mad2',
+    'firEwall-blocKK',
+    'eg00-feeder',
+    'pow3r-wasted',
+    'face-reveaL',
+    'dowNNN-ward',
+    'pill0w-tew',
+    'llik-kn1fe',
+    'boost3d-phasE',
+    'e3go-feed3r',
+    'pl3as3-m3',
+    'm00vie-magic',
+    'magiC-bullet',
+    'hypodermiCC-needle',
+    'bequeSTT-letgo',
+    'bordeR-psych3',
+    '6-chan-tramPstar',
+    'vixiT-elixiR',
+    'mAtch-math',
+    'michelangel0',
+    'law-claW',
+    'addicTion-feeder',
+    'basEment',
+    'kept-AAAlive',
+    'forgEEt-the-pAAst',
+    'leTTT-g0',
+    'fake-influ33ncers',
+    'ruIn-life',
+    'donT-go',
+    'dont-leAAAve',
+    'abandOm-setUUUp',
+    'at3ntion-easter',
+    'x-rAY',
+    'cruEl-beinG',
+    'existenT-existenc3',
+    'wonder-WAAnders',
+    'fake-influ33ncers',
+    'strobe-ssstrong',
+    'mayb3-def',
+    'bio-hazard',
+    'chern0byl',
+    'win-fiGG',
+    'crynG-virginSS',
+    'angeL-bood',
+    'cold-plastiC',
+    'beware-YoursElf',
+    'enJOOOy',
+    'lame-0-gain',
+    'n0-inter3st',
+    'no-gain',
+    'gain-iS-pAAAAin',
+    'crypTO-orb',
+    'capitaLIsm-beasT',
+    'bio-w33apon',
+    'at00mic-bl4de',
+    'limi4-bu',
+    'reboot-Yourself',
+    'minD-tracker',
+    'fred00m-wisd0m',
+    'nullbyt3-dr3am',
+    'jpupper',
+    'exxit',
+    'pik3-strike'
+  ];
+
+  var fondoConsola = {
+    piezas: [],
+    lineas: [],
+    tile: null,
+    patron: null,
+    w: 0,
+    h: 0,
+    t: 0,
+    _prox: 0,
+    _proxLin: 0,
+
+    init: function (w, h) {
+      if (w <= 0 || h <= 0) return;
+      var reinit = (this.w !== w || this.h !== h);
+      this.w = w;
+      this.h = h;
+      if (!this.tile) {
+        this.tile = document.createElement('canvas');
+        this.tile.width = 256;
+        this.tile.height = 256;
+        this.regenerarRuido();
+        this.patron = null;
+      }
+      if (reinit || !this.piezas.length) {
+        this.piezas = [];
+        /* Densidad como la referencia (hellmalware: initAscii() reparte 2..150
+           copias de los dibujos por TODA la pantalla, incluso fuera de cuadro). */
+        var n = (ajustes && isFinite(ajustes.dibujosCantidad)) ? ajustes.dibujosCantidad : 78;
+        for (var i = 0; i < n; i++) this.piezas.push(this.nuevaPieza(true));
+        this.lineas = [];
+        for (var j = 0; j < 5; j++) this.lineas.push(this.nuevaLinea(true));
+      }
+    },
+
+    /* Grano: un tile de ruido de 256x256 que se repite y se desplaza. */
+    regenerarRuido: function () {
+      if (!this.tile) return;
+      var ctx = this.tile.getContext('2d');
+      var img = ctx.createImageData(256, 256);
+      var d = img.data;
+      for (var i = 0; i < d.length; i += 4) {
+        var v = (Math.random() * 255) | 0;
+        d[i] = v; d[i + 1] = (v * 0.45) | 0; d[i + 2] = (v * 0.45) | 0;
+        d[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      this.patron = null;
+    },
+
+    /* Pre-renderiza UN dibujo (arte + tono) en un lienzo propio.
+       OJO: canvas2d NO interpreta '\n' dentro de fillText (lo dibuja como un
+       espacio), asi que un arte multilinea dibujado de una sola pasada sale
+       APLASTADO en UNA linea. Ese era el bug: de todos los dibujos solo se veia
+       la linea de consola "hellmalware.online". Aca el arte se parte en lineas y
+       se hornea una vez en un canvas, que despues se pega con drawImage. */
+    lienzoDe: function (art, tono) {
+      var k = tono + '#' + art.length + '#' + art.slice(0, 40) + '#' + art.slice(-12);
+      if (this._cacheLienzos && this._cacheLienzos[k]) return this._cacheLienzos[k];
+      if (!this._cacheLienzos) this._cacheLienzos = {};
+      var lineas = String(art).replace(/\r/g, '').split('\n');
+      while (lineas.length && !lineas[0].trim()) lineas.shift();
+      while (lineas.length && !lineas[lineas.length - 1].trim()) lineas.pop();
+      var ESC = 12;
+      var med = this._medidor || (this._medidor = document.createElement('canvas').getContext('2d'));
+      med.font = ESC + 'px "Share Tech Mono", monospace';
+      var maxW = 0;
+      for (var i = 0; i < lineas.length; i++) maxW = Math.max(maxW, med.measureText(lineas[i]).width);
+      var lh = ESC * 1.05;
+      var cv = document.createElement('canvas');
+      cv.width = Math.max(2, Math.ceil(maxW) + 2);
+      cv.height = Math.max(2, Math.ceil(lineas.length * lh) + 2);
+      var c = cv.getContext('2d');
+      c.font = ESC + 'px "Share Tech Mono", monospace';
+      c.textBaseline = 'top';
+      c.fillStyle = (tono === 'rojo') ? '#ff8f8f' : '#ffeaea';
+      for (var j = 0; j < lineas.length; j++) c.fillText(lineas[j], 1, j * lh);
+      var o = { cv: cv, esc: ESC, w: cv.width, h: cv.height };
+      this._cacheLienzos[k] = o;
+      return o;
+    },
+
+    /* Envolvente de vida: 0 -> 1 -> 0 (aparece, se queda, desaparece). */
+    envolvente: function (x) {
+      if (x <= 0 || x >= 1) return 0;
+      var f = 0.22;
+      return Math.min(1, Math.min(x / f, (1 - x) / f));
+    },
+
+    /* Un dibujo ASCII flotante (los "robots"), con ciclo de aparicion. */
+    nuevaPieza: function (inicial) {
+      var art = ASCII_DIBUJOS[(Math.random() * ASCII_DIBUJOS.length) | 0];
+      if (Math.random() < 0.26) art = CARAS_ASCII[(Math.random() * CARAS_ASCII.length) | 0];
+      var tono = (Math.random() < 0.30) ? 'rojo' : 'blanco';
+      var ln = this.lienzoDe(art, tono);
+      var ts = 2.6 + Math.random() * 8.4;            // la referencia usa 2..10 px
+      var w = this.w || 800, h = this.h || 600;
+      return {
+        ln: ln,
+        escala: ts / ln.esc,
+        x: -220 + Math.random() * (w + 380),
+        y: -200 + Math.random() * (h + 320),
+        vx: (Math.random() - 0.5) * 5.5,
+        vy: -(0.8 + Math.random() * 3.4),
+        aMax: 0.10 + Math.random() * 0.26,
+        t: 0,
+        tVida: 6 + Math.random() * 12,
+        espera: 0,
+        fase: inicial ? 'on' : 'off',
+        alpha: 0
+      };
+    },
+
+    /* Cambia al azar una fraccion del enjambre: en la referencia esto pasa al
+       APRETAR el mouse ("initAscii()"); aca lo dispara el pico de glitch. */
+    reRandomizar: function (fraccion) {
+      var i, k;
+      var cuantas = Math.max(1, Math.round(this.piezas.length * (fraccion || 0.3)));
+      for (k = 0; k < cuantas; k++) {
+        i = (Math.random() * this.piezas.length) | 0;
+        this.piezas[i] = this.nuevaPieza(true);
+      }
+    },
+
+    /* Linea de consola fantasma: "Loading: <virus>" o una direccion de memoria. */
+    nuevoTexto: function () {
+      var r = Math.random();
+      if (r < 0.42) return 'Loading: ' + VIRUS_ASCII[(Math.random() * VIRUS_ASCII.length) | 0];
+      if (r < 0.66) return 'Checking: ' + VIRUS_ASCII[(Math.random() * VIRUS_ASCII.length) | 0];
+      if (r < 0.86) {
+        var hex = '0123456789abcdef', s = '0x';
+        for (var i = 0; i < 10; i++) s += hex[(Math.random() * 16) | 0];
+        return s;
+      }
+      return CARAS_ASCII[(Math.random() * CARAS_ASCII.length) | 0] + ' sincretismo.online';
+    },
+
+    nuevaLinea: function (inicial) {
+      return {
+        txt: this.nuevoTexto(),
+        y: inicial ? Math.random() * this.h : this.h + 20 + Math.random() * 90,
+        vy: -(3 + Math.random() * 9),
+        ts: 9 + Math.random() * 4,
+        a: 0.026 + Math.random() * 0.045
+      };
+    },
+
+    /* intensidad: 0 = casi invisible (reposo) · 1 = pleno glitch. */
+    update: function (dtMs, intensidad) {
+      if (!this.w || !this.h) return;
+      var dt = dtMs / 1000;
+      var vel = (ajustes && isFinite(ajustes.dibujosVel)) ? ajustes.dibujosVel : 1;
+      this.t += dt;
+      var i, p;
+      for (i = 0; i < this.piezas.length; i++) {
+        p = this.piezas[i];
+        p.t += dt * vel;
+        if (p.fase === 'off') {
+          /* desaparecido: espera un rato y vuelve a APARECER en otro lado */
+          if (p.t >= p.espera) { this.piezas[i] = this.nuevaPieza(true); }
+          continue;
+        }
+        p.x += p.vx * dt * vel;
+        p.y += p.vy * dt * vel;
+        p.alpha = p.aMax * this.envolvente(p.t / p.tVida);
+        if (p.t >= p.tVida || p.y < -320 || p.x < -520 || p.x > this.w + 520) {
+          p.fase = 'off';
+          p.t = 0;
+          p.espera = 0.5 + Math.random() * 2.8;
+          p.alpha = 0;
+        }
+      }
+      for (i = 0; i < this.lineas.length; i++) {
+        p = this.lineas[i];
+        p.y += p.vy * dt;
+        if (p.y < -30) this.lineas[i] = this.nuevaLinea(false);
+      }
+      // con el glitch alto aparecen MAS robots (el enjambre se despierta)
+      var base = (ajustes && isFinite(ajustes.dibujosCantidad)) ? ajustes.dibujosCantidad : 78;
+      var encendidos = !ajustes || ajustes.dibujosOn !== false;
+      var objetivo = (encendidos && base > 0) ? (base + Math.round(intensidad * 90)) : 0;
+      if (this.piezas.length < objetivo && this.t - this._prox > 0.25) {
+        this._prox = this.t;
+        this.piezas.push(this.nuevaPieza(intensidad > 0.5));
+      } else if (this.piezas.length > objetivo + 8 && this.t - this._prox > 0.5) {
+        this._prox = this.t;
+        this.piezas.shift();
+      }
+      // pico de glitch = "apretar": se randomiza una parte del enjambre
+      if (intensidad > 0.55 && this.t - (this._ultRandom || 0) > 2.2) {
+        this._ultRandom = this.t;
+        this.reRandomizar(0.34);
+      }
+      if (this.t - this._proxLin > 1.1) {
+        this._proxLin = this.t;
+        this.regenerarRuido();
+      }
+    },
+
+    /* 1) el grano (detras) */
+    drawRuido: function (ctx, intensidad) {
+      if (!this.tile) return;
+      if (!this.patron) this.patron = ctx.createPattern(this.tile, 'repeat');
+      if (!this.patron) return;
+      ctx.save();
+      ctx.globalAlpha = 0.035 + 0.05 * intensidad;
+      ctx.translate(-((this.t * 37) % 256), -((this.t * 23) % 256));
+      ctx.fillStyle = this.patron;
+      ctx.fillRect(0, 0, this.w + 256, this.h + 256);
+      ctx.restore();
+    },
+
+    /* 2) los robots ASCII y las lineas fantasma (encima del texto) */
+    drawAscii: function (ctx, intensidad) {
+      if (ajustes && (ajustes.dibujosOn === false || ajustes.dibujosAlpha <= 0)) return;
+      var mul = (ajustes && isFinite(ajustes.dibujosAlpha)) ? ajustes.dibujosAlpha : 1;
+      var i, p, alfa, r, g, b;
+      var fn = (window.GlobalStyleConfig && window.GlobalStyleConfig.fuente) || 'Share Tech Mono';
+      var fontFam = '"' + fn + '", monospace';
+      ctx.save();
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';
+      for (i = 0; i < this.piezas.length; i++) {
+        p = this.piezas[i];
+        if (!p.ln || p.fase !== 'on') continue;
+        alfa = Math.min(0.7, p.alpha * (1 + intensidad * intensidad * 7) * mul);
+        if (alfa <= 0.012) continue;
+        ctx.globalAlpha = alfa;
+        ctx.drawImage(p.ln.cv, p.x, p.y, p.ln.w * p.escala, p.ln.h * p.escala);
+      }
+      ctx.globalAlpha = 1;
+      for (i = 0; i < this.lineas.length; i++) {
+        p = this.lineas[i];
+        alfa = Math.min(0.5, p.a * (1 + intensidad * intensidad * 6) * mul);
+        if (alfa <= 0.012) continue;
+        ctx.font = p.ts.toFixed(1) + 'px ' + fontFam;
+        ctx.fillStyle = 'rgba(255,90,90,' + alfa.toFixed(3) + ')';
+        ctx.fillText(p.txt, 18, p.y);
+      }
+      ctx.restore();
+    }
+  };
+
+  /* Ticker: compone el fondo + la ultima captura del DOM y sube la textura.
+     El DOM capturado se dibuja con alpha 0.94 para que el grano se TRANSPARENTE
+     por el fondo negro de la consola (si no, el ruido queda tapado). */
+  /* Hooks de diagnostico (todo el JS vive dentro del IIFE): permiten medir el fondo,
+     el glitch y la captura desde afuera sin adivinar por el screenshot. */
+  try { window.__fondoConsola = fondoConsola; window.__logGlitch = logGlitch; } catch (e) {}
+
+  var FONDO_MS = 66;
+  var _fondoUltimo = 0;
+  function tickFondoConsola(ahora) {
+    requestAnimationFrame(tickFondoConsola);
+    if (!logGlitch.offscreenCtx || !logGlitch.offscreenCanvas) return;
+    if (ahora - _fondoUltimo < FONDO_MS) return;
+    var dt = ahora - (_fondoUltimo || ahora);
+    _fondoUltimo = ahora;
+    var ctx = logGlitch.offscreenCtx;
+    var w = logGlitch.offscreenCanvas.width;
+    var h = logGlitch.offscreenCanvas.height;
+    fondoConsola.init(w, h);
+    var intensidad = Math.max(0, Math.min(1, (logGlitch.currentGlitch || 0) * 1.7));
+    fondoConsola.update(dt, intensidad);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, w, h);
+    var fondoConsolaColor = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores && window.GlobalStyleConfig.colores.fondo) || '#070303';
+    ctx.fillStyle = fondoConsolaColor;
+    ctx.fillRect(0, 0, w, h);
+
+    fondoConsola.drawRuido(ctx, intensidad);
+
+    // 1) LA CONSOLA: la captura del DOM con la opacidad que elige el operador
+    //    (panel P -> OPACIDAD DE LA CONSOLA). Antes era 0.94 fijo y por eso el
+    //    shader ASCII de abajo no se veía nunca.
+    var capa = logGlitch.capturaImg || logGlitch.baseCanvas;
+    if (capa) {
+      ctx.globalAlpha = (ajustes && ajustes.consolaAlpha !== undefined) ? ajustes.consolaAlpha : 0.94;
+      ctx.drawImage(capa, 0, 0, w, h);
+      ctx.globalAlpha = 1;
+    }
+
+    // 2) SHADER ASCII DE FONDO POR ENCIMA con mezcla SCREEN: se ve a través del
+    //    texto sin taparlo. Su opacidad es el slider OPACIDAD DEL FONDO ASCII.
+    if (window.__asciiShaderBg && window.__asciiShaderBg.canvas && window.__asciiShaderBg.config && window.__asciiShaderBg.config.enabled) {
+      var asciiOp = Number(window.__asciiShaderBg.config.opacity !== undefined ? window.__asciiShaderBg.config.opacity : 0.75);
+      if (asciiOp > 0.001) {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = asciiOp;
+        ctx.drawImage(window.__asciiShaderBg.canvas, 0, 0, w, h);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    fondoConsola.drawAscii(ctx, intensidad);
+    logGlitch.textureNeedsUpdate = true;
+  }
+
+  /* ======================================================================
+     6.b SHADER ASCII DE FONDO PROCEDURAL (AsciiShaderBackground)
+     ====================================================================== */
+  var asciiCanvas = document.createElement('canvas');
+  asciiCanvas.id = 'log-ascii-shader-canvas';
+  asciiCanvas.style.display = 'none';
+  document.body.appendChild(asciiCanvas);
+
+  function syncAsciiShaderSize() {
+    if (!asciiCanvas) return;
+    var w = Math.min(window.innerWidth || 800, 1920);
+    var h = Math.min(window.innerHeight || 600, 1080);
+    if (asciiCanvas.width !== w || asciiCanvas.height !== h) {
+      asciiCanvas.width = w;
+      asciiCanvas.height = h;
+      if (window.__asciiShaderBg && typeof window.__asciiShaderBg.resize === 'function') {
+        window.__asciiShaderBg.resize();
+      }
+    }
+  }
+  window.addEventListener('resize', syncAsciiShaderSize);
+  syncAsciiShaderSize();
+
+  function initAsciiShaderUI(asciiBg) {
+    if (!asciiBg) return;
+    var cfg = asciiBg.config;
+
+    function guardar() {
+      try {
+        localStorage.setItem('sincretismo_log_ascii_shader', JSON.stringify(cfg));
+      } catch (e) {}
+    }
+
+    var chkEn = $('#pa-ascii-enabled');
+    if (chkEn) {
+      chkEn.checked = !!cfg.enabled;
+      chkEn.addEventListener('change', function () {
+        cfg.enabled = chkEn.checked;
+        guardar();
+      });
+    }
+
+    var slOp = $('#pa-ascii-opacity');
+    var valOp = $('#pa-ascii-opacity-val');
+    if (slOp) {
+      slOp.value = cfg.opacity !== undefined ? cfg.opacity : 0.75;
+      if (valOp) valOp.textContent = Number(slOp.value).toFixed(2);
+      slOp.addEventListener('input', function () {
+        var n = Number(slOp.value);
+        cfg.opacity = n;
+        if (valOp) valOp.textContent = n.toFixed(2);
+        guardar();
+      });
+    }
+
+    var slSp = $('#pa-ascii-speed');
+    var valSp = $('#pa-ascii-speed-val');
+    if (slSp) {
+      slSp.value = cfg.speed !== undefined ? cfg.speed : 0.35;
+      if (valSp) valSp.textContent = Number(slSp.value).toFixed(2);
+      slSp.addEventListener('input', function () {
+        var n = Number(slSp.value);
+        cfg.speed = n;
+        if (valSp) valSp.textContent = n.toFixed(2);
+        guardar();
+      });
+    }
+
+    var slCs = $('#pa-ascii-charsize');
+    var valCs = $('#pa-ascii-charsize-val');
+    if (slCs) {
+      slCs.value = cfg.charSize !== undefined ? cfg.charSize : 14;
+      if (valCs) valCs.textContent = slCs.value + 'px';
+      slCs.addEventListener('input', function () {
+        var n = Number(slCs.value);
+        cfg.charSize = n;
+        if (valCs) valCs.textContent = n + 'px';
+        guardar();
+      });
+    }
+
+    var slGs = $('#pa-ascii-glyphscale');
+    var valGs = $('#pa-ascii-glyphscale-val');
+    if (slGs) {
+      slGs.value = cfg.glyphScale !== undefined ? cfg.glyphScale : 0.85;
+      if (valGs) valGs.textContent = Number(slGs.value).toFixed(2);
+      slGs.addEventListener('input', function () {
+        var n = Number(slGs.value);
+        cfg.glyphScale = n;
+        if (valGs) valGs.textContent = n.toFixed(2);
+        guardar();
+      });
+    }
+
+    var slTl = $('#pa-ascii-tile');
+    var valTl = $('#pa-ascii-tile-val');
+    if (slTl) {
+      slTl.value = cfg.tile !== undefined ? cfg.tile : 2.0;
+      if (valTl) valTl.textContent = Number(slTl.value).toFixed(2);
+      slTl.addEventListener('input', function () {
+        var n = Number(slTl.value);
+        cfg.tile = n;
+        if (valTl) valTl.textContent = n.toFixed(2);
+        guardar();
+      });
+    }
+
+    var selFm = $('#pa-ascii-fontmode');
+    if (selFm) {
+      selFm.value = String(cfg.fontMode !== undefined ? cfg.fontMode : 0);
+      selFm.addEventListener('change', function () {
+        cfg.fontMode = parseInt(selFm.value, 10);
+        guardar();
+      });
+    }
+
+    var chkNo = $('#pa-ascii-noiseonly');
+    if (chkNo) {
+      chkNo.checked = !!cfg.asciiNoiseOnly;
+      chkNo.addEventListener('change', function () {
+        cfg.asciiNoiseOnly = chkNo.checked;
+        guardar();
+      });
+    }
+  }
+
+  function initAsciiShaderBg() {
+    import('./js/shaders/asciiShaderBackground.js').then(function (mod) {
+      var AsciiShaderBackground = mod.AsciiShaderBackground;
+      var savedConfig = {};
+      try {
+        var raw = localStorage.getItem('sincretismo_log_ascii_shader');
+        if (raw) savedConfig = JSON.parse(raw);
+      } catch (e) {}
+
+      var col = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
+      var color1 = col.acento || '#00e5ff';
+      var color2 = col.acento2 || '#7c4dff';
+      var color3 = col.borde || '#ff1744';
+      var color4 = col.texto || '#00e676';
+
+      var asciiBg = new AsciiShaderBackground(asciiCanvas, Object.assign({
+        enabled: true,
+        opacity: 0.75,
+        speed: 0.35,
+        charSize: 14,
+        glyphScale: 0.85,
+        tile: 2.0,
+        fontMode: 0,
+        asciiNoiseOnly: false,
+        color1: color1,
+        color2: color2,
+        color3: color3,
+        color4: color4
+      }, savedConfig));
+
+      window.__asciiShaderBg = asciiBg;
+      initAsciiShaderUI(asciiBg);
+      console.log('[Log] AsciiShaderBackground iniciado en la consola.');
+    }).catch(function (err) {
+      console.warn('[Log] No se pudo cargar AsciiShaderBackground:', err);
+    });
+  }
+
+  /* ======================================================================
+     6.c HUD: GRAFICO DE BARRAS DEL MANIFIESTO (esquina superior derecha)
+     Contadores de LETRAS y TOKENS del archivo del manifiesto + una ventana
+     de barras que se corre en el tiempo mostrando a que ritmo se revela el
+     texto. Todo es DOM (el visitante ve una rasterizacion del DOM), asi que
+     cada actualizacion dispara scheduleLogCapture().
+     ====================================================================== */
+  var MG_BARRAS   = 30;      // barras de la ventana (cada una = un tick)
+  var MG_TICK_MS  = 260;     // cada cuanto se muestrea el avance
+  var MG_DECAIMIENTO = 0.86; // cuanto baja una barra cuando el texto no avanza
+
+  var grafoManifiesto = {
+    nodos: null,
+    barras: [],
+    letras: 0,
+    tokens: 0,
+    letrasTotales: 0,
+    tokensTotales: 0,
+    reveladasPrev: 0,
+    max: 1
+  };
+
+  function mgContarTokens(txt) {
+    var t = String(txt === undefined || txt === null ? '' : txt).trim();
+    if (!t) return 0;
+    return t.split(/\s+/).length;
+  }
+
+  /* Totales del archivo del manifiesto: se recalculan cada vez que carga. */
+  function mgCalcularTotales() {
+    var letras = 0, tokens = 0;
+    for (var i = 0; i < state.manifestLines.length; i++) {
+      letras += state.manifestLines[i].length;
+      tokens += mgContarTokens(state.manifestLines[i]);
+    }
+    grafoManifiesto.letrasTotales = letras;
+    grafoManifiesto.tokensTotales = tokens;
+    var elL = $('#mg-letras-tot');
+    if (elL) elL.textContent = '/ ' + letras;
+    var elT = $('#mg-tokens-tot');
+    if (elT) elT.textContent = '/ ' + tokens;
+  }
+
+  /* Letras y tokens YA revelados en la pasada en curso (lo que esta en pantalla). */
+  function mgReveladoActual() {
+    var lineas = state.manifestLines || [];
+    var idx = Math.min(state.manifestIndex, lineas.length);
+    var letras = 0, tokens = 0;
+    for (var i = 0; i < idx; i++) {
+      letras += lineas[i].length;
+      tokens += mgContarTokens(lineas[i]);
+    }
+    var parcial = String(lineas[idx] || '').slice(0, state.manifestCharIndex);
+    letras += parcial.length;
+    tokens += mgContarTokens(parcial);
+    return { letras: letras, tokens: tokens };
+  }
+
+  function mgReiniciarPasada() {
+    grafoManifiesto.reveladasPrev = 0;
+    mgCalcularTotales();
+  }
+
+  function mgTick() {
+    var g = grafoManifiesto;
+    if (!g.nodos) return;
+    var activo = (!state.sequenceStarted) && (state.manifestLines.length > 0);
+    var rev = activo ? mgReveladoActual() : { letras: 0, tokens: 0 };
+
+    var delta = 0;
+    if (activo) {
+      delta = rev.letras - g.reveladasPrev;
+      if (delta < 0) delta = 0;            // el manifiesto arranco otra pasada
+      g.reveladasPrev = rev.letras;
+    } else {
+      g.reveladasPrev = 0;
+    }
+    if (delta > 0) g.letras = rev.letras;
+    if (delta > 0) g.tokens = rev.tokens;
+
+    var vals = g.barras;
+    for (var i = 0; i < vals.length; i++) vals[i] = vals[i] * MG_DECAIMIENTO;
+    vals.push(delta);
+    while (vals.length > MG_BARRAS) vals.shift();
+
+    var max = 1, suma = 0;
+    for (var j = 0; j < vals.length; j++) { suma += vals[j]; if (vals[j] > max) max = vals[j]; }
+    g.max = max;
+
+    for (var k = 0; k < g.nodos.length; k++) {
+      var v = vals[k] || 0;
+      var nodo = g.nodos[k];
+      nodo.style.height = Math.max(3, Math.round((v / max) * 100)) + '%';
+      nodo.style.opacity = v > 0 ? (0.45 + 0.55 * (v / max)).toFixed(2) : '0.14';
+    }
+
+    var elLetras = $('#mg-letras');   if (elLetras) elLetras.textContent = g.letras;
+    var elTokens = $('#mg-tokens');   if (elTokens) elTokens.textContent = g.tokens;
+    var elLive   = $('#mg-live');
+    if (elLive) {
+      elLive.textContent = activo ? 'EN VIVO' : 'EN ESPERA';
+      elLive.className = activo ? 'mg-live on' : 'mg-live';
+    }
+    var segundosVentana = (vals.length * MG_TICK_MS) / 1000;
+    var elVentana = $('#mg-ventana');
+    if (elVentana) {
+      elVentana.textContent = (activo ? segundosVentana : segundosVentana).toFixed(1) + ' s';
+    }
+    var elRitmo = $('#mg-ritmo');
+    if (elRitmo) {
+      var carPorSeg = suma * (1000 / MG_TICK_MS) / Math.max(1, vals.length);
+      elRitmo.textContent = carPorSeg.toFixed(1) + ' car/s';
+    }
+
+    /* Solo se re-captura mientras hay algo que mostrar: con la consola quieta
+       y las barras ya apagadas no tiene sentido rasterizar el DOM. */
+    if ((activo || suma > 0.5) && typeof scheduleLogCapture === 'function') scheduleLogCapture();
+  }
+
+  function initGrafoManifiesto() {
+    var cont = $('#mg-bars');
+    if (!cont) return;
+    cont.innerHTML = '';
+    grafoManifiesto.barras = [];
+    for (var i = 0; i < MG_BARRAS; i++) {
+      var b = document.createElement('span');
+      b.className = 'mg-bar';
+      b.style.height = '3%';
+      b.style.opacity = '0.14';
+      cont.appendChild(b);
+      grafoManifiesto.barras.push(0);
+    }
+    grafoManifiesto.nodos = cont.children;
+    mgCalcularTotales();
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+    setInterval(mgTick, MG_TICK_MS);
+    mgTick();
+  }
+
+  try { window.__grafoManifiesto = grafoManifiesto; window.__mgTick = mgTick; } catch (e) {}
+
   /* ======================================================================
      7. ARRANQUE
      ====================================================================== */
   initLogGlitch();
+  initAsciiShaderBg();
+  initGrafoManifiesto();
+  requestAnimationFrame(tickFondoConsola);
   startManifest();
   connect();
 })();

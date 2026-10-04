@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Registro de JSONs guardados (lo genera el server en runtime)
+public/data/jsons_guardados.json

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GLOBALSTYLE // DISEÑO GLOBAL DE SINCRETISMO DE SILICIO</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&family=Space+Mono:wght@400;700&family=Cutive+Mono&family=Anonymous+Pro:wght@400;700&family=Nova+Mono&family=Cousine:wght@400;700&family=Fira+Code:wght@400;500;700&family=JetBrains+Mono:wght@400;700&family=Major+Mono+Display&display=swap" rel="stylesheet" />
+<script src="js/base-path.js?v=3.30"></script>
+<script src="js/global-style.js?v=1.1"></script>
+<link rel="stylesheet" href="css/globalstyle.css?v=1.0" />
+</head>
+<body>
+
+<header class="gs-header">
+  <div class="gs-marca">
+    <span class="gs-punto"></span>
+    <span class="gs-titulo">GLOBALSTYLE</span>
+    <span class="gs-sub">DISEÑO GLOBAL · PALETA · TIPOGRAFÍA · CONTENEDORES</span>
+  </div>
+  <div class="gs-header-acciones">
+    <a class="gs-btn" href="./log.html" target="_blank" rel="noopener">log.html</a>
+    <a class="gs-btn" href="./cosmos-clusters.html" target="_blank" rel="noopener">cúmulo 3D</a>
+    <a class="gs-btn" href="./cambiapalabras.html" target="_blank" rel="noopener">cambiapalabras</a>
+    <a class="gs-btn" href="./?tab=cluster-lib" target="_blank" rel="noopener">biblioteca</a>
+    <button type="button" class="gs-btn" id="gs-reload">↺ releer</button>
+    <button type="button" class="gs-btn gs-btn-primario" id="gs-save">💾 GUARDAR DISEÑO GLOBAL</button>
+  </div>
+</header>
+
+<div class="gs-aviso" id="gs-aviso">
+  Lo que toques acá se aplica <b>EN VIVO</b> en las otras pestañas abiertas (log, cúmulo 3D, cambiapalabras y la biblioteca de clusters).
+  <b>GUARDAR</b> lo deja también en el servidor, para que valga en cualquier navegador.
+</div>
+
+<main class="gs-main">
+
+  <!-- ============ VISTA PREVIA ============ -->
+  <section class="gs-seccion gs-preview-panel">
+    <div class="gs-titulo-seccion"><span>◧ VISTA PREVIA</span><span class="gs-nota">se aplica en vivo sobre esta misma página</span></div>
+    <div class="gs-preview">
+      <div class="gs-preview-barra">
+        <span class="gs-punto"></span>
+        <span>S·S // CONSOLA COGNITIVA</span>
+        <span class="gs-preview-tag">REPOSO</span>
+      </div>
+      <div class="gs-preview-cuerpo">
+        <p class="gs-preview-linea">SINCRETISMO DE SILICIO</p>
+        <p class="gs-preview-linea">El silicio no te roba las palabras, te convence de que las habías prestado.</p>
+        <p class="gs-preview-dim">Loading: satAn · 0x4f3a2b1c9d · (◣_◢)</p>
+        <div class="gs-preview-botones">
+          <button type="button" class="gs-btn">ORDEN #1</button>
+          <button type="button" class="gs-btn gs-btn-primario">CAPTURAR</button>
+        </div>
+      </div>
+    </div>
+    <div class="gs-preview-linea" style="opacity:.75;font-size:12px;">
+      Aa Bb Cc · 0123456789 · ÁÉÍÓÚÑ · ┌∩┐(◣_◢)┌∩┐ · ████ · ● ○ ◆ ▸
+    </div>
+  </section>
+
+  <!-- ============ TIPOGRAFIA ============ -->
+  <section class="gs-seccion">
+    <div class="gs-titulo-seccion"><span>🔤 TIPOGRAFÍA (todas las páginas)</span></div>
+    <div class="gs-fila">
+      <label class="gs-label">FUENTE DE CONSOLA</label>
+      <select id="gs-fuente" class="gs-select"></select>
+    </div>
+    <div class="gs-fila">
+      <input type="range" class="gs-slider" id="gs-escala" min="85" max="130" step="1" value="100" />
+      <span class="gs-valor" id="gs-escala-val">100%</span>
+    </div>
+    <div class="gs-nota">Escala: cambia el tamaño del texto de la vista previa (y deja la variable <b>--gs-escala</b> a mano para las páginas).</div>
+  </section>
+
+  <!-- ============ COLORES ============ -->
+  <section class="gs-seccion">
+    <div class="gs-titulo-seccion">
+      <span>🎨 PALETAS RÁPIDAS & COLORES POR PANTALLA</span>
+      <span class="gs-nota">armonizan todas las pantallas</span>
+    </div>
+    <div class="gs-paletas-barra">
+      <div class="gs-paletas" id="gs-paletas"></div>
+      <button type="button" class="gs-btn gs-btn-agregar" id="gs-btn-agregar-paleta" title="Guardar la combinación actual como una paleta rápida">➕ AGREGAR TU PALETA</button>
+    </div>
+
+    <div class="gs-colores-nav" id="gs-colores-nav">
+      <button type="button" class="gs-tab-btn activo" data-tab="todos">TODOS</button>
+      <button type="button" class="gs-tab-btn" data-tab="cluster">🌌 COSMOS CLUSTERS</button>
+      <button type="button" class="gs-tab-btn" data-tab="log">📋 LOG</button>
+      <button type="button" class="gs-tab-btn" data-tab="cambia">📹 CAMBIAPALABRAS</button>
+      <button type="button" class="gs-tab-btn" data-tab="global">⚙️ GLOBAL / BASE</button>
+    </div>
+
+    <div id="gs-colores" class="gs-colores"></div>
+  </section>
+
+  <!-- ============ CONTENEDORES ============ -->
+  <section class="gs-seccion">
+    <div class="gs-titulo-seccion"><span>▢ CONTENEDORES (paneles, tarjetas y cajas)</span></div>
+    <div id="gs-contenedores"></div>
+  </section>
+
+  <!-- ============ NOTAS ============ -->
+  <section class="gs-seccion">
+    <div class="gs-titulo-seccion"><span>ℹ CÓMO FUNCIONA</span></div>
+    <ul class="gs-lista">
+      <li>La config vive en <b>public/data/global_style.json</b> (la guardás desde acá con GUARDAR).</li>
+      <li>Cada página carga <b>js/global-style.js</b>, que define las variables <b>--gs-*</b> e inyecta las reglas de los contenedores.</li>
+      <li>Páginas alcanzadas: <b>log.html</b>, <b>cosmos-clusters.html</b>, <b>cambiapalabras.html</b> y la <b>biblioteca de clusters</b> (index.html).</li>
+      <li>Si el server está apagado, GUARDAR avisa en rojo y el diseño queda sólo en el archivo local.</li>
+    </ul>
+  </section>
+
+</main>
+
+<div class="gs-toast" id="gs-toast"></div>
+
+<script src="js/globalstyle-editor.js?v=1.0"></script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S·S // JSONs GUARDADOS</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="js/base-path.js?v=1.0"></script>
+<script src="js/global-style.js?v=1.1"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    min-height: 100%;
+    background: var(--gs-fondo, #070303);
+    color: var(--gs-texto, #e88f93);
+    font-family: var(--gs-fuente, "Share Tech Mono", monospace);
+    padding: 18px 20px 40px;
+  }
+  header.js-head {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    border-bottom: var(--gs-borde-ancho, 1px) solid var(--gs-borde, #331416);
+    padding-bottom: 10px; margin-bottom: 16px;
+  }
+  header.js-head h1 { font-size: 17px; letter-spacing: .08em; color: var(--gs-acento, #f59ca0); font-weight: 700; }
+  header.js-head .js-sub { font-size: 11.5px; color: var(--gs-texto-dim, #8b4f52); letter-spacing: .06em; }
+  header.js-head .js-sp { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  a.js-btn, button.js-btn {
+    background: var(--gs-panel, #140708);
+    color: var(--gs-acento, #f59ca0);
+    border: 1px solid var(--gs-borde, #471c1e);
+    padding: 5px 12px; border-radius: 3px; cursor: pointer;
+    font: inherit; font-size: 11px; letter-spacing: .07em; text-decoration: none;
+  }
+  a.js-btn:hover, button.js-btn:hover { border-color: var(--gs-acento, #ff000d); }
+  .js-resumen { font-size: 11.5px; color: var(--gs-texto-dim, #8b4f52); margin-bottom: 14px; letter-spacing: .05em; }
+  .js-resumen b { color: var(--gs-acento, #f59ca0); }
+  .js-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); gap: 14px; }
+  .js-card {
+    background: var(--gs-panel, #140708);
+    border: var(--gs-borde-ancho, 1px) solid var(--gs-borde, #331416);
+    border-radius: 6px; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .js-card-top {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    padding: 9px 12px; border-bottom: 1px solid var(--gs-borde, #331416);
+    background: linear-gradient(90deg, rgba(255,255,255,.04), transparent);
+  }
+  .js-card-top strong { font-size: 12.5px; letter-spacing: .07em; color: var(--gs-acento, #f59ca0); }
+  .js-card-top .js-ruta { font-size: 11px; color: var(--gs-texto-dim, #8b4f52); }
+  .js-card-top .js-meta { margin-left: auto; font-size: 10.5px; color: var(--gs-texto-dim, #8b4f52); text-align: right; }
+  .js-card pre {
+    margin: 0; padding: 10px 12px 14px; overflow: auto; max-height: 340px;
+    font-family: inherit; font-size: 11.5px; line-height: 1.45; white-space: pre;
+    color: var(--gs-texto, #edd3be);
+  }
+  .js-vacio { font-size: 12.5px; color: var(--gs-texto-dim, #8b4f52); padding: 24px 4px; }
+</style>
+</head>
+<body>
+
+<header class="js-head">
+  <h1>&#9636; JSONs QUE EL SISTEMA VA GUARDANDO</h1>
+  <span class="js-sub">todo lo que se persiste, con su contenido completo</span>
+  <span class="js-sp">
+    <a class="js-btn" href="./globalstyle.html">&#127899; DISENO GLOBAL</a>
+    <a class="js-btn" href="./log">&#9673; LOG</a>
+    <a class="js-btn" href="./cambiapalabras.html">&#9635; CAMBIAPALABRAS</a>
+    <button class="js-btn" id="js-refresh">&#8635; ACTUALIZAR</button>
+  </span>
+</header>
+
+<div class="js-resumen" id="js-resumen">Cargando registro...</div>
+<div class="js-lista" id="js-lista"></div>
+
+<script>
+(function () {
+  'use strict';
+  var url = (typeof window.sbApi === 'function') ? window.sbApi('/api/jsons-guardados') : 'api/jsons-guardados';
+  var listaEl = document.getElementById('js-lista');
+  var resEl = document.getElementById('js-resumen');
+
+  function esc(s) {
+    return String(s === undefined || s === null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function kb(bytes) { return (Number(bytes || 0) / 1024).toFixed(1) + ' KB'; }
+
+  function render(reg) {
+    var archivos = (reg && reg.archivos) || [];
+    if (!archivos.length) {
+      resEl.innerHTML = 'Todavia no se guardo ningun JSON. Guarda algo desde /globalstyle.html, la biblioteca de clusters o el modal (P) de cambiapalabras.';
+      listaEl.innerHTML = '';
+      return;
+    }
+    resEl.innerHTML = '<b>' + archivos.length + '</b> archivo(s) registrados · ultimo guardado: <b>' +
+      esc(reg.actualizado || '-') + '</b> · se actualiza solo cada vez que el server escribe un JSON.';
+    listaEl.innerHTML = archivos.map(function (a) {
+      return '<div class="js-card">' +
+        '<div class="js-card-top">' +
+          '<strong>' + esc(a.etiqueta || a.archivo) + '</strong>' +
+          '<span class="js-ruta">' + esc(a.archivo) + '</span>' +
+          '<span class="js-meta">' + kb(a.bytes) + ' · ' + esc(a.guardado) +
+            ((a.versiones || 0) > 0 ? ' · ' + a.versiones + ' guardado(s)' : '') + '</span>' +
+        '</div>' +
+        '<pre>' + esc(JSON.stringify(a.json, null, 2)) + '</pre>' +
+      '</div>';
+    }).join('');
+  }
+
+  function cargar() {
+    fetch(url + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(render)
+      .catch(function (e) {
+        resEl.textContent = 'No se pudo leer el registro (' + e.message + '). Si el server no esta corriendo, reiniciá npm start.';
+      });
+  }
+
+  var btn = document.getElementById('js-refresh');
+  if (btn) btn.addEventListener('click', cargar);
+  cargar();
+  setInterval(cargar, 5000);
+})();
+</script>
+</body>
+</html>

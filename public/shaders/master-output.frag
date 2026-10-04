@@ -37,6 +37,7 @@ uniform sampler2D renderJPSHADER;
 uniform int u_activeState;
 uniform vec3 u_stateWeights;
 
+
 // Uniforms de Control de GLITCH (Mismos parámetros que en LOG)
 uniform float glitchAmount;
 uniform float blockIntensity;
@@ -48,6 +49,39 @@ uniform float edgeTearingIntensity;
 // Uniforms de resolución y tiempo
 uniform vec2 u_resolution;
 uniform float u_time;
+
+// ---------------------------------------------------------------------------
+// PATRÓN RDM — FONDO DE LAS CAJAS DE PALABRAS Y DEL CONTENEDOR DEL HAIKU
+// ---------------------------------------------------------------------------
+// Port del shader "rdmf" de jpShadereditor (autor jpupper): un campo de RUIDO
+// ALEATORIO POR CAPAS. Del original se quitó el feedback (iChannel0) y el hue:
+// el patrón se calcula EN BLANCO y se tiñe con u_rdmColor.
+//
+// TODOS estos uniforms son manejables desde ARRIBA: los manda script.js en cada
+// frame desde el panel MASTER RDM del modal (tecla P) y desde MASTER_RDM_DEF
+// (arriba de todo en public/cambiapalabras/script.js). Llegan NORMALIZADOS a
+// 0..1 y acá se pasan a la escala física del shader original con rdMap().
+uniform float u_rdmCnt;        // CAPAS          (físico 1..20)
+uniform float u_rdmIteScale;   // ESCALA X CAPA  (físico 0..10)
+uniform float u_rdmSpeedX;     // deriva X       (físico -0.2..0.2)
+uniform float u_rdmSpeedY;     // deriva Y       (físico -0.2..0.2)
+uniform float u_rdmSpeedRot;   // rotación       (físico -0.01..0.01)
+uniform float u_rdmSpeedRnd;   // velocidad del random (0..1)
+uniform float u_rdmSm1;        // SMOOTH BAJO (umbral del smoothstep)
+uniform float u_rdmSm2;        // SMOOTH ALTO (dónde llega a blanco pleno)
+uniform float u_rdmForce;      // brillo final (e_force del original)
+uniform float u_rdmMix;        // PRESENCIA: 1 = tapa el fondo anterior
+uniform vec3  u_rdmColor;      // tinte del patrón
+
+// ---------------------------------------------------------------------------
+// PALETA UNIFICADA (la del GLOBALSTYLE: /globalstyle.html y global_style.json)
+// ---------------------------------------------------------------------------
+// u_palModo = 1 → el patrón RDM, los marcos de las palabras, el contenedor del
+// haiku y el tinte de la cámara usan la paleta. 0 → colores fijos de siempre.
+uniform vec3  u_palA;          // acento primario   (borde / acento)
+uniform vec3  u_palB;          // acento secundario (acento2)
+uniform float u_palModo;       // 1 = seguir la paleta global
+uniform float u_camPal;        // 0..1 cuánto se tiñe la cámara con la paleta
 #define pi 3.14159265359
 
 // ---------------------------------------------------------------------------
@@ -58,36 +92,115 @@ uniform float u_time;
 #define WORD_BOX_X        0.55
 
 // Tamaño del contenedor del HAIKU (media medida, en UV)
-#define HAIKU_BOX_W       0.40
-#define HAIKU_BOX_H       0.21
-
-// Margen (en UV) alrededor del marco del haiku que queda INMUNE al glitch
-#define HAIKU_IMMUNE_PAD  0.030
+#define HAIKU_BOX_W       0.25
+#define HAIKU_BOX_H       0.3
 
 // VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
 // Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
-#define WORD_SPIN_SPEED   0.32
+#define WORD_SPIN_SPEED   0.032
 
 // Margen del marco alrededor del ancho real de la palabra (1.0 = exacto)
-#define WORD_BOX_PAD      1.06
+#define WORD_BOX_PAD   0.9
+#define HAIKU_BG_TOP      vec3(0.0, 0.0, 0.0)
+#define HAIKU_BG_BOT      vec3(0.0, 0.0, 0.0)
+#define HAIKU_LINE_COL    vec3(1.0, 1.0, 0.1)
+#define HAIKU_GLOW_COL    vec3(0.4, 0.4, 0.4)
 
-// CONTENEDOR DEL HAIKU: el interior es OPACO (el fondo NO se ve nunca) y ROJO.
-// HAIKU_BG_TOP/BOT = relleno del cuadrado (rojo con profundidad).
-// Si lo querés NEGRO PURO: vec3(0.0) en los dos.
-// HAIKU_LINE_COL = la línea del marco (rojo claro, para que se lea sobre el rojo).
-#define HAIKU_BG_TOP      vec3(0.05, 0.95, 0.30)
-#define HAIKU_BG_BOT      vec3(0.004, 0.34, 0.10)
-#define HAIKU_LINE_COL    vec3(0.55, 1.0, 0.62)
-#define HAIKU_GLOW_COL    vec3(0.05, 0.92, 0.35)
-
-// Función de ruido base pseudo-aleatorio
 float rand(vec2 co){
     return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
-// -----------------------------------------------------------------
-// FORMAS POLIGONALES Y PALABRAS
-// -----------------------------------------------------------------
+// Función de ruido suave 2D (Value Noise continuo con interpolación quintic)
+float noise2D(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+
+    float a = rand(i);
+    float b = rand(i + vec2(1.0, 0.0));
+    float c = rand(i + vec2(0.0, 1.0));
+    float d = rand(i + vec2(1.0, 1.0));
+
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Ruido FBM de muy alta frecuencia (5 octavas con rotación irracional)
+float fbmHighFreq(vec2 p) {
+    float val = 0.0;
+    float amp = 0.52;
+    mat2 rot = mat2(0.80, 0.60, -0.60, 0.80);
+    for (int i = 0; i < 5; i++) {
+        val += amp * noise2D(p);
+        p = rot * p * 2.07 + vec2(4.13, 7.37);
+        amp *= 0.50;
+    }
+    return val;
+}
+
+// Fondo de alta frecuencia para los contenedores de palabras y el contenedor del haiku:
+// Textura táctica densa con balance lumínico (no negro absoluto 0.0, ni blanco quemado)
+vec3 getHighFreqNoiseBg(vec2 uv) {
+    float aspect = u_resolution.x / u_resolution.y;
+    vec2 p = uv * vec2(280.0 * aspect, 280.0) + vec2(u_time * 0.35, u_time * 0.20);
+    float n = clamp(fbmHighFreq(p), 0.0, 1.0);
+    float lum = mix(0.08, 0.26, n);
+    return vec3(lum);
+}
+
+// ---------------------------------------------------------------------------
+// PATRÓN RDM (port de "rdmf"): se promedian u_rdmCnt capas de ruido aleatorio,
+// cada una con su fase, su rotación y su escala (ite_scale * i). El original
+// dividía por (cnt+1) y cerraba con un smoothstep: se respeta tal cual.
+// ---------------------------------------------------------------------------
+float rdMap(float v, float lo, float hi) { return lo + (hi - lo) * v; }
+mat2 rdRotate2d(float a) { return mat2(cos(a), -sin(a), sin(a), cos(a)); }
+mat2 rdScale2d(vec2 sc) { return mat2(sc.x, 0.0, 0.0, sc.y); }
+float rdRandom(vec2 st, float t) {
+    return fract(sin(dot(floor(st.xy), vec2(12.9898, 78.233))) * 43000.3 + t);
+}
+
+vec3 rdmPattern(vec2 uv) {
+    float fix = u_resolution.x / u_resolution.y;
+    uv.x *= fix;                                  // el original escala el X (si no, se estira)
+
+    int mcnt = int(floor(rdMap(u_rdmCnt, 1.0, 20.0)));
+    if (mcnt < 1) mcnt = 1;
+    float mite_scale = rdMap(u_rdmIteScale, 0.0, 10.0);
+    float mspeedx    = rdMap(u_rdmSpeedX, -0.2, 0.2);
+    float mspeedy    = rdMap(u_rdmSpeedY, -0.2, 0.2);
+    float mspeedrot  = rdMap(u_rdmSpeedRot, -0.01, 0.01);
+    float mspeedrdm  = u_rdmSpeedRnd;
+    float tm = u_time;
+
+    vec3 dib = vec3(1.0);
+    for (int i = 1; i < 10; i++) {
+        float fase = float(i) * pi * 2.0 / float(mcnt);
+        vec2 uv2 = uv;
+        uv2.x += tm * mspeedx;
+        uv2.y += tm * mspeedy;
+
+        uv2 -= vec2(0.5); uv2 *= rdRotate2d(mspeedrot * tm); uv2 += vec2(0.5);
+        uv2 -= vec2(0.5); uv2 *= rdScale2d(vec2(mite_scale * float(i))); uv2 += vec2(0.5);
+
+        float e = rdRandom(uv2 * mite_scale * float(i), tm * mspeedrdm + fase);
+        dib += vec3(e);
+    }
+    dib /= (float(mcnt) + 1.0);
+    dib = smoothstep(u_rdmSm1, max(u_rdmSm2, u_rdmSm1 + 0.001), dib);
+    return dib * u_rdmForce;
+}
+
+// Fondo RDM teñido. Con u_palModo = 1 el patrón se PINTA con la paleta global:
+// el degradado va del acento primario (oscuro) al acento secundario (crestas), y
+// el brillo del patrón modula la mezcla. Con u_palModo = 0 queda el color del
+// panel (blanco por defecto = tal cual el shader rdmf).
+vec3 getRdmBg(vec2 uv) {
+    vec3 p = rdmPattern(uv);
+    float g = clamp(dot(p, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+    vec3 conPaleta = mix(u_palA * 0.45, u_palB, g) * (0.35 + 0.65 * g);
+    return mix(p * u_rdmColor, conPaleta, clamp(u_palModo, 0.0, 1.0));
+}
+
 float poly(vec2 uv, vec2 p, float s, float dif, int N, float a){
     vec2 st = p - uv;
     float a2 = atan(st.x, st.y) + a;
@@ -96,7 +209,6 @@ float poly(vec2 uv, vec2 p, float s, float dif, int N, float a){
     float e = 1.0 - smoothstep(s, dif, d);
     return e;
 }
-
 vec4 getWords(vec2 uv, float animPulse){
     float t = u_time * (1.0 + animPulse * 1.5);
     vec4 wordsEffect = vec4(0.0);
@@ -118,13 +230,8 @@ vec4 getWords(vec2 uv, float animPulse){
     }
     return wordsEffect;
 }
-
-// Contenedores de las palabras (marcos).
-// (c) AHORA SON MÁS ANCHOS: el eje X se comprime por WORD_BOX_X antes de
-// evaluar el polígono, así el marco se estira horizontalmente alrededor de la
-// palabra (el eje Y no se toca).
 vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
-    // Giro MUCHO más lento: antes (1.0 + 2*animPulse) = hasta 3.0 rad/s.
+
     float t = u_time * WORD_SPIN_SPEED * (1.0 + animPulse);
     vec4 wordsEffect = vec4(0.0);
     float fx = u_resolution.x / u_resolution.y;
@@ -140,25 +247,21 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
 
         // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
         // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
-        float wAncho = u_wordWidths[i] * WORD_BOX_PAD;
+        float wAncho = u_wordWidths[i] * WORD_BOX_PAD*.5;
         float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
         // uv_m = uv con el eje X comprimido alrededor de la palabra
         vec2 uv_m = wPos + (uv - wPos) * vec2(kx, 1.0);
 
-        float e = poly(uv_m, wPos, s, s + d, 4, animPulse * sin(t + float(i)));
-        e -= poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, animPulse * sin(t + float(i)));
+        float rot = animPulse * sin(t + float(i));
+        float full = poly(uv_m, wPos, s, s + d, 4, rot);
+        float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
+        float border = max(0.0, full - inner);
 
-        wordsEffect += e;
+        wordsEffect.rgb += vec3(border);
+        wordsEffect.a = max(wordsEffect.a, full);
     }
     return wordsEffect;
 }
-
-// -----------------------------------------------------------------
-// CONTENEDOR (MARCO CIBERNÉTICO) DEL HAIKU EN SHADER
-// Se dibuja detrás del Haiku e interpola fluidamente con los 3 estados.
-// La geometría se calcula SIEMPRE con la UV SIN GLITCH (rawUv): así el marco
-// nunca se deforma y define una zona inmune que no se glitchea.
-// -----------------------------------------------------------------
 struct HaikuBox {
     float presence;   // 0 en IDLE, sube en THINKING (escaneo), pleno en HAIKU
     vec2  size;       // semitamaño del marco en UV
@@ -167,7 +270,6 @@ struct HaikuBox {
     float boxDist;    // distancia al contorno (0 = sobre el borde)
     float inside;     // 1.0 adentro, 0.0 afuera
 };
-
 HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
     HaikuBox b;
     // SOLO cuando se está formando el haiku (estado HAIKU = weights.z). Antes de
@@ -184,19 +286,6 @@ HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
     b.inside = (b.d.x < 0.0 && b.d.y < 0.0) ? 1.0 : 0.0;
     return b;
 }
-
-// Zona INMUNE AL GLITCH: 1.0 dentro del marco (y su margen), 0.0 afuera.
-// IMPORTANTE: NO se multiplica por 'presence'. La inmunidad es GEOMÉTRICA: donde
-// el marco está dibujado, las UVs son SIEMPRE limpio (rawUv) — antes, con
-// presence=0.55 (THINKING) sólo se corregía el 55% del desplazamiento y el
-// contenedor entraba a pantalla ya con las UVs movidas por el glitch.
-float getHaikuImmuneZone(vec2 uv, vec3 weights) {
-    HaikuBox b = haikuBoxAt(uv, weights);
-    if (b.presence < 0.005) return 0.0;
-    float zone = 1.0 - smoothstep(0.0, HAIKU_IMMUNE_PAD, b.boxDist);
-    return zone;
-}
-
 vec4 getHaikuContainer(vec2 uv, vec3 weights) {
     HaikuBox b = haikuBoxAt(uv, weights);
     if (b.presence < 0.005) return vec4(0.0);
@@ -212,13 +301,14 @@ vec4 getHaikuContainer(vec2 uv, vec3 weights) {
     if (b.inside > 0.5) {
         // Rejilla de silicio holográfica interna
         vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.04, 0.0));
-        float gridLine = (step(0.90, gridUv.x) + step(0.90, gridUv.y)) * 0.16;
+        float gridLine = (step(0.90, gridUv.x) + step(0.90, gridUv.y)) * 0.05;
 
         // Barras de escaneo horizontal sutil
         float scan = sin(uv.y * 140.0 + u_time * 6.0) * 0.05 * (wThink + 0.2);
 
-        // Relleno del contenedor: ROJO (degradado vertical suave).
-        vec3 bg = mix(HAIKU_BG_TOP, HAIKU_BG_BOT, uv.y);
+        // Relleno del contenedor: ruido FBM de alta frecuencia en vez de negro puro
+        // Fondo: RDM del panel MASTER RDM (u_rdmMix=1 lo tapa por completo).
+        vec3 bg = mix(getHighFreqNoiseBg(uv), getRdmBg(uv), u_rdmMix) + vec3(gridLine);
     
         // Viñeta interna: los bordes más apagados, el centro sostiene el texto
         float bordeInt = min(min(b.size.x - abs(b.p.x), b.size.y - abs(b.p.y)) * 6.0, 1.0);
@@ -249,16 +339,16 @@ vec4 getHaikuContainer(vec2 uv, vec3 weights) {
     float lineaAlpha = (edgeGlow * 3.2 * cornerBoost + innerLine * 1.6 * cornerBoost) * b.presence;
     float auraAlpha = (outerAura + innerAura) * b.presence;
 
-    outColor.rgb = mix(outColor.rgb, HAIKU_GLOW_COL, clamp(auraAlpha, 0.0, 1.0));
-    outColor.rgb = mix(outColor.rgb, HAIKU_LINE_COL, clamp(lineaAlpha, 0.0, 1.0));
+    // Línea y aura del contenedor: con la paleta activa salen de u_palB / u_palA.
+    vec3 lineaCol = mix(HAIKU_LINE_COL, u_palB, clamp(u_palModo, 0.0, 1.0));
+    vec3 auraCol  = mix(HAIKU_GLOW_COL, u_palA * 0.55, clamp(u_palModo, 0.0, 1.0));
+
+    outColor.rgb = mix(outColor.rgb, auraCol, clamp(auraAlpha, 0.0, 1.0));
+    outColor.rgb = mix(outColor.rgb, lineaCol, clamp(lineaAlpha, 0.0, 1.0));
     outColor.a = max(outColor.a, clamp(max(lineaAlpha, auraAlpha), 0.0, 1.0));
 
     return outColor;
 }
-
-// -----------------------------------------------------------------
-// FUNCIÓN ENCAPSULADA DE GLITCH
-// -----------------------------------------------------------------
 void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out float scanline, out float vhsNoise) {
     float t = floor(u_time * 15.0);
 
@@ -312,9 +402,6 @@ void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out floa
     vhsNoise = (rand(uv * u_time) - 0.5) * 0.15 * effectiveVHS;
 }
 
-// -----------------------------------------------------------------
-// MAIN
-// -----------------------------------------------------------------
 void main() {
     vec2 rawUv = gl_FragCoord.xy / u_resolution;
 
@@ -329,21 +416,9 @@ void main() {
         weights /= sumW;
     }
 
-    // (b) ZONA INMUNE AL GLITCH: donde se dibuja el contenedor del haiku el
-    // shader NO se glitchea (ni se desplaza, ni aberra, ni mete scanlines/ruido).
-    float immune = getHaikuImmuneZone(rawUv, weights);
-
-    // Cálculo de coordenadas con GLITCH integrado
     vec2 uvR, uvG, uvB;
     float scanline, vhsNoise;
     getGlitchCoords(rawUv, uvR, uvG, uvB, scanline, vhsNoise);
-
-    // Dentro del contenedor se usan las coordenadas LIMPIAS
-    uvR = mix(uvR, rawUv, immune);
-    uvG = mix(uvG, rawUv, immune);
-    uvB = mix(uvB, rawUv, immune);
-    scanline *= (1.0 - immune);
-    vhsNoise *= (1.0 - immune);
 
     vec2 uv = uvG;
 
@@ -353,18 +428,21 @@ void main() {
     vec2 camUvB = vec2(1.0 - uvB.x, 1.0 - uvB.y);
 
     // 1) Render Cámara con aberración cromática glitcheada
-    vec3 camCol = vec3(0.0);
-    if (u_hasCamera == 1) {
+    vec3 camCol = texture2D(u_cameraTexture, camUvR).rgb;
+  /*  if (u_hasCamera == 1) {
         camCol.r = texture2D(u_cameraTexture, camUvR).r;
         camCol.g = texture2D(u_cameraTexture, camUvG).g;
         camCol.b = texture2D(u_cameraTexture, camUvB).b;
+    }*/
+    // TINTE DE LA CÁMARA con la paleta unificada (u_camPal = 0 → imagen original).
+    if (u_hasCamera == 1 && u_camPal > 0.001) {
+        float camLum = dot(camCol, vec3(0.299, 0.587, 0.114));
+        vec3 camPalCol = mix(u_palA * 0.35, u_palB, clamp(camLum * 1.15, 0.0, 1.0));
+        camCol = mix(camCol, camPalCol, clamp(u_camPal * u_palModo, 0.0, 1.0));
     }
     vec3 invcamCol = vec3(1.0, 1.0, 1.0) - camCol.rgb;
-
-    // 2) Render Depth Map / Segmentación
     vec4 depthCol = (u_hasDepth == 1) ? texture2D(u_depthTexture, vec2(uv.x, 1.0 - uv.y)) : vec4(0.0);
 
-    // 3) Render Silueta / OpenPose (Esqueleto Cinemático & Nodos)
     vec4 openposeCol = vec4(0.0);
     if (u_hasOpenpose == 1) {
         openposeCol = texture2D(u_openposeTexture, vec2(uv.x,1.-uv.y));
@@ -381,68 +459,59 @@ void main() {
     }
 
     // 4) Render directo de JPShaderEditor Include
-    vec3 jpCol = vec3(0.0);
-    jpCol.r = texture2D(renderJPSHADER, uvR).r;
-    jpCol.g = texture2D(renderJPSHADER, uvG).g;
-    jpCol.b = texture2D(renderJPSHADER, uvB).b;
+    vec3 jpCol = texture2D(renderJPSHADER, uvR).rgb;
 
     // 5) Efectos de palabras en pantalla (fondo de las palabras)
     float animPulse = weights.y * 1.0 + weights.z * 0.3;
     vec4 words = getWords(uv, animPulse);
-    vec4 wordsq = getQuadWords(uv, mix(0.03, 0.045, weights.y), 0.0, animPulse);
+    vec4 wordsq = getQuadWords(rawUv, mix(0.03, 0.045, weights.y), 0.0, animPulse);
 
-    // (3) Los marcos de TODAS las palabras desaparecen apenas ENTRA el contenedor
-    //     del haiku (la caja empieza a aparecer en THINKING, no sólo en HAIKU) y
-    //     vuelven cuando la caja se retira.
     float cajaPresence = clamp(weights.z, 0.0, 1.0);   // = presencia del contenedor
     wordsq *= (1.0 - smoothstep(0.03, 0.45, cajaPresence));
 
-    // 6) DIBUJO DEL CONTENEDOR DEL HAIKU (con rawUv: geometría fija, sin glitch)
     vec4 haikuBox = getHaikuContainer(rawUv, weights);
 
-    // Composición de capas de renderizado:
-    // Capa A: Salida base (JPShader + Cámara recortada por Depth Map)
-    vec3 finalColor = vec3(0.0);
-    finalColor += jpCol * words.r;
-    finalColor += mix(jpCol * words.r, camCol, depthCol.r);
 
-    // (a) SILUETA OPENPOSE: primero BLANCA y después, cuando la obra avanza a
-    //     THINKING / HAIKU, pasa al COLOR INVERTIDO DE LA CÁMARA.
-    //     En IDLE (weights.x) el esqueleto queda blanco puro; al entrar en los
-    //     otros estados se mezcla hacia (1 - cámara).
-    float opToInvert = clamp(weights.y + weights.z, 0.0, 1.0);
-    vec3 siluetaCol = mix(vec3(1.0), invcamCol, opToInvert);
-    finalColor += openposeCol.rgb * siluetaCol;
+
+
+    vec3 fin = vec3(0.0);
+    fin += jpCol * words.r;
+    fin += mix(jpCol * words.r, camCol, depthCol.r);
+
+    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
+    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
+    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
+    //     trackingConfig.boneWidth / pointRadius del overlay).
+    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
+    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
+    //     huesos de colores.
+    float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
+    fin += vec3(1.0) * opMask * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
 
     // Capa D: Integración del contenedor del Haiku detrás de los textos
-    finalColor = mix(finalColor, haikuBox.rgb, haikuBox.a);
+    fin = mix(fin, haikuBox.rgb, haikuBox.a);
 
-    // Fondo y halos de las palabras (transición suave entre estados)
-    vec3 wordQuadCol = mix(vec3(1.0, 0.05, 0.05), vec3(1.0, 0.65, 0.15), weights.y);
-    wordQuadCol = mix(wordQuadCol, vec3(0.2, 0.95, 1.0), weights.x * 0.4);
-    finalColor += wordsq.rgb * wordQuadCol;
+    // Fondo del interior de las cajas de las palabras: patrón RDM del panel
+    // MASTER RDM (u_rdmMix = 1 lo tapa por completo; en 0 queda el grano viejo).
+    float wordMask = clamp(wordsq.a, 0.0, 1.0);
+    vec3 wordNoise = mix(getHighFreqNoiseBg(rawUv), getRdmBg(rawUv), u_rdmMix);
+    fin = mix(fin, wordNoise, wordMask);
 
-    // Modulación e interferencias continuas según el peso de cada estado.
-    // OJO: nada de esto entra en la zona del contenedor del haiku ('limpio' = 0
-    // ahí) — el marco y su texto son la última pila de la imagen del shader, así
-    // que ningún post efecto (ni del shader ni de una capa DOM superior) los toca.
-    float limpio = 1.0 - immune;
+    // Borde de las palabras: rojo→oro de siempre, o la paleta global si está activa.
+    vec3 wordQuadFijo = mix(vec3(1.0, 0.05, 0.05), vec3(1.0, 0.65, 0.15), weights.y);
+    vec3 wordQuadPal  = mix(u_palA, u_palB, clamp(weights.y * 0.85 + 0.15, 0.0, 1.0));
+    vec3 wordQuadCol = mix(wordQuadFijo, wordQuadPal, clamp(u_palModo, 0.0, 1.0));
+    fin += wordsq.rgb * wordQuadCol;
 
-    // Estado 0 (IDLE): tinte de reposo cibernético sutil
-    finalColor += vec3(0.0, 0.02, 0.04) * weights.x * limpio;
+    // Tinte y efectos sutiles de estado (sólo fuera de cajas de haiku y palabras)
+    float maskTotal = max(haikuBox.a, wordMask);
+    fin += vec3(0.0, 0.02, 0.04) * weights.x * (1.0 - maskTotal);
 
-    // Estado 1 (THINKING): interferencia de alta frecuencia y escaneo sináptico
-    float waveThink = sin(uv.y * 90.0 + u_time * 16.0) * 0.08;
-    //finalColor += vec3(0.14 + waveThink, 0.01, 0.05) * weights.y * limpio;
+    // Estado 2 (HAIKU): tinte parejo, SIN onda. El usuario pidio que no aparezca el
+    // dibujo de ondas/grilla animada mientras se esta generando el haiku (antes el
+    // tinte iba modulado por una senoidal vertical que barria toda la pantalla).
+    fin += vec3(0.04, 0.01, 0.02) * weights.z * (1.0 - maskTotal);
 
-    // Estado 2 (HAIKU): matriz estructurada y coherencia poética
-    float gridHaiku = sin(uv.y * 160.0 + u_time * 2.5) * 0.03;
-    finalColor += vec3(0.04, 0.01 + gridHaiku, 0.02) * weights.z * limpio;
 
-    // Aplicación de Scanlines y Ruido VHS de la función glitch
-    // (dentro del contenedor del haiku NO entran: el marco queda limpio)
-    finalColor -= scanline;
-    finalColor += vhsNoise;
-
-    gl_FragColor = vec4(finalColor, 1.0);
+    gl_FragColor = vec4(fin, 1.0);
 }

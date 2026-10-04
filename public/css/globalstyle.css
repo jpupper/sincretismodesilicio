@@ -1,0 +1,188 @@
+/* ==========================================================================
+   GLOBALSTYLE — hoja propia del editor de diseño global.
+   Usa las variables --gs-* (las define js/global-style.js) con fallbacks, así
+   el editor se ve coherente antes y después de cargar la config.
+   ========================================================================== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  min-height: 100%;
+  background: #070303;
+  color: var(--gs-texto, #e88f93);
+  font-family: "Share Tech Mono", "VT323", "IBM Plex Mono", monospace;
+}
+
+body {
+  padding: 14px 18px 60px;
+  font-size: calc(13px * var(--gs-escala, 1));
+}
+
+/* ---------- barra superior ---------- */
+.gs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 0, 13, .35);
+  border-radius: var(--gs-radio, 10px);
+  background: rgba(20, 7, 8, .8);
+}
+.gs-marca { display: flex; align-items: center; gap: 10px; }
+.gs-punto {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--gs-acento, #ff000d);
+  box-shadow: 0 0 10px var(--gs-acento, #ff000d);
+}
+.gs-titulo { font-weight: 700; letter-spacing: 2px; color: var(--gs-acento, #ff000d); }
+.gs-sub { font-size: .78em; opacity: .7; border-left: 1px solid rgba(255, 255, 255, .2); padding-left: 10px; }
+.gs-header-acciones { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.gs-btn {
+  background: rgba(40, 14, 15, .9);
+  border: 1px solid rgba(255, 0, 13, .35);
+  border-radius: var(--gs-radio, 10px);
+  color: var(--gs-texto, #e88f93);
+  font-family: inherit; font-size: .82em; letter-spacing: .5px;
+  padding: 6px 11px; cursor: pointer; text-decoration: none;
+}
+.gs-btn:hover { border-color: var(--gs-acento, #ff000d); color: #fff; }
+.gs-btn-primario { background: rgba(255, 0, 13, .18); color: #fff; border-color: var(--gs-acento, #ff000d); }
+
+.gs-aviso {
+  font-size: .82em; opacity: .85;
+  border-left: 2px solid var(--gs-acento, #ff000d);
+  padding: 6px 10px; margin-bottom: 14px;
+  background: rgba(255, 0, 13, .06);
+}
+
+.gs-main { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+
+/* ---------- secciones ---------- */
+.gs-seccion {
+  border: 1px solid rgba(255, 0, 13, .28);
+  border-radius: var(--gs-radio, 10px);
+  background: rgba(18, 6, 7, .72);
+  padding: 12px 14px;
+}
+.gs-titulo-seccion {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: .86em; letter-spacing: 1px; color: var(--gs-acento, #ff000d);
+  border-bottom: 1px dashed rgba(255, 0, 13, .25);
+  padding-bottom: 6px; margin-bottom: 10px;
+}
+.gs-nota { font-size: .78em; opacity: .6; }
+.gs-fila { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.gs-label { font-size: .8em; min-width: 148px; opacity: .85; }
+.gs-valor { font-size: .8em; min-width: 58px; text-align: right; color: #fff; }
+.gs-lista { font-size: .82em; line-height: 1.6; padding-left: 18px; opacity: .9; }
+
+.gs-select {
+  flex: 1; background: #0c0405; color: inherit;
+  border: 1px solid rgba(255, 0, 13, .4); border-radius: 6px;
+  padding: 6px 8px; font-family: inherit; font-size: .88em;
+}
+
+.gs-slider { flex: 1; accent-color: var(--gs-acento, #ff000d); }
+
+/* ---------- paletas rápidas y barra ---------- */
+.gs-paletas-barra {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.gs-paletas { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+.gs-paleta {
+  border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px;
+  padding: 5px 8px; cursor: pointer; background: #0c0405;
+  display: flex; align-items: center; gap: 6px; font-family: inherit; font-size: .78em; color: inherit;
+  transition: all .15s ease;
+}
+.gs-paleta:hover { border-color: var(--gs-acento, #ff000d); transform: translateY(-1px); }
+.gs-paleta i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.gs-paleta-del {
+  margin-left: 4px; font-weight: bold; font-size: 1.15em; line-height: 1;
+  opacity: .5; cursor: pointer; padding: 0 4px; border-radius: 3px;
+}
+.gs-paleta-del:hover { opacity: 1; color: #ff3355; background: rgba(255, 50, 80, .2); }
+.gs-btn-agregar {
+  background: rgba(255, 176, 0, .14);
+  border: 1px dashed var(--gs-acento, #ff000d);
+  color: var(--gs-acento, #ff000d);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.gs-btn-agregar:hover {
+  background: var(--gs-acento, #ff000d);
+  color: #000;
+  border-style: solid;
+}
+
+/* ---------- tabs de modulos de colores ---------- */
+.gs-colores-nav {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, .1); padding-bottom: 8px;
+}
+.gs-tab-btn {
+  background: rgba(20, 7, 8, .6); border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 6px; color: inherit; font-family: inherit; font-size: .78em;
+  padding: 5px 10px; cursor: pointer; transition: all .15s ease;
+}
+.gs-tab-btn:hover { border-color: var(--gs-acento, #ff000d); }
+.gs-tab-btn.activo {
+  background: var(--gs-acento, #ff000d); color: #000; font-weight: bold;
+  border-color: var(--gs-acento, #ff000d); box-shadow: 0 0 10px rgba(255, 0, 13, .3);
+}
+
+/* ---------- grupos de color por modulo ---------- */
+.gs-grupo-colores {
+  margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 8px; padding: 12px 14px; background: rgba(10, 4, 5, .45);
+}
+.gs-grupo-colores.oculto { display: none !important; }
+.gs-grupo-cab {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; border-bottom: 1px solid rgba(255, 255, 255, .1);
+  padding-bottom: 6px; margin-bottom: 12px;
+}
+.gs-grupo-titulo { font-size: .88em; font-weight: 700; letter-spacing: 1px; color: var(--gs-acento, #ff000d); }
+.gs-grupo-desc { font-size: .75em; opacity: .65; }
+
+/* ---------- filas de color ---------- */
+.gs-color-fila { margin-bottom: 12px; }
+.gs-color-cab { display: flex; align-items: center; justify-content: space-between; font-size: .82em; margin-bottom: 5px; }
+.gs-color-cab .gs-hex { color: #fff; font-family: monospace; font-size: 1.05em; }
+.gs-swatches { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
+.gs-swatch {
+  width: 22px; height: 22px; border-radius: 4px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .25);
+}
+.gs-swatch.activo { outline: 2px solid #fff; outline-offset: 1px; }
+.gs-color-fila .gs-mini { display: flex; align-items: center; gap: 8px; font-size: .74em; opacity: .85; }
+
+/* ---------- vista previa ---------- */
+.gs-preview {
+  border: 1px solid rgba(255, 0, 13, .3);
+  border-radius: var(--gs-radio, 10px);
+  overflow: hidden; margin-bottom: 8px;
+  background: #070303;
+}
+.gs-preview-barra {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; font-size: .8em;
+  background: rgba(20, 7, 8, .95);
+  border-bottom: 1px solid rgba(255, 0, 13, .25);
+}
+.gs-preview-tag { margin-left: auto; border: 1px solid rgba(255, 0, 13, .4); border-radius: 4px; padding: 1px 6px; font-size: .9em; }
+.gs-preview-cuerpo { padding: 12px; }
+.gs-preview-linea { margin-bottom: 8px; }
+.gs-preview-dim { opacity: .55; margin-bottom: 10px; font-size: .9em; }
+.gs-preview-botones { display: flex; gap: 8px; }
+
+/* ---------- toast ---------- */
+.gs-toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  background: rgba(20, 7, 8, .96);
+  border: 1px solid var(--gs-acento, #ff000d);
+  border-radius: 8px; padding: 9px 16px; font-size: .85em;
+  display: none; z-index: 50; max-width: 80vw;
+}
+.gs-toast.is-error { border-color: #ff3355; color: #ffb3bd; }

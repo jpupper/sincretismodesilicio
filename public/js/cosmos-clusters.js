@@ -2,7 +2,7 @@
  * SINCRETISMO DE SILICIO // CÚMULO 3D DE NEURONAS & SINAPSIS
  * Script de inicialización y control dedicado para cosmos-clusters.html
  */
-import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js?v=3.30';
+import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js?v=3.32';
 
 let visualizer = null;
 
@@ -91,6 +91,19 @@ const GRUPOS_AJUSTES = [
     nota: 'Cu\u00e1nto se ve el fondo animado de estrellas y membranas celulares. 0% = negro puro.' },
   { tab: 'fondo', key: 'fondoVel', titulo: '2 \u00b7 VELOCIDAD DEL FONDO', sufijo: '%',
     nota: 'Qu\u00e9 tan r\u00e1pido titilan las estrellas y derivan las membranas. 0% = fondo quieto \u00b7 100% = como est\u00e1.' },
+  /* PATRON RDM DEL FONDO (port del shader rdmf): cada uniform, por separado. */
+  { tab: 'fondo', key: 'fondoRdmCnt', titulo: '3 \u00b7 PATR\u00d3N: CAPAS', sufijo: '%',
+    nota: 'Cu\u00e1ntas capas de ruido se promedian. 100% = 11 capas \u00b7 m\u00e1s capas = el patr\u00f3n m\u00e1s fino y detallado.' },
+  { tab: 'fondo', key: 'fondoRdmIteScale', titulo: '4 \u00b7 PATR\u00d3N: ESCALA POR CAPA', sufijo: '%',
+    nota: 'Cu\u00e1nto crece la escala en cada capa. M\u00e1s alto = manchas m\u00e1s chicas y apretadas.' },
+  { tab: 'fondo', key: 'fondoRdmSpeedRnd', titulo: '5 \u00b7 PATR\u00d3N: VELOCIDAD DEL RANDOM', sufijo: '%',
+    nota: 'Qu\u00e9 tan r\u00e1pido mutan las manchas por dentro. 0% = patr\u00f3n congelado (deriva s\u00f3lo con la c\u00e1mara).' },
+  { tab: 'fondo', key: 'fondoRdmSm1', titulo: '6 \u00b7 PATR\u00f3N: SMOOTH BAJO (RECORTE)', sufijo: '%',
+    nota: 'Umbral inferior del contraste. M\u00e1s alto = se recorta lo oscuro y quedan s\u00f3lo las manchas.' },
+  { tab: 'fondo', key: 'fondoRdmSm2', titulo: '7 \u00b7 PATR\u00f3N: SMOOTH ALTO (TECHO)', sufijo: '%',
+    nota: 'Umbral superior. Si est\u00e1 muy alto el fondo queda apagado: para que se vea, mantenelo por debajo de 100%.' },
+  { tab: 'fondo', key: 'fondoRdmForce', titulo: '8 \u00b7 PATR\u00f3N: BRILLO FINAL', sufijo: '%',
+    nota: 'Multiplicador de brillo del patr\u00f3n. 0% = negro.' },
 
   { tab: 'camara', key: 'camAnimVel', titulo: '1 \u00b7 VELOCIDAD DEL VIAJE AUTOM\u00c1TICO', sufijo: '%',
     nota: 'El recorrido que hace la c\u00e1mara sola entre las palabras (modo animaci\u00f3n).' },
@@ -215,12 +228,67 @@ function initPanelAjustes(viz) {
   const botonesTab = Array.prototype.slice.call(document.querySelectorAll('#pa-tabs .pa-tab'));
   function abrirTab(nombre) {
     botonesTab.forEach((b) => b.classList.toggle('activo', b.dataset.tab === nombre));
-    ['textos', 'planetas', 'fondo', 'camara'].forEach((t) => {
+    ['textos', 'planetas', 'fondo', 'camara', 'ventanas'].forEach((t) => {
       const sec = document.getElementById('pa-seccion-' + t);
       if (sec) sec.classList.toggle('activo', t === nombre);
     });
   }
   botonesTab.forEach((b) => b.addEventListener('click', () => abrirTab(b.dataset.tab)));
+
+  /* ---------- pestaña VENTANAS HUD ---------- */
+  const seccionVentanas = document.getElementById('pa-seccion-ventanas');
+  if (seccionVentanas) {
+    const ventanasConfig = [
+      { id: 'alien-nav-hud', btnCloseId: 'btn-close-alien-nav', label: 'Vectores 3D & Giroscopio' },
+      { id: 'semantic-tree-hud', btnCloseId: 'btn-close-semantic-tree', label: 'Distancia Semántica / Grafo 2D' },
+      { id: 'neural-orders-hud', btnCloseId: 'btn-close-neural-hud', label: 'Órdenes Cerebrales (Sicre2)' },
+      { id: 'cosmos-hud-telemetry', btnCloseId: 'btn-close-telemetry-hud', label: 'Telemetría Nodal 3D' }
+    ];
+
+    ventanasConfig.forEach((vc) => {
+      const el = document.getElementById(vc.id);
+      const btnClose = document.getElementById(vc.btnCloseId);
+      const grupo = document.createElement('div');
+      grupo.className = 'pa-grupo';
+      grupo.style.display = 'flex';
+      grupo.style.alignItems = 'center';
+      grupo.style.justifyContent = 'space-between';
+
+      const lbl = document.createElement('label');
+      lbl.style.display = 'flex';
+      lbl.style.alignItems = 'center';
+      lbl.style.gap = '8px';
+      lbl.style.cursor = 'pointer';
+      lbl.style.fontFamily = 'var(--font-mono)';
+      lbl.style.fontSize = '11.5px';
+      lbl.style.color = '#ff9da2';
+
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = el ? !el.classList.contains('hud-hidden') : true;
+
+      const txt = document.createElement('span');
+      txt.textContent = vc.label;
+
+      lbl.appendChild(chk);
+      lbl.appendChild(txt);
+      grupo.appendChild(lbl);
+      seccionVentanas.appendChild(grupo);
+
+      function setVisible(v) {
+        if (el) el.classList.toggle('hud-hidden', !v);
+        chk.checked = v;
+      }
+
+      chk.addEventListener('change', () => setVisible(chk.checked));
+      if (btnClose) {
+        btnClose.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setVisible(false);
+        });
+      }
+    });
+  }
 
   /* ---------- valores ---------- */
   function sincronizar() {
