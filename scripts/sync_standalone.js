@@ -11,6 +11,7 @@ fs.copyFileSync('public/cambiapalabras/style.css', 'cyber-hijack/style.css');
 fs.copyFileSync('public/cambiapalabras/script.js', 'cyber-hijack/script.js');
 fs.mkdirSync('cyber-hijack/js', { recursive: true });
 fs.copyFileSync('public/js/base-path.js', 'cyber-hijack/js/base-path.js');
+fs.copyFileSync('public/js/control-remoto.js', 'cyber-hijack/js/control-remoto.js');
 
 let html = fs.readFileSync('public/cambiapalabras.html', 'utf-8');
 

@@ -9,7 +9,7 @@
   --border-cyan: rgba(0, 240, 255, 0.4);
   --border-green: rgba(0, 255, 102, 0.5);
   --border-red: rgba(255, 0, 85, 0.6);
-  
+
   --accent-cyan: #00f0ff;
   --accent-green: #00ff66;
   --accent-neon-green: #39ff14;
@@ -41,7 +41,7 @@
 
   --font-organic: var(--gs-fuente, 'Share Tech Mono', monospace);
   --font-cyber: var(--gs-fuente, 'Share Tech Mono', monospace);
-  
+
   --glow-cyan: 0 0 5px rgba(0, 240, 255, 0.35);
   --glow-green: 0 0 6px rgba(0, 255, 102, 0.4);
   --glow-red: 0 0 7px rgba(255, 0, 85, 0.45);
@@ -75,13 +75,44 @@
   text-transform: uppercase !important;
 }
 
-html, body, button, input, select, textarea, div, p, span, h1, h2, h3, h4, h5, h6, a, label, pre, code,
-.organic-word-item, .organic-word-item *, .cctv-word, .modal-card, .modal-card *, .speech-text-output,
-.word-chip, #cctv-hud, #cctv-hud *, .speech-text, .cctv-tag, .chip-btn, .modal-tab-btn, .cctv-preview-card {
+html,
+body,
+button,
+input,
+select,
+textarea,
+div,
+p,
+span,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+a,
+label,
+pre,
+code,
+.organic-word-item,
+.organic-word-item *,
+.cctv-word,
+.modal-card,
+.modal-card *,
+.speech-text-output,
+.word-chip,
+#cctv-hud,
+#cctv-hud *,
+.speech-text,
+.cctv-tag,
+.chip-btn,
+.modal-tab-btn,
+.cctv-preview-card {
   text-transform: uppercase !important;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -224,8 +255,11 @@ html, body {
   font-size: 11px;
   display: none;
 }
+
 @media (min-width: 900px) {
-  .cctv-node-id { display: block; }
+  .cctv-node-id {
+    display: block;
+  }
 }
 
 .cctv-timestamp {
@@ -278,6 +312,7 @@ html, body {
   border-color: var(--border-red);
   color: var(--accent-red);
 }
+
 #installation-container.state-processing .state-dot {
   background: var(--accent-red);
   box-shadow: 0 0 8px var(--accent-red);
@@ -289,6 +324,7 @@ html, body {
   border-color: var(--border-green);
   color: var(--accent-green);
 }
+
 #installation-container.state-hijack .state-dot {
   background: var(--accent-green);
   box-shadow: 0 0 8px var(--accent-green);
@@ -360,8 +396,17 @@ html, body {
 }
 
 @keyframes pulseOllama {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
 }
 
 /* Ocultar el canvas original de JPShaderInclude en el DOM pero mantenerlo
@@ -421,28 +466,6 @@ html, body {
 .btn-icon-only {
   padding: 6px 10px;
 }
-
-/* ==========================================================================
-   MARCO TELEMÉTRICO Y ESQUINAS CCTV
-   ========================================================================== */
-.cctv-frame-corners {
-  position: fixed;
-  inset: 20px;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.corner {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  border: 2px solid rgba(0, 240, 255, 0.45);
-}
-
-.corner-tl { top: 0; left: 0; border-right: none; border-bottom: none; }
-.corner-tr { top: 0; right: 0; border-left: none; border-bottom: none; }
-.corner-bl { bottom: 0; left: 0; border-right: none; border-top: none; }
-.corner-br { bottom: 0; right: 0; border-left: none; border-top: none; }
 
 /* Badge de Telemetría Biometría Flotante */
 #telemetry-badge {
@@ -509,12 +532,12 @@ html, body {
   -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000;
   text-stroke: var(--word-stroke-width, 1.5px) #000000;
   paint-order: stroke fill;
-  text-shadow: 
+  text-shadow:
     -1px -1px 0 #000,
-     1px -1px 0 #000,
-    -1px  1px 0 #000,
-     1px  1px 0 #000,
-     var(--word-glow, 0 2px 10px rgba(0, 0, 0, 0.95));
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    var(--word-glow, 0 2px 10px rgba(0, 0, 0, 0.95));
   will-change: transform, opacity;
   pointer-events: auto;
   transition: color 0.2s ease, filter 0.2s ease, text-shadow 0.2s ease;
@@ -550,12 +573,33 @@ html, body {
   -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
   text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
   paint-order: stroke fill;
-  text-shadow: 
+  text-shadow:
     -1px -1px 0 #000,
-     1px -1px 0 #000,
-    -1px  1px 0 #000,
-     1px  1px 0 #000,
-     0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
+}
+
+/* CARGA CONSERVADA: cuando la palabra termina de llenarse (se engancha sola) o
+   la agarrás, mantiene el MISMO resplandor de "llenando" durante el estado
+   enganchado (word-slotted). Se limpia recién al pasar al centro. */
+.organic-word-item.word-charged {
+  -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
+}
+
+/* Micro-reacción visual ante impacto de colisión física */
+.organic-word-item.word-colliding {
+  filter: brightness(1.35) drop-shadow(0 0 10px var(--accent-1-strong, #00f0ff));
+  transition: filter 0.08s ease-out;
 }
 
 /* ==========================================================================
@@ -629,20 +673,23 @@ html, body {
   position: relative !important;
   display: inline-flex !important;
   transform: none !important;
-  margin: 3px 6px !important;
-  padding: 4px 14px !important;
-  font-size: var(--word-font-size-phrase, 62px) !important;
+  margin: 0 0.16em !important;
+  padding: 0.08em 0.28em !important;
+  font-size: var(--word-font-size-phrase, 34px) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 800 !important;
-  letter-spacing: 1.5px !important;
+  letter-spacing: 1.2px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
   border: none !important;
   background: transparent !important;
-  box-shadow: none !important;   /* sin halo rectangular: la palabra es texto limpio */
+  box-shadow: none !important;
+  /* sin halo rectangular: la palabra es texto limpio */
   pointer-events: none !important;
   -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
   text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
   paint-order: stroke fill;
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.5s ease, margin 0.5s cubic-bezier(0.16, 1, 0.3, 1), padding 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.4s ease !important;
 }
 
 /* Estado 5: Palabras Auxiliares de la Frase */
@@ -650,34 +697,47 @@ html, body {
   position: relative !important;
   display: inline-flex !important;
   transform: none !important;
-  margin: 3px 4px !important;
-  padding: 4px 10px !important;
-  font-size: calc(var(--word-font-size-phrase, 62px) * 0.86) !important;
+  margin: 0 0.12em !important;
+  padding: 0.08em 0.20em !important;
+  font-size: calc(var(--word-font-size-phrase, 34px) * 0.92) !important;
   font-family: var(--font-cyber) !important;
-  font-weight: 500 !important;
-  letter-spacing: 1px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.8px !important;
   color: #ffffff !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
   -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
   text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
   paint-order: stroke fill;
-  text-shadow: 
+  text-shadow:
     -1px -1px 0 #000,
-     1px -1px 0 #000,
-    -1px  1px 0 #000,
-     1px  1px 0 #000,
-     0 2px 10px rgba(0, 0, 0, 0.95), 0 0 14px var(--accent-1-mid) !important;
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 2px 10px rgba(0, 0, 0, 0.95), 0 0 14px var(--accent-1-mid) !important;
   opacity: 0;
   animation: auxGlitchIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   pointer-events: none !important;
 }
 
 @keyframes auxGlitchIn {
-  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
-  60% { opacity: 1; transform: translateY(-2px) scale(1.04); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.04);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* SISTEMA UNIFICADO: cuando el slot está ocupado, el texto propio se oculta y
@@ -689,30 +749,51 @@ html, body {
   visibility: hidden !important;
 }
 
-/* Contenedor flexible para frase compuesta */
+/* Contenedor vertical para los 3 versos del Haiku: NUNCA se rompen ni se desbordan */
 .phrase-flow-container {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px 4px;
-  line-height: 1.8;
-  width: 100%;
-  text-align: center;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px 0 !important;
+  line-height: 1.35 !important;
+  width: 100% !important;
+  max-width: 1440px !important;
+  text-align: center !important;
+  pointer-events: none !important;
+}
+
+/* Cada uno de los 3 versos es una fila horizontal continua que NUNCA se parte en dos */
+.phrase-flow-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 4px 0 !important;
+  overflow: visible !important;
 }
 
 /* ==========================================================================
-   CURSOR TÁCTICO / RETÍCULO DE FIJACIÓN
+   CURSOR TÁCTICO / RETÍCULO DE FIJACIÓN (ESTILO MIRA STEAMPUNK)
    ========================================================================== */
 #cursor-reticle {
   position: fixed;
   top: 0;
   left: 0;
-  width: 52px;
-  height: 52px;
+  width: 58px;
+  height: 58px;
   transform: translate(-50%, -50%);
   z-index: 25;
   pointer-events: none;
+  /* Fondo negro óptico de mira / lente steampunk */
+  background: radial-gradient(circle, rgba(12, 9, 6, 0.94) 0%, rgba(18, 14, 9, 0.96) 65%, rgba(4, 3, 2, 0.99) 92%, #000 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 16px rgba(0, 0, 0, 0.95), inset 0 0 10px rgba(0, 0, 0, 0.9);
   transition: width 0.2s ease, height 0.2s ease, opacity 0.3s ease;
 }
 
@@ -722,11 +803,11 @@ html, body {
 
 .reticle-ring {
   position: absolute;
-  inset: 0;
-  border: 1.5px dashed var(--accent-cyan);
-  border-radius: 0;
-  animation: rotateClockwise 8s linear infinite;
-  box-shadow: 0 0 10px var(--accent-1-mid);
+  inset: 2px;
+  border: 2px solid #c28b3a;
+  border-radius: 50%;
+  animation: rotateClockwise 12s linear infinite;
+  box-shadow: inset 0 0 8px rgba(194, 139, 58, 0.3), 0 0 10px rgba(194, 139, 58, 0.4);
 }
 
 .reticle-core {
@@ -736,58 +817,65 @@ html, body {
   width: 6px;
   height: 6px;
   transform: translate(-50%, -50%);
-  background-color: var(--accent-cyan);
-  border-radius: 0;
-  box-shadow: 0 0 8px var(--accent-cyan);
+  background-color: #dfa857;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #dfa857;
 }
 
 .reticle-crosshair {
   position: absolute;
-  background: var(--accent-cyan);
+  background: #c28b3a;
 }
 
 .reticle-crosshair.ch-x {
   top: 50%;
-  left: -8px;
-  right: -8px;
+  left: 2px;
+  right: 2px;
   height: 1px;
   transform: translateY(-50%);
 }
 
 .reticle-crosshair.ch-y {
   left: 50%;
-  top: -8px;
-  bottom: -8px;
+  top: 2px;
+  bottom: 2px;
   width: 1px;
   transform: translateX(-50%);
 }
 
 .reticle-label {
   position: absolute;
-  top: 56px;
+  top: 62px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 9px;
-  color: var(--accent-cyan);
-  background: var(--bg-panel-deep);
+  font-size: 8.5px;
+  letter-spacing: 0.8px;
+  color: #dfa857;
+  background: rgba(14, 10, 6, 0.94);
   padding: 1px 6px;
-  border: 1px solid var(--border-cyan);
+  border: 1px solid #c28b3a;
+  border-radius: 2px;
   white-space: nowrap;
 }
 
 #cursor-reticle.locking .reticle-ring {
-  border-style: solid;
-  border-color: var(--accent-amber);
-  box-shadow: 0 0 18px var(--accent-amber);
-  animation-duration: 2s;
+  border-color: #ff5722;
+  box-shadow: inset 0 0 12px rgba(255, 87, 34, 0.45), 0 0 20px rgba(255, 87, 34, 0.6);
+  animation-duration: 2.5s;
 }
+
 #cursor-reticle.locking .reticle-core {
-  background-color: var(--accent-amber);
-  box-shadow: 0 0 12px var(--accent-amber);
+  background-color: #ff3b30;
+  box-shadow: 0 0 12px #ff3b30;
 }
+
+#cursor-reticle.locking .reticle-crosshair {
+  background: #ff5722;
+}
+
 #cursor-reticle.locking .reticle-label {
-  color: var(--accent-amber);
-  border-color: var(--accent-amber);
+  color: #ff9800;
+  border-color: #ff5722;
 }
 
 /* ==========================================================================
@@ -812,8 +900,7 @@ html, body {
   pointer-events: none;
 }
 
-  color: var(--text-muted);
-}
+
 
 .slots-container {
   display: flex;
@@ -998,6 +1085,7 @@ html, body {
     box-shadow: 0 0 20px rgba(255, 0, 85, 0.35), inset 0 0 10px rgba(255, 0, 85, 0.15);
     border-color: rgba(255, 0, 85, 0.6);
   }
+
   100% {
     box-shadow: 0 0 50px rgba(255, 0, 85, 0.8), inset 0 0 24px rgba(255, 0, 85, 0.4);
     border-color: #ff0055;
@@ -1005,11 +1093,25 @@ html, body {
 }
 
 @keyframes glitchTextMini {
-  0% { transform: translate(0, 0); }
-  25% { transform: translate(-1.5px, 0.5px); }
-  50% { transform: translate(1px, -0.5px); }
-  75% { transform: translate(-0.5px, -1px); }
-  100% { transform: translate(0, 0); }
+  0% {
+    transform: translate(0, 0);
+  }
+
+  25% {
+    transform: translate(-1.5px, 0.5px);
+  }
+
+  50% {
+    transform: translate(1px, -0.5px);
+  }
+
+  75% {
+    transform: translate(-0.5px, -1px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
 }
 
 /* Contenedor de las 3 palabras centrales en grande */
@@ -1122,18 +1224,17 @@ html, body {
   margin: 0 auto !important;
 }
 
-/* Discurso Final de la IA (Caja inferior con frase inspiracional) */
+/* Discurso Final de la IA (Caja con los 3 versos del Haiku sobre el shader maestro) */
 .final-speech-box {
   position: relative;
   z-index: 2;
-  width: 100%;
-  max-width: 960px;
-  /* Contenedor de la frase ELIMINADO visualmente: sólo anclaje de layout, el
-     texto flota directo sobre el shader maestro. */
+  width: 92vw;
+  max-width: 1440px;
+  /* Contenedor de la frase: anclaje de layout centrado que no restringe los 3 versos */
   background: transparent;
   border: none;
   box-shadow: none;
-  padding: 24px 36px;
+  padding: 12px 20px;
   border-radius: 0;
   display: flex;
   flex-direction: column;
@@ -1192,7 +1293,8 @@ html, body {
   justify-content: center;
   padding: 20px;
   opacity: 1;
-  pointer-events: none; /* Permite clicks a través del fondo */
+  pointer-events: none;
+  /* Permite clicks a través del fondo */
   transition: opacity 0.3s ease;
 }
 
@@ -1209,7 +1311,8 @@ html, body {
 }
 
 .modal-card {
-  pointer-events: auto; /* Solo la tarjeta captura clicks */
+  pointer-events: auto;
+  /* Solo la tarjeta captura clicks */
   position: relative;
   width: 100%;
   max-width: 1560px;
@@ -1232,7 +1335,8 @@ html, body {
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  cursor: grab; /* Permite arrastrar la ventana */
+  cursor: grab;
+  /* Permite arrastrar la ventana */
   user-select: none;
 }
 
@@ -1352,8 +1456,15 @@ html, body {
 }
 
 @keyframes tabPaneFade {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* System Prompt Header con botón Expandir / Reducir */
@@ -1593,37 +1704,79 @@ textarea:focus {
    ANIMACIONES & KEYFRAMES
    ========================================================================== */
 @keyframes pulseDot {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.85); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.3;
+    transform: scale(0.85);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes rotateClockwise {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes slotSnapIn {
-  0% { transform: scale(0.85); opacity: 0.5; }
-  60% { transform: scale(1.05); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.85);
+    opacity: 0.5;
+  }
+
+  60% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes textBlinkRed {
-  0% { opacity: 1; }
-  100% { opacity: 0.45; }
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.45;
+  }
 }
 
 @keyframes blinkBlock {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes videoGlitchFlicker {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scaleX(-1);
     filter: brightness(100%) contrast(100%);
   }
+
   50% {
     transform: scaleX(-1);
     filter: brightness(112%) contrast(108%);
@@ -1631,31 +1784,79 @@ textarea:focus {
 }
 
 @keyframes glitchSlice1 {
-  0% { clip-path: inset(40% 0 61% 0); }
-  20% { clip-path: inset(92% 0 1% 0); }
-  40% { clip-path: inset(10% 0 85% 0); }
-  60% { clip-path: inset(58% 0 33% 0); }
-  80% { clip-path: inset(25% 0 58% 0); }
-  100% { clip-path: inset(70% 0 20% 0); }
+  0% {
+    clip-path: inset(40% 0 61% 0);
+  }
+
+  20% {
+    clip-path: inset(92% 0 1% 0);
+  }
+
+  40% {
+    clip-path: inset(10% 0 85% 0);
+  }
+
+  60% {
+    clip-path: inset(58% 0 33% 0);
+  }
+
+  80% {
+    clip-path: inset(25% 0 58% 0);
+  }
+
+  100% {
+    clip-path: inset(70% 0 20% 0);
+  }
 }
 
 @keyframes glitchSlice2 {
-  0% { clip-path: inset(25% 0 58% 0); }
-  20% { clip-path: inset(70% 0 20% 0); }
-  40% { clip-path: inset(40% 0 61% 0); }
-  60% { clip-path: inset(92% 0 1% 0); }
-  80% { clip-path: inset(10% 0 85% 0); }
-  100% { clip-path: inset(58% 0 33% 0); }
+  0% {
+    clip-path: inset(25% 0 58% 0);
+  }
+
+  20% {
+    clip-path: inset(70% 0 20% 0);
+  }
+
+  40% {
+    clip-path: inset(40% 0 61% 0);
+  }
+
+  60% {
+    clip-path: inset(92% 0 1% 0);
+  }
+
+  80% {
+    clip-path: inset(10% 0 85% 0);
+  }
+
+  100% {
+    clip-path: inset(58% 0 33% 0);
+  }
 }
 
 @keyframes modalEnter {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes toastIn {
-  from { opacity: 0; transform: translateX(30px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* ==========================================================================
@@ -1668,7 +1869,8 @@ textarea:focus {
   height: 100vh;
   object-fit: cover;
   z-index: 1;
-  transform: scaleX(-1); /* Espejado horizontal para coincidir con la cámara */
+  transform: scaleX(-1);
+  /* Espejado horizontal para coincidir con la cámara */
   pointer-events: none;
   display: none;
 }
@@ -1696,6 +1898,7 @@ textarea:focus {
 html.master-output-active #master-output-canvas {
   z-index: 4;
 }
+
 /* MODO SOLO MASTER OUTPUT (tecla Y / ?solo=1): se oculta todo menos el canvas
    del shader de salida; el fondo va a negro puro para que no se cuele nada. */
 html.solo-master {
@@ -1725,11 +1928,13 @@ html.master-output-active #flowfield-overlay-canvas {
   cursor: pointer;
   transition: all .15s ease;
 }
+
 .pa-cp-btn-test:hover {
   background: rgba(255, 0, 13, 0.25) !important;
   border-color: #ff000d !important;
   box-shadow: 0 0 10px rgba(255, 0, 13, 0.4);
 }
+
 .pa-cp-btn-test.active {
   background: #ff000d !important;
   color: #000 !important;
@@ -1806,13 +2011,25 @@ html.master-output-active #flowfield-overlay-canvas {
 }
 
 @keyframes vhsTrackingRoll {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100%);
+  }
 }
 
 @keyframes vhsNoiseFlicker {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 0.85; }
+
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 0.85;
+  }
 }
 
 /* Lluvia de partículas corporativas en pantalla final */
@@ -1955,7 +2172,7 @@ input[type="color"]:hover {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.palette-swatches > span {
+.palette-swatches>span {
   display: block;
   width: 16px;
   height: 26px;
@@ -2006,7 +2223,7 @@ input[type="color"]:hover {
   background: rgba(3, 7, 13, 0.4);
 }
 
-.color-advanced > summary {
+.color-advanced>summary {
   cursor: pointer;
   padding: 10px 12px;
   font-family: var(--font-cyber);
@@ -2017,15 +2234,15 @@ input[type="color"]:hover {
   user-select: none;
 }
 
-.color-advanced > summary::-webkit-details-marker {
+.color-advanced>summary::-webkit-details-marker {
   display: none;
 }
 
-.color-advanced > summary:hover {
+.color-advanced>summary:hover {
   color: var(--accent-cyan);
 }
 
-.color-advanced[open] > summary {
+.color-advanced[open]>summary {
   color: var(--accent-cyan);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -2108,7 +2325,7 @@ input[type="color"]:hover {
   cursor: ew-resize;
   touch-action: none;
   background: linear-gradient(to right,
-    #f00 0%, #ff0 16.6%, #0f0 33.3%, #0ff 50%, #00f 66.6%, #f0f 83.3%, #f00 100%);
+      #f00 0%, #ff0 16.6%, #0f0 33.3%, #0ff 50%, #00f 66.6%, #f0f 83.3%, #f00 100%);
 }
 
 .wcp-hue-cursor {
@@ -2391,6 +2608,7 @@ input[type="color"]:hover {
   border-color: rgba(0, 240, 255, 0.4);
   color: var(--accent-cyan);
 }
+
 .btn-add-words:hover {
   background: var(--bg-accent-strong);
   box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
@@ -2401,6 +2619,7 @@ input[type="color"]:hover {
   border-color: rgba(255, 170, 0, 0.4);
   color: #ffaa00;
 }
+
 .btn-replace-words:hover {
   background: rgba(255, 170, 0, 0.3);
   box-shadow: 0 0 12px rgba(255, 170, 0, 0.3);
@@ -2411,6 +2630,7 @@ input[type="color"]:hover {
   border-color: rgba(148, 163, 184, 0.3);
   color: var(--text-muted);
 }
+
 .btn-default-words:hover {
   background: rgba(148, 163, 184, 0.25);
   color: #fff;
@@ -2507,6 +2727,18 @@ input[type="color"]:hover {
   width: 230px;
 }
 
+.pip-top-right {
+  top: 65px;
+  right: 24px;
+  width: 220px;
+}
+
+.pip-bottom-left {
+  bottom: 80px;
+  left: 28px;
+  width: 220px;
+}
+
 .pip-header {
   display: flex;
   align-items: center;
@@ -2586,7 +2818,7 @@ input[type="color"]:hover {
   width: 100%;
   height: auto;
   display: block;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 .pip-scanline {
@@ -2625,10 +2857,29 @@ input[type="color"]:hover {
   border-style: solid;
 }
 
-.fc-tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
-.fc-tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
-.fc-bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
-.fc-br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+.fc-tl {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+}
+
+.fc-tr {
+  top: 0;
+  right: 0;
+  border-width: 2px 2px 0 0;
+}
+
+.fc-bl {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 2px 2px;
+}
+
+.fc-br {
+  bottom: 0;
+  right: 0;
+  border-width: 0 2px 2px 0;
+}
 
 .face-biometric-reticle {
   position: absolute;
@@ -2736,19 +2987,62 @@ input[type="color"]:hover {
   border-radius: 0;
 }
 
-input:checked + .slider-round {
+input:checked+.slider-round {
   background-color: rgba(0, 240, 255, 0.25);
   border-color: var(--accent-cyan);
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
 }
 
-input:checked + .slider-round:before {
+input:checked+.slider-round:before {
   transform: translateX(20px);
   background-color: var(--accent-cyan);
   box-shadow: 0 0 8px var(--accent-cyan);
 }
 
 /* Grid de Calibración */
+/* Selector de puntos que capturan palabras (pestaña TRACKING) */
+.collision-points {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 240, 255, 0.18);
+  background: rgba(0, 240, 255, 0.04);
+}
+
+.collision-points-title {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--accent-cyan);
+  margin-bottom: 7px;
+}
+
+.collision-points-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 5px 12px;
+}
+
+.cb-point {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cb-point input[type="checkbox"] {
+  accent-color: var(--accent-cyan);
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+}
+
+.cb-point input[type="checkbox"]:checked+span {
+  color: var(--text-main);
+}
+
 .calibration-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -3093,13 +3387,15 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 3px 6px;
-  padding: 4px 14px;
+  margin: 0 0.16em;
+  padding: 0.08em 0.28em;
   font-family: var(--font-cyber);
   font-weight: 800;
-  letter-spacing: 1.5px;
+  letter-spacing: 1.2px;
   /* Debe medir EXACTAMENTE igual que la palabra real que va a ocupar el hueco */
-  font-size: var(--word-font-size-phrase, 62px);
+  font-size: var(--word-font-size-phrase, 34px);
+  white-space: nowrap;
+  flex-shrink: 0;
   visibility: hidden;
   pointer-events: none;
 }
@@ -3130,7 +3426,12 @@ textarea {
   transform: translateY(0);
   transition: opacity .6s ease, transform .6s cubic-bezier(.16, 1, .3, 1);
 }
-.idle-cta.hidden { opacity: 0; transform: translateY(18px); }
+
+.idle-cta.hidden {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
 .idle-cta-frame {
   max-width: min(820px, 88vw);
   padding: 16px 34px 14px;
@@ -3142,6 +3443,7 @@ textarea {
   /* COBRE + GLOW: el marco y el resplandor salen del acento de la paleta. */
   box-shadow: 0 0 30px var(--accent-1-mid), 0 0 70px var(--accent-1-soft), inset 0 0 26px rgba(0, 0, 0, .5);
 }
+
 .idle-cta-kicker {
   font-family: var(--font-cyber);
   font-size: 10.5px;
@@ -3150,6 +3452,7 @@ textarea {
   text-shadow: 0 0 10px var(--accent-1-mid);
   text-transform: uppercase;
 }
+
 .idle-cta-title {
   margin-top: 7px;
   font-family: var(--font-cyber);
@@ -3159,6 +3462,7 @@ textarea {
   color: var(--text-main);
   animation: idleCtaPulse 2.8s ease-in-out infinite;
 }
+
 .idle-cta-sub {
   margin-top: 8px;
   font-family: var(--font-organic);
@@ -3167,20 +3471,56 @@ textarea {
   color: var(--text-muted);
   letter-spacing: .03em;
 }
-.idle-cta-dots { display: flex; gap: 6px; justify-content: center; margin-top: 11px; }
+
+.idle-cta-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 11px;
+}
+
 .idle-cta-dots span {
-  width: 6px; height: 6px; border-radius: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   background: var(--accent-1-strong);
   opacity: .22;
   animation: idleCtaDot 1.6s infinite;
 }
-.idle-cta-dots span:nth-child(2) { animation-delay: .22s; }
-.idle-cta-dots span:nth-child(3) { animation-delay: .44s; }
-@keyframes idleCtaPulse {
-  0%, 100% { opacity: .9; text-shadow: 0 0 8px var(--accent-1-soft); }
-  50%      { opacity: 1;  text-shadow: 0 0 20px var(--accent-1-mid); }
+
+.idle-cta-dots span:nth-child(2) {
+  animation-delay: .22s;
 }
-@keyframes idleCtaDot { 0%, 100% { opacity: .18; } 50% { opacity: .95; } }
+
+.idle-cta-dots span:nth-child(3) {
+  animation-delay: .44s;
+}
+
+@keyframes idleCtaPulse {
+
+  0%,
+  100% {
+    opacity: .9;
+    text-shadow: 0 0 8px var(--accent-1-soft);
+  }
+
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 20px var(--accent-1-mid);
+  }
+}
+
+@keyframes idleCtaDot {
+
+  0%,
+  100% {
+    opacity: .18;
+  }
+
+  50% {
+    opacity: .95;
+  }
+}
 
 /* ---------------------------------------------------------------------------
    TINTE DE PALETA DE LOS MONITORES PiP (depth map + biometría facial)

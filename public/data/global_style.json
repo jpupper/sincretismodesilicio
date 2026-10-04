@@ -21,7 +21,9 @@
     "cambiaFondo": "#0c0705",
     "cambiaHud": "#1b0f0a",
     "cambiaAcento": "#d46238",
-    "cambiaPalabra": "#dca876"
+    "cambiaPalabra": "#dca876",
+    "puntero": "#d46238",
+    "punteroFijo": "#dca876"
   },
   "contenedores": {
     "radio": 10,
@@ -31,6 +33,6 @@
     "opacidadPanel": 0.85,
     "sombra": 18
   },
-  "guardado": 1791084446741,
+  "guardado": 1791145483265,
   "escala": 1.28
 }

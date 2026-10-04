@@ -27,6 +27,7 @@ uniform vec2 u_wordPositions[MAX_WORDS];
 // Ancho REAL de cada palabra en UV x (px/ancho de pantalla). 0 = sin dato:
 // en ese caso el marco usa el ancho fijo de WORD_BOX_X.
 uniform float u_wordWidths[MAX_WORDS];
+uniform float u_wordDwell[MAX_WORDS];
 uniform int u_wordCount;
 
 uniform sampler2D renderJPSHADER;
@@ -82,6 +83,16 @@ uniform vec3  u_palA;          // acento primario   (borde / acento)
 uniform vec3  u_palB;          // acento secundario (acento2)
 uniform float u_palModo;       // 1 = seguir la paleta global
 uniform float u_camPal;        // 0..1 cuánto se tiñe la cámara con la paleta
+// SILUETA (reemplazo de la cámara de color): la máscara de profundidad pintada con el
+// patrón RDM de la paleta y un borde blanco. u_camVis = 1 vuelve a la cámara original.
+uniform float u_camVis;        // 0..1 MEZCLA: 0 = depth+RDM puro · 1 = cámara pura
+uniform float u_silRdm;        // 0..1 pinta la silueta con el patrón RDM
+uniform float u_silEdge;       // 0..1 borde blanco de la silueta
+uniform float u_maskOn;        // 0..1 PRESENCIA de la mascarilla del cuerpo (0 = solo el esqueleto)
+uniform float u_silBlur;       // radio de BLUR del depth, en TEXELES del depth (no en px de pantalla:
+                               // el depth viene de 240x160 y se estira ~6,6x, asi que el blur tiene
+                               // que medirse en texeles o no alcanza a tapar el pixelado)
+uniform vec2  u_depthTexel;     // 1.0 / tamaño real del canvas de depth
 #define pi 3.14159265359
 
 // ---------------------------------------------------------------------------
@@ -91,16 +102,20 @@ uniform float u_camPal;        // 0..1 cuánto se tiñe la cámara con la paleta
 //   1.0 = cuadrado · 0.55 = 1.8x MÁS ANCHO · 0.40 = 2.5x MÁS ANCHO
 #define WORD_BOX_X        0.55
 
+// ADAPTACIÓN PANTALLA VERTICAL:
+// Comprime el alto en shader para palabras y reduce un poquito el ancho
+#define WORD_BOX_KY       1.0
+#define WORD_BOX_PAD      1.0
+
 // Tamaño del contenedor del HAIKU (media medida, en UV)
+// 0.38 media medida = 0.76 ancho total (~1460px en 1920) para que 3 versos queden cómodos en una sola línea
+// 0.22 media medida = 0.44 alto total (~475px en 1080) para dar holgura vertical sin desbordar
 #define HAIKU_BOX_W       0.25
-#define HAIKU_BOX_H       0.3
+#define HAIKU_BOX_H       0.25
 
 // VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
 // Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
 #define WORD_SPIN_SPEED   0.032
-
-// Margen del marco alrededor del ancho real de la palabra (1.0 = exacto)
-#define WORD_BOX_PAD   0.9
 #define HAIKU_BG_TOP      vec3(0.0, 0.0, 0.0)
 #define HAIKU_BG_BOT      vec3(0.0, 0.0, 0.0)
 #define HAIKU_LINE_COL    vec3(1.0, 1.0, 0.1)
@@ -247,15 +262,40 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
 
         // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
         // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
-        float wAncho = u_wordWidths[i] * WORD_BOX_PAD*.5;
+        float wAncho = u_wordWidths[i] * WORD_BOX_PAD * 0.5;
         float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
-        // uv_m = uv con el eje X comprimido alrededor de la palabra
-        vec2 uv_m = wPos + (uv - wPos) * vec2(kx, 1.0);
+        float ky = WORD_BOX_KY;
+        // uv_m = uv con ejes adaptados para pantalla vertical (alto reducido)
+        vec2 uv_m = wPos + (uv - wPos) * vec2(kx, ky);
 
         float rot = animPulse * sin(t + float(i));
         float full = poly(uv_m, wPos, s, s + d, 4, rot);
         float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
         float border = max(0.0, full - inner);
+
+        // REQUERIMIENTO 6: Relleno animado en el shader cuando se toca la palabra (dwell)
+        // Animación como si se estuviera prendiendo (ignición incandescente / plasma)
+        float dwell = (i < MAX_WORDS) ? u_wordDwell[i] : 0.0;
+        if (dwell > 0.001 && full > 0.01) {
+            float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
+            // Coordenada horizontal normalizada dentro del contenedor
+            float normX = clamp((uv.x - (wPos.x - effAncho)) / (2.0 * effAncho), 0.0, 1.0);
+            
+            // Frente de carga que se va llenando
+            float fillProgress = smoothstep(0.0, 0.02, dwell - normX);
+            // Filamento / chispa brillante en el frente activo de llenado
+            float sparkLine = exp(-abs(normX - dwell) * 45.0) * (1.3 + 0.6 * sin(uv.y * 140.0 + u_time * 30.0));
+            // Chisporroteo / calor de ignición
+            float sizzle = 0.8 + 0.25 * sin(uv.x * 90.0 + u_time * 28.0) * cos(uv.y * 90.0 - u_time * 22.0);
+            
+            // Color que se prende: cobre fundido a núcleo blanco-ámbar incandescente
+            vec3 igniteCol = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.92, 0.55), normX);
+            if (u_palModo > 0.5) igniteCol = mix(u_palA * 1.3, u_palB * 1.8, normX);
+            
+            float igniteIntensity = (fillProgress * 0.70 * sizzle + sparkLine * 1.6) * full;
+            wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
+            border *= (1.0 + dwell * 0.9);
+        }
 
         wordsEffect.rgb += vec3(border);
         wordsEffect.a = max(wordsEffect.a, full);
@@ -402,6 +442,17 @@ void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out floa
     vhsNoise = (rand(uv * u_time) - 0.5) * 0.15 * effectiveVHS;
 }
 
+// Función auxiliar para leer la máscara de profundidad limpia (canal alpha prioritario o luminancia)
+float getDepthMask(vec2 p) {
+    if (u_hasDepth != 1) return 0.0;
+    // REQUERIMIENTO 3: Ensanchar la silueta fullscreen para que en pantalla vertical no se vea angosta/rara
+    float sx = (u_resolution.y > u_resolution.x) ? 0.72 : 0.85;
+    vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
+    if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
+    vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
+    return (d.a > 0.001) ? d.a : max(d.r, max(d.g, d.b));
+}
+
 void main() {
     vec2 rawUv = gl_FragCoord.xy / u_resolution;
 
@@ -476,7 +527,77 @@ void main() {
 
     vec3 fin = vec3(0.0);
     fin += jpCol * words.r;
-    fin += mix(jpCol * words.r, camCol, depthCol.r);
+
+    /* ============ SILUETA DEL CUERPO: la cámara de color ya no es tan obvia ============
+       Pedido: "en vez de que se vea la máscara de COLOR, que sea solo la DEPTH pero pintada
+       con un patrón RDM" y con "el borde blanco". Donde antes aparecía la IMAGEN de la
+       cámara ahora va la máscara de profundidad rellena con el patrón RDM de la paleta
+       (cobre) + un contorno BLANCO sacado del gradiente del depth.
+       u_camVis (0 = cámara reemplazada, 1 = cámara original), u_silRdm y u_silEdge lo
+       controlan desde el panel MASTER OUTPUT SHADER. */
+    float silLum = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 1.9, 0.0, 1.0);
+    vec3  silRelleno = mix(u_palA, u_palB, 0.35) * (0.40 + 1.5 * silLum);
+    vec3  silCol = mix(camCol, silRelleno, clamp(u_silRdm, 0.0, 1.0));
+    /* MEZCLA: 0 = depth pintada con el RDM · 1 = cámara de color · en el medio, las dos
+       cosas mezcladas (pedido: "probar mezclar la depth con el patrón RDM con la cámara"). */
+    vec3  cuerpoCol = mix(silCol, camCol, clamp(u_camVis, 0.0, 1.0));
+
+    /* BLUR DEL DEPTH DE ALTA CALIDAD (17 TAPS):
+       Elimina el serruchado de píxeles y genera una silueta orgánica, etérea y suave.
+       u_silBlur = radio de difusión. */
+    float silMask = 0.0;
+    float silBorde = 0.0;
+    if (u_hasDepth == 1) {
+        float bRadius = max(u_silBlur, 0.8) * 3.2;
+        vec2 bStep = bRadius * u_depthTexel;
+
+        // Muestreo gaussiano concéntrico de 17 taps
+        float acc = getDepthMask(uv) * 0.18;
+        float wsum = 0.18;
+
+        // Anillo 1 (radio 1.0): 8 muestras
+        float w1 = 0.07;
+        acc += getDepthMask(uv + vec2( bStep.x,  0.0)) * w1;
+        acc += getDepthMask(uv + vec2(-bStep.x,  0.0)) * w1;
+        acc += getDepthMask(uv + vec2( 0.0,  bStep.y)) * w1;
+        acc += getDepthMask(uv + vec2( 0.0, -bStep.y)) * w1;
+        acc += getDepthMask(uv + vec2( bStep.x * 0.7071,  bStep.y * 0.7071)) * w1;
+        acc += getDepthMask(uv + vec2(-bStep.x * 0.7071,  bStep.y * 0.7071)) * w1;
+        acc += getDepthMask(uv + vec2( bStep.x * 0.7071, -bStep.y * 0.7071)) * w1;
+        acc += getDepthMask(uv + vec2(-bStep.x * 0.7071, -bStep.y * 0.7071)) * w1;
+        wsum += 8.0 * w1;
+
+        // Anillo 2 (radio 2.0): 8 muestras a doble distancia
+        float w2 = 0.0325;
+        vec2 bStep2 = bStep * 2.0;
+        acc += getDepthMask(uv + vec2( bStep2.x,  0.0)) * w2;
+        acc += getDepthMask(uv + vec2(-bStep2.x,  0.0)) * w2;
+        acc += getDepthMask(uv + vec2( 0.0,  bStep2.y)) * w2;
+        acc += getDepthMask(uv + vec2( 0.0, -bStep2.y)) * w2;
+        acc += getDepthMask(uv + vec2( bStep2.x * 0.7071,  bStep2.y * 0.7071)) * w2;
+        acc += getDepthMask(uv + vec2(-bStep2.x * 0.7071,  bStep2.y * 0.7071)) * w2;
+        acc += getDepthMask(uv + vec2( bStep2.x * 0.7071, -bStep2.y * 0.7071)) * w2;
+        acc += getDepthMask(uv + vec2(-bStep2.x * 0.7071, -bStep2.y * 0.7071)) * w2;
+        wsum += 8.0 * w2;
+
+        silMask = clamp(acc / wsum, 0.0, 1.0);
+
+        // BORDE SUAVE DE LA SILUETA: contorno limpio derivado de la máscara ya difuminada
+        // Cero serruchado, antialiasing perfecto
+        if (u_silEdge > 0.001) {
+            float edgeBand = smoothstep(0.12, 0.42, silMask) * (1.0 - smoothstep(0.48, 0.88, silMask));
+            silBorde = clamp(edgeBand * 2.8, 0.0, 1.0) * clamp(u_silEdge, 0.0, 1.0);
+        }
+    }
+
+    /* PRESENCIA: la mascarilla del cuerpo aparece y desaparece con el ciclo
+       random de los monitores PiP. SOLO se dibuja si u_hasDepth == 1 y maskVis > 0.001 */
+    float maskVis = clamp(u_maskOn, 0.0, 1.0);
+    if (u_hasDepth == 1 && maskVis > 0.001) {
+        float cuerpoAlpha = smoothstep(0.18, 0.72, silMask) * maskVis;
+        fin = mix(fin, cuerpoCol, cuerpoAlpha);
+        fin = mix(fin, vec3(1.0), silBorde * maskVis);
+    }
 
     // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
     //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
@@ -485,8 +606,11 @@ void main() {
     //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
     //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
     //     huesos de colores.
-    float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
-    fin += vec3(1.0) * opMask * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    if (u_hasOpenpose == 1) {
+        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
+        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
+        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    }
 
     // Capa D: Integración del contenedor del Haiku detrás de los textos
     fin = mix(fin, haikuBox.rgb, haikuBox.a);

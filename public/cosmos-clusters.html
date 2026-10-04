@@ -7,13 +7,11 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   
   <!-- Tipografías de Alta Fidelidad -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-  
   <script src="js/base-path.js?v=3.32"></script>
-  <script src="js/global-style.js?v=1.1"></script>
-  <link rel="stylesheet" href="css/cosmos-clusters.css?v=3.32" />
+  <script src="js/global-style.js?v=1.3"></script>
+  <script src="js/control-remoto.js?v=1"></script>
+  <link rel="stylesheet" href="css/cosmos-clusters.css?v=3.51" />
+  <link rel="stylesheet" href="css/fonts-local.css?v=1">
 </head>
 <body>
 
@@ -160,7 +158,7 @@
       <!-- Indicador radial alienígena de rotación de la cámara (Requerimiento 5d) -->
       <div class="alien-gyro-box">
         <div class="alien-section-header">
-          <span>GIROSCÓPIO ALIENÍGENA [XYZ]</span>
+          <span>GIROSCOPIO</span>
           <span class="alien-angle-tags" id="alien-gyro-text">P: 0° · Y: 0° · R: 0°</span>
         </div>
         <canvas class="alien-gyro-canvas" id="canvas-alien-gyro" width="340" height="150"></canvas>
@@ -237,6 +235,6 @@
 
   </main>
 
-  <script type="module" src="js/cosmos-clusters.js?v=3.32"></script>
+  <script type="module" src="js/cosmos-clusters.js?v=3.51"></script>
 </body>
 </html>

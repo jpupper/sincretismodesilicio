@@ -15,11 +15,11 @@ const sbFetch = typeof window.sbFetch === 'function' ? window.sbFetch : function
 const sbWsUrl = typeof window.sbWsUrl === 'function'
   ? window.sbWsUrl
   : function () {
-      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${proto}//${window.location.host}${SB_BASE}/ws`;
-    };
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}${SB_BASE}/ws`;
+  };
 const getOllamaUrl = typeof window.getOllamaUrl === 'function' ? window.getOllamaUrl : function () { return 'http://localhost:11434'; };
-const setOllamaUrl = typeof window.setOllamaUrl === 'function' ? window.setOllamaUrl : function () {};
+const setOllamaUrl = typeof window.setOllamaUrl === 'function' ? window.setOllamaUrl : function () { };
 const getOllamaUrls = typeof window.getOllamaUrls === 'function' ? window.getOllamaUrls : function () { return ['http://localhost:11434']; };
 
 // ============================================================================
@@ -34,67 +34,495 @@ const STATES = {
 };
 
 const DEFAULT_WORDS_POOL = [
-  "política", "izquierda", "derecha", "fascismo", "comunismo", "gobierno",
-  "estado", "democracia", "ideología", "justicia", "ley", "soberanía",
-  "república", "autoridad", "libertad", "imperio", "perro", "gato",
-  "elefante", "tigre", "león", "caballo", "lobo", "águila",
-  "ballena", "delfín", "oso", "serpiente", "halcón", "zorro",
-  "ciervo", "pantera", "existencia", "tiempo", "filosofía", "mente",
-  "alma", "verdad", "conciencia", "universo", "destino", "razón",
-  "muerte", "infinito", "ética", "esencia", "duda", "conocimiento",
-  "computadora", "robot", "código", "algoritmo", "futuro", "silicio",
-  "red", "memoria", "procesador", "sistema", "inteligencia", "interfaz",
-  "servidor", "cibernética", "datos", "enlace", "amor", "nostalgia",
-  "ternura", "tristeza", "alegría", "fragilidad", "esperanza", "miedo",
-  "anhelo", "soledad", "duelo", "calma", "pasión", "desvelo",
-  "empatía", "consuelo", "verso", "metáfora", "ritmo", "silencio",
-  "belleza", "poema", "sombra", "eco", "espejo", "misterio",
-  "ceniza", "aurora", "abismo", "origen", "creación", "armonía",
-  "bosque", "río", "montaña", "océano", "viento", "lluvia",
-  "raíz", "tierra", "semilla", "flor", "cielo", "hoja",
-  "tormenta", "desierto", "nieve", "sol", "transhumanismo", "extropianismo",
-  "singularidad", "singularitarismo", "cosmismo", "racionalismo", "altruismo", "largoterminismo",
-  "aceleracionismo", "tecnoptimismo", "tecnoutopía", "posthumanismo", "superinteligencia", "agi",
-  "existencial", "extinción", "colonización", "inmortalidad", "mejoramiento", "criónica",
-  "abundancia", "inevitable", "progreso", "disrupción", "disruptivo", "escalar",
-  "escalabilidad", "hipercrecimiento", "ecosistema", "plataforma", "foso", "efecto",
-  "exponencial", "palanca", "pivote", "unicornio", "decacornio", "viable",
-  "monetización", "tracción", "adopción", "expansión", "velocidad", "dominio",
-  "centralización", "monopolio", "dato", "modelo", "fundación", "inferencia",
-  "entrenamiento", "alineación", "mundo", "mejorar", "romper", "malvado",
-  "equis", "grindset", "hustle", "moonshot", "frontera", "misión",
-  "global", "descentralización", "visión", "revolución", "tecnócrata", "tecnomagnate",
-  "magnate", "oligarca", "gurú", "visionario", "fundador", "inversor",
-  "capital", "mecenas", "emporio", "tirano", "neolengua", "viejalengua",
-  "doblepensar", "bipensar", "ideadelito", "crimen", "policía", "negroblanco",
-  "pato", "despersonalizado", "agujero", "telepantalla", "ministerio", "hermano",
-  "bueno", "doble", "ingsoc", "cinco", "orwelliano", "ortodoxia",
-  "heterodoxia", "banear", "suspensión", "desmonetizar", "despriorizar", "marcado",
-  "sensible", "directrices", "odio", "desinformación", "bulo", "deepfake",
-  "verificación", "filtro", "bloqueo", "restricción", "reporte", "apelación",
-  "moderador", "bot", "desvivir", "morir", "seggs", "panini",
-  "pandemia", "maquillaje", "contabilidad", "maíz", "uva", "bean",
-  "algospeak", "autocensura", "eufemismo", "clave", "disfraz", "camuflaje",
-  "voldemorting", "captura", "netspeak", "índice", "prohibido", "excomunión",
-  "quema", "herejía", "blasfemia", "tabú", "veto", "prohibida",
-  "cortafuegos", "sensibilidad", "control", "exclusión", "censurar", "tachar",
-  "borrar", "silenciar", "clausurar", "prohibición", "cibersoberanía", "autonomía",
-  "autarquía", "dependencia", "resiliencia", "infraestructura", "jurisdicción", "regulación",
-  "gobernanza", "cumplimiento", "marco", "normativa", "responsable", "confiable",
-  "humanismo", "enfoque", "riesgo", "algorítmico", "auditoría", "caja",
-  "opacidad", "transparencia", "explicabilidad", "sesgo", "discriminación", "rendición",
-  "supervisión", "conformidad", "aceptable", "alto", "inaceptable", "transformación",
-  "digitalización", "modernización", "innovación", "competitividad", "eficiencia", "productividad",
-  "economía", "sociedad", "industria", "sostenible", "inclusión", "brecha",
-  "ciudadanía", "abierto", "agenda", "talento", "liderazgo", "usuario",
-  "ciudadano", "contribuyente", "beneficiario", "perfil", "identidad", "expediente",
-  "trámite", "pasaporte", "biometría", "padrón", "registro", "puntuación",
-  "score", "crédito", "legajo", "formulario"
+  "política",
+  "izquierda",
+  "derecha",
+  "fascismo",
+  "comunismo",
+  "gobierno",
+  "estado",
+  "democracia",
+  "ideología",
+  "justicia",
+  "ley",
+  "soberanía",
+  "república",
+  "autoridad",
+  "libertad",
+  "imperio",
+  "perro",
+  "gato",
+  "elefante",
+  "tigre",
+  "león",
+  "caballo",
+  "lobo",
+  "águila",
+  "ballena",
+  "delfín",
+  "oso",
+  "serpiente",
+  "halcón",
+  "zorro",
+  "ciervo",
+  "pantera",
+  "existencia",
+  "tiempo",
+  "filosofía",
+  "mente",
+  "alma",
+  "verdad",
+  "conciencia",
+  "universo",
+  "destino",
+  "razón",
+  "muerte",
+  "infinito",
+  "ética",
+  "esencia",
+  "duda",
+  "conocimiento",
+  "computadora",
+  "robot",
+  "código",
+  "algoritmo",
+  "futuro",
+  "silicio",
+  "red",
+  "memoria",
+  "procesador",
+  "sistema",
+  "inteligencia",
+  "interfaz",
+  "servidor",
+  "cibernética",
+  "datos",
+  "enlace",
+  "amor",
+  "nostalgia",
+  "ternura",
+  "tristeza",
+  "alegría",
+  "fragilidad",
+  "esperanza",
+  "miedo",
+  "anhelo",
+  "soledad",
+  "duelo",
+  "calma",
+  "pasión",
+  "desvelo",
+  "empatía",
+  "consuelo",
+  "verso",
+  "metáfora",
+  "ritmo",
+  "silencio",
+  "belleza",
+  "poema",
+  "sombra",
+  "eco",
+  "espejo",
+  "misterio",
+  "ceniza",
+  "aurora",
+  "abismo",
+  "origen",
+  "creación",
+  "armonía",
+  "bosque",
+  "río",
+  "montaña",
+  "océano",
+  "viento",
+  "lluvia",
+  "raíz",
+  "tierra",
+  "semilla",
+  "flor",
+  "cielo",
+  "hoja",
+  "tormenta",
+  "desierto",
+  "nieve",
+  "sol",
+  "transhumanismo",
+  "extropianismo",
+  "singularidad",
+  "singularitarismo",
+  "cosmismo",
+  "racionalismo",
+  "altruismo",
+  "largoterminismo",
+  "aceleracionismo",
+  "tecnoptimismo",
+  "tecnoutopía",
+  "posthumanismo",
+  "superinteligencia",
+  "agi",
+  "existencial",
+  "extinción",
+  "colonización",
+  "inmortalidad",
+  "mejoramiento",
+  "criónica",
+  "abundancia",
+  "inevitable",
+  "progreso",
+  "disrupción",
+  "disruptivo",
+  "escalar",
+  "escalabilidad",
+  "hipercrecimiento",
+  "ecosistema",
+  "plataforma",
+  "foso",
+  "efecto",
+  "exponencial",
+  "palanca",
+  "pivote",
+  "unicornio",
+  "decacornio",
+  "viable",
+  "monetización",
+  "tracción",
+  "adopción",
+  "expansión",
+  "velocidad",
+  "dominio",
+  "centralización",
+  "monopolio",
+  "dato",
+  "modelo",
+  "fundación",
+  "inferencia",
+  "entrenamiento",
+  "alineación",
+  "mundo",
+  "mejorar",
+  "romper",
+  "malvado",
+  "equis",
+  "grindset",
+  "hustle",
+  "moonshot",
+  "frontera",
+  "misión",
+  "global",
+  "descentralización",
+  "visión",
+  "revolución",
+  "tecnócrata",
+  "tecnomagnate",
+  "magnate",
+  "oligarca",
+  "gurú",
+  "visionario",
+  "fundador",
+  "inversor",
+  "capital",
+  "mecenas",
+  "emporio",
+  "tirano",
+  "neolengua",
+  "viejalengua",
+  "doblepensar",
+  "bipensar",
+  "ideadelito",
+  "crimen",
+  "policía",
+  "negroblanco",
+  "pato",
+  "despersonalizado",
+  "agujero",
+  "telepantalla",
+  "ministerio",
+  "hermano",
+  "bueno",
+  "doble",
+  "ingsoc",
+  "cinco",
+  "orwelliano",
+  "ortodoxia",
+  "heterodoxia",
+  "banear",
+  "suspensión",
+  "desmonetizar",
+  "despriorizar",
+  "marcado",
+  "sensible",
+  "directrices",
+  "odio",
+  "desinformación",
+  "bulo",
+  "deepfake",
+  "verificación",
+  "filtro",
+  "bloqueo",
+  "restricción",
+  "reporte",
+  "apelación",
+  "moderador",
+  "bot",
+  "desvivir",
+  "morir",
+  "seggs",
+  "panini",
+  "pandemia",
+  "maquillaje",
+  "contabilidad",
+  "maíz",
+  "uva",
+  "bean",
+  "algospeak",
+  "autocensura",
+  "eufemismo",
+  "clave",
+  "disfraz",
+  "camuflaje",
+  "voldemorting",
+  "captura",
+  "netspeak",
+  "índice",
+  "prohibido",
+  "excomunión",
+  "quema",
+  "herejía",
+  "blasfemia",
+  "tabú",
+  "veto",
+  "prohibida",
+  "cortafuegos",
+  "sensibilidad",
+  "control",
+  "exclusión",
+  "censurar",
+  "tachar",
+  "borrar",
+  "silenciar",
+  "clausurar",
+  "prohibición",
+  "cibersoberanía",
+  "autonomía",
+  "autarquía",
+  "dependencia",
+  "resiliencia",
+  "infraestructura",
+  "jurisdicción",
+  "regulación",
+  "gobernanza",
+  "cumplimiento",
+  "marco",
+  "normativa",
+  "responsable",
+  "confiable",
+  "humanismo",
+  "enfoque",
+  "riesgo",
+  "algorítmico",
+  "auditoría",
+  "caja",
+  "opacidad",
+  "transparencia",
+  "explicabilidad",
+  "sesgo",
+  "discriminación",
+  "rendición",
+  "supervisión",
+  "conformidad",
+  "aceptable",
+  "alto",
+  "inaceptable",
+  "transformación",
+  "digitalización",
+  "modernización",
+  "innovación",
+  "competitividad",
+  "eficiencia",
+  "productividad",
+  "economía",
+  "sociedad",
+  "industria",
+  "sostenible",
+  "inclusión",
+  "brecha",
+  "ciudadanía",
+  "abierto",
+  "agenda",
+  "talento",
+  "liderazgo",
+  "usuario",
+  "ciudadano",
+  "contribuyente",
+  "beneficiario",
+  "perfil",
+  "identidad",
+  "expediente",
+  "trámite",
+  "pasaporte",
+  "biometría",
+  "padrón",
+  "registro",
+  "puntuación",
+  "score",
+  "crédito",
+  "legajo",
+  "formulario",
+  "Anónimo",
+  "Ciberperson",
+  "Cyborgs",
+  "transexual",
+  "pansexual",
+  "bisexual",
+  "lesbiana",
+  "homosexual",
+  "gay",
+  "LGBT",
+  "lgtbyq",
+  "placer",
+  "poliamor",
+  "poliamoroso",
+  "cuidado",
+  "autocuidado",
+  "sonreír",
+  "UBA",
+  "UNSAM",
+  "UNTREF",
+  "UNLAM",
+  "polvo",
+  "asado",
+  "vino",
+  "conección",
+  "desconexión",
+  "UTP",
+  "notebooks",
+  "kinect",
+  "lidar",
+  "github",
+  "git",
+  "nodos",
+  "emulador",
+  "llegar",
+  "montaje",
+  "127.0.0.1",
+  "install.bat",
+  ".env",
+  "apikey",
+  "key",
+  "api",
+  "sockets",
+  "MongoDB",
+  "php",
+  "Phpmyadmin",
+  "handcode",
+  "vibecode",
+  "freebuff",
+  "antigravity",
+  "node",
+  "server.js",
+  "index.html",
+  "style.css",
+  "javascript.js",
+  "script.js",
+  "font.ttf",
+  "model.obj",
+  "model.gltf",
+  "exitos2000.wav",
+  "dreamcore",
+  "hardcore",
+  "synthcore",
+  "softcore",
+  "chillstep",
+  "everynoiseatonce",
+  "música",
+  "tango",
+  "rock",
+  "sky",
+  "mate",
+  "cancha",
+  "incas",
+  "aztecas",
+  "mayas",
+  "Kipu",
+  "telares",
+  "códices",
+  "textos",
+  "libros",
+  "información",
+  "historia",
+  "sociología",
+  "descolonización",
+  "laico",
+  "gratuito",
+  "una",
+  "clases",
+  "pedagogía",
+  "Duolingo",
+  "lenguaje",
+  "teatro",
+  "improvisación",
+  "Chéjov",
+  "impro",
+  "transitarlo",
+  "vivirlo",
+  "Relajarse",
+  "encurtidos",
+  "pica",
+  "Marcas",
+  "productora",
+  "TECNOPOLIS",
+  "comunicaciones",
+  "radio",
+  "cine",
+  "reel",
+  "mapping",
+  "pantalla",
+  "salida",
+  "DNS",
+  "ipconfig",
+  "ipv4",
+  "ipv6",
+  "QR",
+  "doomscrolling",
+  "dopamina",
+  "serotonina",
+  "superar",
+  "integridad",
+  "moral",
+  "salvación",
+  "Words",
+  "phonocentrico",
+  "ideogramas",
+  "prompting",
+  "promptear",
+  "4k",
+  "bloom",
+  "blur",
+  "lighting3d",
+  "Input",
+  "output",
+  "entrada",
+  "Esperar",
+  "paciencia",
+  "ansiedad",
+  "pensar",
+  "accionar",
+  "archivo",
+  "archivado",
+  ".json",
+  "Sostener",
+  "membresías",
+  "programa",
+  "INADI",
+  "contratar",
+  "conocido",
+  "referido",
+  "charlar"
 ];
 
 const DEFAULT_CONFIG = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (SIEMPRE UNA SOLA PALABRA, en mayúsculas. PROHIBIDO el guion bajo, el espacio y el guion: nada de compuestos tipo OPTIMO_LUJO o CAJA_NEGRA, se dice OPTIMO o CAJA. Si el concepto necesita dos palabras, elegí LA MÁS FUERTE y usá solo esa).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (SON 3 ORACIONES Y NADA MÁS, UNA POR VERSO: NUNCA 4 ORACIONES) (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno.\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno.\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona.\nREGLA DE ORO DEL CONTEO: el haiku tiene EXACTAMENTE 3 ORACIONES, una por verso, y cada verso llega a UN SOLO punto final (sin puntos internos que lo partan en dos). Si te sale una cuarta oración, la tenés que fundir en la tercera con una coma. 4 oraciones = ERROR.\nREGLA CRUCIAL DE CONEXIÓN: Los tres versos deben narrar una sola imagen poética conectada y coherente donde los tres conceptos interactúan con naturalidad. NO deben sonar a palabras forzadas ni listas inconexas.\nAntes de responder, verificá que cada uno de los 3 términos sea UNA SOLA PALABRA sin separadores (sin guion bajo, sin espacio, sin guion).\\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "Verso 1 con TERMINO1\\nVerso 2 con TERMINO2\\nVerso 3 con TERMINO3"}.',
+  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (SIEMPRE UNA SOLA PALABRA, en mayúsculas. PROHIBIDO el guion bajo, el espacio y el guion: nada de compuestos tipo OPTIMO_LUJO o CAJA_NEGRA, se dice OPTIMO o CAJA. Si el concepto necesita dos palabras, elegí LA MÁS FUERTE y usá solo esa).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (SON 3 ORACIONES Y NADA MÁS, UNA POR VERSO: NUNCA 4 ORACIONES) (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno (4 a 7 palabras).\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno (4 a 7 palabras).\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona (4 a 7 palabras).\nREGLAS DE ORO:\n- LONGITUD BREVE: Cada verso debe tener entre 4 y 7 palabras (MÁXIMO 8 PALABRAS). Prohibido hacer oraciones largas o explicativas para que cada verso quepa en una sola línea horizontal sin partirse.\n- CONTEO OBLIGATORIO: EXACTAMENTE 3 ORACIONES (una sola oración por verso). Versos 1 y 2 terminan en coma o sin punto. Verso 3 termina con un solo punto final. Prohibido poner dos oraciones dentro del mismo verso. 4 oraciones = ERROR.\n- COHERENCIA: Los tres versos deben narrar una sola imagen poética conectada donde los tres conceptos interactúan con naturalidad.\nAntes de responder, verificá que cada uno de los 3 términos sea UNA SOLA PALABRA sin separadores (sin guion bajo, sin espacio, sin guion).\\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "Verso 1 con TERMINO1\\nVerso 2 con TERMINO2\\nVerso 3 con TERMINO3."}.',
   wordsPool: [...DEFAULT_WORDS_POOL]
 };
 
@@ -115,6 +543,9 @@ const IDLE_CTA_CAMERA_MOVE_PX = 26;     // movimiento mínimo para contar en cá
 // aparece, te muestra los datos y se va.
 const PIP_RANDOM_MIN_S = 5;
 const PIP_RANDOM_MAX_S = 30;
+
+// Claves de los monitores PiP que parpadean solos (cada uno con su propio reloj).
+const PIP_CYCLE_KEYS = ['face', 'depth', 'leftHand', 'rightHand'];
 
 
 
@@ -196,7 +627,7 @@ const UI_CSS_VAR_MAP = {
   bgPanel: '--bg-panel',
   bgPanelDeep: '--bg-panel-deep',
   bgSlot: '--bg-slot',
-  bgCard: '--bg-card',  
+  bgCard: '--bg-card',
   bgMutated: '--bg-mutated',
   bgFinal: '--bg-final',
   bgModal: '--bg-modal',
@@ -215,28 +646,28 @@ const UI_CSS_VAR_MAP = {
 // colores de todos los elementos de la interfaz + el fondo general.
 // ============================================================================
 const UI_PALETTES = [
-  { id: 'cyan',      name: 'Cian Ciber',        c1: '#00f0ff', c2: '#00ff66', c3: '#ff0055' },
-  { id: 'amber',     name: 'Ámbar Terminal',    c1: '#ffb703', c2: '#ffd166', c3: '#ff4d00' },
-  { id: 'magenta',   name: 'Magenta Neón',      c1: '#ff2bd6', c2: '#00e5ff', c3: '#ff7a00' },
-  { id: 'matrix',    name: 'Verde Matrix',      c1: '#39ff14', c2: '#00ffa3', c3: '#ff2e63' },
-  { id: 'violet',    name: 'Violeta Sintético', c1: '#a855f7', c2: '#22d3ee', c3: '#f43f5e' },
-  { id: 'corporate', name: 'Rojo Corporativo',  c1: '#ff2e2e', c2: '#ffb703', c3: '#00d5ff' },
-  { id: 'electric',  name: 'Azul Eléctrico',    c1: '#3b82f6', c2: '#06b6d4', c3: '#f59e0b' },
-  { id: 'oxide',     name: 'Oro y Óxido',       c1: '#ffd166', c2: '#e07a5f', c3: '#3d5a80' },
-  { id: 'quantum',   name: 'Rosa Cuántico',     c1: '#ff4d8d', c2: '#7c3aed', c3: '#00e0b8' },
-  { id: 'mono',      name: 'Monocromo',         c1: '#e2e8f0', c2: '#94a3b8', c3: '#64748b' },
+  { id: 'cyan', name: 'Cian Ciber', c1: '#00f0ff', c2: '#00ff66', c3: '#ff0055' },
+  { id: 'amber', name: 'Ámbar Terminal', c1: '#ffb703', c2: '#ffd166', c3: '#ff4d00' },
+  { id: 'magenta', name: 'Magenta Neón', c1: '#ff2bd6', c2: '#00e5ff', c3: '#ff7a00' },
+  { id: 'matrix', name: 'Verde Matrix', c1: '#39ff14', c2: '#00ffa3', c3: '#ff2e63' },
+  { id: 'violet', name: 'Violeta Sintético', c1: '#a855f7', c2: '#22d3ee', c3: '#f43f5e' },
+  { id: 'corporate', name: 'Rojo Corporativo', c1: '#ff2e2e', c2: '#ffb703', c3: '#00d5ff' },
+  { id: 'electric', name: 'Azul Eléctrico', c1: '#3b82f6', c2: '#06b6d4', c3: '#f59e0b' },
+  { id: 'oxide', name: 'Oro y Óxido', c1: '#ffd166', c2: '#e07a5f', c3: '#3d5a80' },
+  { id: 'quantum', name: 'Rosa Cuántico', c1: '#ff4d8d', c2: '#7c3aed', c3: '#00e0b8' },
+  { id: 'mono', name: 'Monocromo', c1: '#e2e8f0', c2: '#94a3b8', c3: '#64748b' },
   /* COBRE STEAMPUNK: la misma que el diseño global (global_style.json). Es la que
      deja en cobre los fondos/acentos: antes la "matriz" (verde) teñía el HUD,
      los monitores PiP y el call to action. */
-  { id: 'cobre',     name: 'Cobre Steampunk',   c1: '#d46238', c2: '#dca876', c3: '#b0431c' }
+  { id: 'cobre', name: 'Cobre Steampunk', c1: '#d46238', c2: '#dca876', c3: '#b0431c' }
 ];
 
 const DEFAULT_PALETTE_ID = 'cyan';
 
 /* Revision de los ajustes de PARTICULAS guardados en localStorage: al subirla,
    los valores viejos de tamanos de letra se descartan y valen los nuevos
-   (2 = frase 62 px y centro 52 px). */
-const PARTICLES_REV = 2;
+   (3 = frase optimizada a 34 px responsive y centro 44 px). */
+const PARTICLES_REV = 3;
 
 function hexToHsl(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
@@ -278,8 +709,8 @@ function hslToHex(h, s, l) {
 
 function getPaletteById(id) {
   return UI_PALETTES.find((p) => p.id === id) ||
-         UI_PALETTES.find((p) => p.id === DEFAULT_PALETTE_ID) ||
-         UI_PALETTES[0];
+    UI_PALETTES.find((p) => p.id === DEFAULT_PALETTE_ID) ||
+    UI_PALETTES[0];
 }
 
 // Deriva el mapa COMPLETO de colores de la interfaz desde los 3 colores base
@@ -345,26 +776,28 @@ let wordColorEscHandler = null;
 // ============================================================================
 const appState = {
   currentState: STATES.IDLE,
-  
+
   // Prioridad de Entrada: Inicia con Mouse para pruebas inmediatas sin depender de cámara
   inputMode: 'mouse', // 'mouse' | 'camera'
   isUsingMouse: true, // Si es true, el mouse tiene prioridad absoluta y MediaPipe NO mueve el cursor
   lastMouseMoveTime: 0,
-  
+
   config: { ...DEFAULT_CONFIG },
-  
+
   // Posiciones de Cursor
   cursorX: window.innerWidth / 2,
   cursorY: window.innerHeight / 2,
   targetCursorX: window.innerWidth / 2,
   targetCursorY: window.innerHeight / 2,
   cursorActive: true,
-  
+
   // MediaPipe
   poseInstance: null,
   cameraReady: false,
   landmarkConfidence: 0,
-  
+  hasHuman: false,
+  lastHumanSeenTimestamp: 0,
+
   // Shader ASCII
   asciiShader: null,
   asciiConfig: {
@@ -397,14 +830,25 @@ const appState = {
     lifetime: 0,
     maxWords: 9,
     speed: 1.0,
-    fontSizeCenter: 52,
-    fontSizePhrase: 62
+    maxSpeed: 2.0,
+    fontSizeCenter: 44,
+    fontSizePhrase: 34
+  },
+
+  // Sistema de Física y Colisiones de Palabras (Pestaña FÍSICAS & COLISIÓN)
+  physicsConfig: {
+    enabled: true,         // Colisiones activadas
+    bounce: 0.75,          // Rebote / Restitución elástica (0.0 a 1.2)
+    friction: 0.05,        // Fricción / Amortiguamiento (0.0 a 0.40)
+    collisionForce: 1.0,   // Fuerza de aceleración / Impulso (0.2 a 3.0)
+    collisionRadius: 48,   // Radio del cuerpo físico en px (20 a 100)
+    wallBounce: 0.80       // Rebote en bordes de pantalla (0.0 a 1.2)
   },
 
   // Shader Maestro de Salida y Frame Difference
   masterOutputShader: null,
   frameDiffShader: null,
-  
+
   // Palabras Flotantes y Sistema Unificado de Palabras
   floatingWords: [],
   selectedWordObjects: [], // Palabras atrapadas / en mutación / en frase (mismo objeto)
@@ -414,16 +858,16 @@ const appState = {
   maxFloatingWords: 9,
   caughtWords: [], // Máximo 3 textos
   hudMenuVisible: false, // Menú HUD oculto por defecto (Tecla M)
-  
+
   // Dwell / Temporizador de Proximidad
   targetedWordIndex: -1,
   dwellTimer: 0,
-  dwellDuration: 1.2, // Segundos de proximidad para atrapar
-  
+  dwellDuration: 3.0, // Segundos de proximidad para atrapar (Requerimiento 7: 3 segundos)
+
   // Audio
   audioEnabled: true,
   audioCtx: null,
-  
+
   // Call to action por inactividad
   lastUserActivity: Date.now(),
   idleCtaVisible: false,
@@ -436,9 +880,15 @@ const appState = {
   depthFrameId: 0,
   drawStaticNoise: null,
   // Estado del parpadeo de los monitores PiP (lo maneja updatePipAutoCycle).
-  pipCycleVisible: { face: false, depth: false },
-  pipNextToggleAt: { face: 0, depth: 0 },
+  pipCycleVisible: { face: false, depth: false, leftHand: false, rightHand: false },
+  pipNextToggleAt: { face: 0, depth: 0, leftHand: 0, rightHand: 0 },
   pipCycleDisabledByUser: false,
+
+  // Suavizado de encuadre de los monitores PiP de MANOS (recorte sobre la muñeca)
+  handTrackingState: {
+    left: { x: 0.5, y: 0.5, size: 0.3 },
+    right: { x: 0.5, y: 0.5, size: 0.3 }
+  },
 
   // Configuración de Tracking y Calibración
   trackingConfig: {
@@ -450,16 +900,32 @@ const appState = {
     minConfidence: 0.5,
     colorTheme: 'cyberpunk', // 'classic' | 'cyberpunk' | 'phosphor' | 'thermal'
     bodyCollision: true, // REQUERIMIENTO 6: Colisión multi-articular de OpenPose con palabras
+    // Modo selector de colisión: qué puntos SÍ capturan palabras y cuáles NO.
+    // Por defecto SOLO el puntero y las dos manos del OpenPose (muñecas 15/16).
+    collisionPoints: {
+      mouse: true,
+      manoIzq: true,
+      manoDer: true,
+      dedoIzq: false,
+      dedoDer: false,
+      codoIzq: false,
+      codoDer: false,
+      centroFacial: false
+    },
+
     showDepthMap: false,
     depthMode: 'cyberpunk', // 'cyberpunk' | 'thermal' | 'monochrome'
     depthContrast: 1.5,
     depthInShader: true, // REQUERIMIENTO 3: Máscara depth en shader ASCII sobre la silueta
     bodyColor: 'neon-green', // REQUERIMIENTO 3: Color de letras en silueta corporal
     showFaceCamera: false,
-    faceBoxOnScreen: true, // REQUERIMIENTO 10: Dibujar cuadrito que trackea la cara en posición real
     faceZoom: 1.8,
     faceReticle: true,
     faceSmoothing: true,
+    // Monitores PiP de MANOS: recorte de la cámara sobre la muñeca 15 (izq) / 16 (der)
+    showLeftHand: false,
+    showRightHand: false,
+    handZoom: 2.6,
     frameDifference: false, // REQUERIMIENTO 2: Capa FRAME DIFFERENCE de análisis óptico en GPU
     frameDiffLimit: 0.08,   // Umbral de sensibilidad (limit)
     frameDiffForce: 0.85,   // Fuerza del buffer de feedback (force)
@@ -468,6 +934,45 @@ const appState = {
     trackingAnchor: 'nose', // 'nose' | 'right_wrist' | 'left_wrist' | 'chest'
     smoothingFactor: 0.55
   },
+
+  // Estado dinámico del gesto de manos (apertura / cierre y agarre instantáneo)
+  handGestures: {
+    left: {
+      closure: 0,
+      targetClosure: 0,
+      minM: 0.07,
+      maxM: 0.22,
+      isOpen: true,
+      isClosed: false,
+      justGrabbed: false,
+      lastGrabTime: 0,
+      lastOpenTime: 0,
+      confidence: 0,
+      pos: { x: 0, y: 0 }
+    },
+    right: {
+      closure: 0,
+      targetClosure: 0,
+      minM: 0.07,
+      maxM: 0.22,
+      isOpen: true,
+      isClosed: false,
+      justGrabbed: false,
+      lastGrabTime: 0,
+      lastOpenTime: 0,
+      confidence: 0,
+      pos: { x: 0, y: 0 }
+    },
+    mouse: {
+      closure: 0,
+      targetClosure: 0,
+      isClosed: false,
+      justGrabbed: false,
+      lastGrabTime: 0
+    }
+  },
+  openposeSpeeds: null,
+  openposePrev: null,
 
   // Últimos landmarks detectados para colisiones y análisis
   lastLandmarks: [],
@@ -508,6 +1013,8 @@ const appState = {
     pointersOpacity: 1.0,
     depthEnabled: false,
     faceEnabled: false,
+    leftHandEnabled: false,
+    rightHandEnabled: false,
     scanlinesEnabled: false,
     scanlinesOpacity: 0.85,
     noiseEnabled: false,
@@ -533,10 +1040,10 @@ const appState = {
     noiseSpeed: 1.0,
     testPreviewState: null,
     params: {
-      blockIntensity:       { value: 0.80, animated: true },
-      blockSize:            { value: 0.60, animated: true },
-      chromaIntensity:      { value: 0.70, animated: true },
-      vhsNoiseIntensity:    { value: 0.65, animated: true },
+      blockIntensity: { value: 0.80, animated: true },
+      blockSize: { value: 0.60, animated: true },
+      chromaIntensity: { value: 0.70, animated: true },
+      vhsNoiseIntensity: { value: 0.65, animated: true },
       edgeTearingIntensity: { value: 0.50, animated: true }
     }
   }
@@ -596,6 +1103,8 @@ const DOM = {
 
   cfgRenderDepthToggle: document.getElementById('cfg-render-depth-toggle'),
   cfgRenderFaceToggle: document.getElementById('cfg-render-face-toggle'),
+  cfgRenderLeftHandToggle: document.getElementById('cfg-render-lefthand-toggle'),
+  cfgRenderRightHandToggle: document.getElementById('cfg-render-righthand-toggle'),
 
   cfgRenderCutoutToggle: document.getElementById('cfg-render-cutout-toggle'),
   cfgRenderCutoutContrast: document.getElementById('cfg-render-cutout-contrast'),
@@ -633,7 +1142,20 @@ const DOM = {
   faceMetaConf: document.getElementById('face-meta-conf'),
   faceFooterZoom: document.getElementById('face-footer-zoom'),
   faceFooterTracking: document.getElementById('face-footer-tracking'),
-  
+
+  // Monitores PiP de MANOS (recorte de cámara sobre cada mano)
+  leftHandPip: document.getElementById('left-hand-pip'),
+  leftHandCanvas: document.getElementById('left-hand-canvas'),
+  btnCloseLeftHandPip: document.getElementById('btn-close-left-hand-pip'),
+  leftHandPipStatus: document.getElementById('left-hand-pip-status'),
+  leftHandFooterZoom: document.getElementById('left-hand-footer-zoom'),
+
+  rightHandPip: document.getElementById('right-hand-pip'),
+  rightHandCanvas: document.getElementById('right-hand-canvas'),
+  btnCloseRightHandPip: document.getElementById('btn-close-right-hand-pip'),
+  rightHandPipStatus: document.getElementById('right-hand-pip-status'),
+  rightHandFooterZoom: document.getElementById('right-hand-footer-zoom'),
+
   // HUD
   hudTimestamp: document.getElementById('hud-timestamp'),
   hudGeneralFps: document.getElementById('hud-general-fps'),
@@ -645,29 +1167,29 @@ const DOM = {
   btnToggleAudio: document.getElementById('btn-toggle-audio'),
   audioIcon: document.getElementById('audio-icon'),
   btnFullscreen: document.getElementById('btn-fullscreen'),
-  
+
   // Telemetría
   // Badge de telemetria (SENSOR/COORD/CONFIANZA) ELIMINADO del HTML: los nodos
   // quedan en null y todas las escrituras están protegidas con if (DOM.x).
   telemetrySensor: document.getElementById('telemetry-sensor'),
   telemetryCoords: document.getElementById('telemetry-coords'),
   telemetryConfidence: document.getElementById('telemetry-confidence'),
-  
+
   // Capas Interactivas
   floatingLayer: document.getElementById('floating-words-layer'),
   reticle: document.getElementById('cursor-reticle'),
   reticleLabel: document.getElementById('reticle-label'),
-  
+
   // (Sin slots en el DOM: las 3 palabras elegidas se enganchan ARRIBA y la
   //  misma palabra vuela al centro y después a su lugar en la frase.)
-  
+
   // Escenario Central de Resignificación y Síntesis
   mutationStage: document.getElementById('mutation-stage'),
   idleCta: document.getElementById('idle-cta'),
   desprocesandoBanner: document.getElementById('desprocesando-banner'),
   finalSpeechBox: document.getElementById('final-speech-box'),
   finalTypewriterText: document.getElementById('final-typewriter-text'),
-  
+
   // Modal Config & Pestañas
   configModal: document.getElementById('config-modal'),
   modalTabsNav: document.getElementById('modal-tabs-nav'),
@@ -746,8 +1268,24 @@ const DOM = {
   valPartMaxWords: document.getElementById('val-part-maxwords'),
   cfgPartSpeed: document.getElementById('cfg-part-speed'),
   valPartSpeed: document.getElementById('val-part-speed'),
+  cfgPartMaxSpeed: document.getElementById('cfg-part-maxspeed'),
+  valPartMaxSpeed: document.getElementById('val-part-maxspeed'),
   cfgPartOutlineGlow: document.getElementById('cfg-part-outline-glow'),
   btnPartReset: document.getElementById('btn-part-reset'),
+  // Pestaña FÍSICAS & COLISIÓN
+  cfgPhysEnabled: document.getElementById('cfg-phys-enabled'),
+  valPhysEnabled: document.getElementById('val-phys-enabled'),
+  cfgPhysBounce: document.getElementById('cfg-phys-bounce'),
+  valPhysBounce: document.getElementById('val-phys-bounce'),
+  cfgPhysFriction: document.getElementById('cfg-phys-friction'),
+  valPhysFriction: document.getElementById('val-phys-friction'),
+  cfgPhysForce: document.getElementById('cfg-phys-force'),
+  valPhysForce: document.getElementById('val-phys-force'),
+  cfgPhysRadius: document.getElementById('cfg-phys-radius'),
+  valPhysRadius: document.getElementById('val-phys-radius'),
+  cfgPhysWallBounce: document.getElementById('cfg-phys-wall-bounce'),
+  valPhysWallBounce: document.getElementById('val-phys-wall-bounce'),
+  btnResetPhysics: document.getElementById('btn-reset-physics'),
   // Banco de Palabras
   wordsCountBadge: document.getElementById('words-count-badge'),
   cfgWordsInput: document.getElementById('cfg-words-input'),
@@ -767,18 +1305,28 @@ const DOM = {
   valTrackConfidence: document.getElementById('val-track-confidence'),
   cfgTrackTheme: document.getElementById('cfg-track-theme'),
   cfgTrackBodyCollision: document.getElementById('cfg-track-body-collision'),
-  cfgTrackDepth: document.getElementById('cfg-track-depth'),
+  cfgColPointMouse: document.getElementById('cfg-col-point-mouse'),
+  cfgColPointManoIzq: document.getElementById('cfg-col-point-mano-izq'),
+  cfgColPointManoDer: document.getElementById('cfg-col-point-mano-der'),
+  cfgColPointDedoIzq: document.getElementById('cfg-col-point-dedo-izq'),
+  cfgColPointDedoDer: document.getElementById('cfg-col-point-dedo-der'),
+  cfgColPointCodoIzq: document.getElementById('cfg-col-point-codo-izq'),
+  cfgColPointCodoDer: document.getElementById('cfg-col-point-codo-der'),
+  cfgColPointCentroFacial: document.getElementById('cfg-col-point-centro-facial'), cfgTrackDepth: document.getElementById('cfg-track-depth'),
   cfgTrackDepthShader: document.getElementById('cfg-track-depth-shader'),
   cfgTrackBodyColor: document.getElementById('cfg-track-body-color'),
   cfgTrackDepthMode: document.getElementById('cfg-track-depth-mode'),
   cfgTrackDepthContrast: document.getElementById('cfg-track-depth-contrast'),
   valTrackDepthContrast: document.getElementById('val-track-depth-contrast'),
   cfgTrackFace: document.getElementById('cfg-track-face'),
-  cfgTrackFaceBox: document.getElementById('cfg-track-face-box'),
   cfgTrackFaceZoom: document.getElementById('cfg-track-face-zoom'),
   valTrackFaceZoom: document.getElementById('val-track-face-zoom'),
   cfgTrackFaceReticle: document.getElementById('cfg-track-face-reticle'),
   cfgTrackFaceSmooth: document.getElementById('cfg-track-face-smooth'),
+  cfgTrackLeftHand: document.getElementById('cfg-track-left-hand'),
+  cfgTrackRightHand: document.getElementById('cfg-track-right-hand'),
+  cfgTrackHandZoom: document.getElementById('cfg-track-hand-zoom'),
+  valTrackHandZoom: document.getElementById('val-track-hand-zoom'),
   cfgTrackFrameDiff: document.getElementById('cfg-track-frame-diff'),
   cfgTrackFrameDiffLimit: document.getElementById('cfg-track-framediff-limit'),
   valTrackFrameDiffLimit: document.getElementById('val-track-framediff-limit'),
@@ -801,7 +1349,7 @@ const DOM = {
   btnCancelConfig: document.getElementById('btn-cancel-config'),
   btnSaveConfig: document.getElementById('btn-save-config'),
   btnResetDefaultConfig: document.getElementById('btn-reset-default-config'),
-  
+
   // Toasts
   toastContainer: document.getElementById('toast-container')
 };
@@ -826,7 +1374,7 @@ function playSound(type, param = 0) {
   try {
     const ctx = appState.audioCtx;
     const now = ctx.currentTime;
-    
+
     if (type === 'hover-charge') {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -838,7 +1386,7 @@ function playSound(type, param = 0) {
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 0.08);
-    } 
+    }
     else if (type === 'catch') {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -851,7 +1399,7 @@ function playSound(type, param = 0) {
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 0.18);
-    } 
+    }
     else if (type === 'processing-drone') {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -863,7 +1411,7 @@ function playSound(type, param = 0) {
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + 1.5);
-    } 
+    }
     else if (type === 'hijack-strike') {
       const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
@@ -882,7 +1430,7 @@ function playSound(type, param = 0) {
       osc2.start(now);
       osc1.stop(now + 0.45);
       osc2.stop(now + 0.45);
-    } 
+    }
     else if (type === 'typewriter') {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -895,7 +1443,7 @@ function playSound(type, param = 0) {
       osc.start(now);
       osc.stop(now + 0.03);
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // Generador de tablas y colores para Silueta Corporal en Shader ASCII
@@ -953,7 +1501,7 @@ async function checkOllamaLiveStatus() {
         activeUrl = base;
         break;
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   if (!isConnected) {
@@ -975,7 +1523,7 @@ async function checkOllamaLiveStatus() {
           activeUrl = 'proxy';
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   if (isConnected) {
@@ -1135,6 +1683,7 @@ uniform vec2 u_wordPositions[MAX_WORDS];
 // Ancho REAL de cada palabra en UV x (px/ancho de pantalla). 0 = sin dato:
 // en ese caso el marco usa el ancho fijo de WORD_BOX_X.
 uniform float u_wordWidths[MAX_WORDS];
+uniform float u_wordDwell[MAX_WORDS];
 uniform int u_wordCount;
 
 uniform sampler2D renderJPSHADER;
@@ -1190,6 +1739,16 @@ uniform vec3  u_palA;          // acento primario   (borde / acento)
 uniform vec3  u_palB;          // acento secundario (acento2)
 uniform float u_palModo;       // 1 = seguir la paleta global
 uniform float u_camPal;        // 0..1 cuánto se tiñe la cámara con la paleta
+// SILUETA (reemplazo de la cámara de color): la máscara de profundidad pintada con el
+// patrón RDM de la paleta y un borde blanco. u_camVis = 1 vuelve a la cámara original.
+uniform float u_camVis;        // 0..1 MEZCLA: 0 = depth+RDM puro · 1 = cámara pura
+uniform float u_silRdm;        // 0..1 pinta la silueta con el patrón RDM
+uniform float u_silEdge;       // 0..1 borde blanco de la silueta
+uniform float u_maskOn;        // 0..1 PRESENCIA de la mascarilla del cuerpo (0 = solo el esqueleto)
+uniform float u_silBlur;       // radio de BLUR del depth, en TEXELES del depth (no en px de pantalla:
+                               // el depth viene de 240x160 y se estira ~6,6x, asi que el blur tiene
+                               // que medirse en texeles o no alcanza a tapar el pixelado)
+uniform vec2  u_depthTexel;     // 1.0 / tamaño real del canvas de depth
 #define pi 3.14159265359
 
 // ---------------------------------------------------------------------------
@@ -1199,16 +1758,18 @@ uniform float u_camPal;        // 0..1 cuánto se tiñe la cámara con la paleta
 //   1.0 = cuadrado · 0.55 = 1.8x MÁS ANCHO · 0.40 = 2.5x MÁS ANCHO
 #define WORD_BOX_X        0.55
 
+// ADAPTACIÓN PANTALLA VERTICAL:
+// Comprime el alto en shader para palabras y reduce un poquito el ancho
+#define WORD_BOX_KY       1.75
+#define WORD_BOX_PAD      0.78
+
 // Tamaño del contenedor del HAIKU (media medida, en UV)
-#define HAIKU_BOX_W       0.25
-#define HAIKU_BOX_H       0.3
+#define HAIKU_BOX_W       0.38
+#define HAIKU_BOX_H       0.22
 
 // VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
 // Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
 #define WORD_SPIN_SPEED   0.032
-
-// Margen del marco alrededor del ancho real de la palabra (1.0 = exacto)
-#define WORD_BOX_PAD   0.9
 #define HAIKU_BG_TOP      vec3(0.0, 0.0, 0.0)
 #define HAIKU_BG_BOT      vec3(0.0, 0.0, 0.0)
 #define HAIKU_LINE_COL    vec3(1.0, 1.0, 0.1)
@@ -1355,15 +1916,40 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
 
         // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
         // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
-        float wAncho = u_wordWidths[i] * WORD_BOX_PAD*.5;
+        float wAncho = u_wordWidths[i] * WORD_BOX_PAD * 0.5;
         float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
-        // uv_m = uv con el eje X comprimido alrededor de la palabra
-        vec2 uv_m = wPos + (uv - wPos) * vec2(kx, 1.0);
+        float ky = WORD_BOX_KY;
+        // uv_m = uv con ejes adaptados para pantalla vertical (alto reducido)
+        vec2 uv_m = wPos + (uv - wPos) * vec2(kx, ky);
 
         float rot = animPulse * sin(t + float(i));
         float full = poly(uv_m, wPos, s, s + d, 4, rot);
         float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
         float border = max(0.0, full - inner);
+
+        // REQUERIMIENTO 6: Relleno animado en el shader cuando se toca la palabra (dwell)
+        // Animación como si se estuviera prendiendo (ignición incandescente / plasma)
+        float dwell = (i < MAX_WORDS) ? u_wordDwell[i] : 0.0;
+        if (dwell > 0.001 && full > 0.01) {
+            float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
+            // Coordenada horizontal normalizada dentro del contenedor
+            float normX = clamp((uv.x - (wPos.x - effAncho)) / (2.0 * effAncho), 0.0, 1.0);
+            
+            // Frente de carga que se va llenando
+            float fillProgress = smoothstep(0.0, 0.02, dwell - normX);
+            // Filamento / chispa brillante en el frente activo de llenado
+            float sparkLine = exp(-abs(normX - dwell) * 45.0) * (1.3 + 0.6 * sin(uv.y * 140.0 + u_time * 30.0));
+            // Chisporroteo / calor de ignición
+            float sizzle = 0.8 + 0.25 * sin(uv.x * 90.0 + u_time * 28.0) * cos(uv.y * 90.0 - u_time * 22.0);
+            
+            // Color que se prende: cobre fundido a núcleo blanco-ámbar incandescente
+            vec3 igniteCol = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.92, 0.55), normX);
+            if (u_palModo > 0.5) igniteCol = mix(u_palA * 1.3, u_palB * 1.8, normX);
+            
+            float igniteIntensity = (fillProgress * 0.70 * sizzle + sparkLine * 1.6) * full;
+            wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
+            border *= (1.0 + dwell * 0.9);
+        }
 
         wordsEffect.rgb += vec3(border);
         wordsEffect.a = max(wordsEffect.a, full);
@@ -1510,6 +2096,17 @@ void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out floa
     vhsNoise = (rand(uv * u_time) - 0.5) * 0.15 * effectiveVHS;
 }
 
+// Función auxiliar para leer la máscara de profundidad limpia (canal alpha prioritario o luminancia)
+float getDepthMask(vec2 p) {
+    if (u_hasDepth != 1) return 0.0;
+    // REQUERIMIENTO 3: Ensanchar la silueta fullscreen para que en pantalla vertical no se vea angosta/rara
+    float sx = (u_resolution.y > u_resolution.x) ? 0.72 : 0.85;
+    vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
+    if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
+    vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
+    return (d.a > 0.001) ? d.a : max(d.r, max(d.g, d.b));
+}
+
 void main() {
     vec2 rawUv = gl_FragCoord.xy / u_resolution;
 
@@ -1584,7 +2181,74 @@ void main() {
 
     vec3 fin = vec3(0.0);
     fin += jpCol * words.r;
-    fin += mix(jpCol * words.r, camCol, depthCol.r);
+
+    /* ============ SILUETA DEL CUERPO (Depth Map Suavizado + RDM + Borde) ============
+       Pedido del usuario:
+       1) Borrar completamente puntos rojos de trackeo (ya no se dibujan en la textura).
+       2) Difuminado/blur amplio de alta resolución (17 taps concéntricos) para eliminar
+          el pixelado/serruchado del canvas y generar una silueta suave, orgánica y etérea.
+       3) Contorno blanco limpio derivado de la máscara ya difuminada, sin dientes de sierra. */
+    float silLum = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 1.9, 0.0, 1.0);
+    vec3  silRelleno = mix(u_palA, u_palB, 0.35) * (0.40 + 1.5 * silLum);
+    vec3  silCol = mix(camCol, silRelleno, clamp(u_silRdm, 0.0, 1.0));
+    vec3  cuerpoCol = mix(silCol, camCol, clamp(u_camVis, 0.0, 1.0));
+
+    /* BLUR DEL DEPTH DE ALTA CALIDAD (17 TAPS):
+       Elimina el serruchado de píxeles y genera una silueta orgánica, etérea y suave.
+       u_silBlur = radio de difusión. */
+    float silMask = 0.0;
+    float silBorde = 0.0;
+    if (u_hasDepth == 1) {
+        float bRadius = max(u_silBlur, 0.8) * 3.2;
+        vec2 bStep = bRadius * u_depthTexel;
+
+        // Muestreo gaussiano concéntrico de 17 taps
+        float acc = getDepthMask(uv) * 0.18;
+        float wsum = 0.18;
+
+        // Anillo 1 (radio 1.0): 8 muestras
+        float w1 = 0.07;
+        acc += getDepthMask(uv + vec2( bStep.x,  0.0)) * w1;
+        acc += getDepthMask(uv + vec2(-bStep.x,  0.0)) * w1;
+        acc += getDepthMask(uv + vec2( 0.0,  bStep.y)) * w1;
+        acc += getDepthMask(uv + vec2( 0.0, -bStep.y)) * w1;
+        acc += getDepthMask(uv + vec2( bStep.x * 0.7071,  bStep.y * 0.7071)) * w1;
+        acc += getDepthMask(uv + vec2(-bStep.x * 0.7071,  bStep.y * 0.7071)) * w1;
+        acc += getDepthMask(uv + vec2( bStep.x * 0.7071, -bStep.y * 0.7071)) * w1;
+        acc += getDepthMask(uv + vec2(-bStep.x * 0.7071, -bStep.y * 0.7071)) * w1;
+        wsum += 8.0 * w1;
+
+        // Anillo 2 (radio 2.0): 8 muestras a doble distancia
+        float w2 = 0.0325;
+        vec2 bStep2 = bStep * 2.0;
+        acc += getDepthMask(uv + vec2( bStep2.x,  0.0)) * w2;
+        acc += getDepthMask(uv + vec2(-bStep2.x,  0.0)) * w2;
+        acc += getDepthMask(uv + vec2( 0.0,  bStep2.y)) * w2;
+        acc += getDepthMask(uv + vec2( 0.0, -bStep2.y)) * w2;
+        acc += getDepthMask(uv + vec2( bStep2.x * 0.7071,  bStep2.y * 0.7071)) * w2;
+        acc += getDepthMask(uv + vec2(-bStep2.x * 0.7071,  bStep2.y * 0.7071)) * w2;
+        acc += getDepthMask(uv + vec2( bStep2.x * 0.7071, -bStep2.y * 0.7071)) * w2;
+        acc += getDepthMask(uv + vec2(-bStep2.x * 0.7071, -bStep2.y * 0.7071)) * w2;
+        wsum += 8.0 * w2;
+
+        silMask = clamp(acc / wsum, 0.0, 1.0);
+
+        // BORDE SUAVE DE LA SILUETA: contorno limpio derivado de la máscara ya difuminada
+        // Cero serruchado, antialiasing perfecto
+        if (u_silEdge > 0.001) {
+            float edgeBand = smoothstep(0.12, 0.42, silMask) * (1.0 - smoothstep(0.48, 0.88, silMask));
+            silBorde = clamp(edgeBand * 2.8, 0.0, 1.0) * clamp(u_silEdge, 0.0, 1.0);
+        }
+    }
+
+    /* PRESENCIA: la mascarilla del cuerpo aparece y desaparece con el ciclo
+       random de los monitores PiP. SOLO se dibuja si u_hasDepth == 1 y maskVis > 0.001 */
+    float maskVis = clamp(u_maskOn, 0.0, 1.0);
+    if (u_hasDepth == 1 && maskVis > 0.001) {
+        float cuerpoAlpha = smoothstep(0.18, 0.72, silMask) * maskVis;
+        fin = mix(fin, cuerpoCol, cuerpoAlpha);
+        fin = mix(fin, vec3(1.0), silBorde * maskVis);
+    }
 
     // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
     //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
@@ -1593,8 +2257,11 @@ void main() {
     //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
     //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
     //     huesos de colores.
-    float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
-    fin += vec3(1.0) * opMask * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    if (u_hasOpenpose == 1) {
+        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
+        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
+        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    }
 
     // Capa D: Integración del contenedor del Haiku detrás de los textos
     fin = mix(fin, haikuBox.rgb, haikuBox.a);
@@ -1666,6 +2333,7 @@ void main() {
       renderJPSHADER: gl.getUniformLocation(this.program, 'renderJPSHADER'),
       wordPositions: gl.getUniformLocation(this.program, 'u_wordPositions'),
       wordWidths: gl.getUniformLocation(this.program, 'u_wordWidths'),
+      wordDwell: gl.getUniformLocation(this.program, 'u_wordDwell'),
       wordCount: gl.getUniformLocation(this.program, 'u_wordCount'),
       activeState: gl.getUniformLocation(this.program, 'u_activeState'),
       // Uniforms de estados interpolados y Glitch
@@ -1692,7 +2360,14 @@ void main() {
       palA: gl.getUniformLocation(this.program, 'u_palA'),
       palB: gl.getUniformLocation(this.program, 'u_palB'),
       palModo: gl.getUniformLocation(this.program, 'u_palModo'),
-      camPal: gl.getUniformLocation(this.program, 'u_camPal')
+      camPal: gl.getUniformLocation(this.program, 'u_camPal'),
+      // Silueta (reemplazo de la cámara de color)
+      camVis: gl.getUniformLocation(this.program, 'u_camVis'),
+      silRdm: gl.getUniformLocation(this.program, 'u_silRdm'),
+      silEdge: gl.getUniformLocation(this.program, 'u_silEdge'),
+      maskOn: gl.getUniformLocation(this.program, 'u_maskOn'),
+      silBlur: gl.getUniformLocation(this.program, 'u_silBlur'),
+      depthTexel: gl.getUniformLocation(this.program, 'u_depthTexel')
     };
 
     if (!window.GLITCH_ANIMATION_CONFIG) {
@@ -1703,7 +2378,7 @@ void main() {
           haiku: 0.5
         },
         duration: 1.2,
-        curve: function(t) {
+        curve: function (t) {
           return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
         }
       };
@@ -1763,6 +2438,7 @@ void main() {
     // Buffer pre-asignado para evitar garbage collection masiva cada frame (60 FPS)
     this.wordPositionsBuffer = new Float32Array(64);
     this.wordWidthsBuffer = new Float32Array(32);   // ancho real de cada palabra (UV x)
+    this.wordDwellBuffer = new Float32Array(32);    // dwell/progreso de llenado (0.0 a 1.0)
     this.lastOpenposeFrameId = -1;
     this.lastFlowfieldFrameId = -1;
     this.lastDepthFrameId = -1;
@@ -1812,16 +2488,17 @@ void main() {
       gl.uniform1i(this.uniforms.hasCamera, 0);
     }
 
-    // 2) Depth Map (Texture 1) — solo subir textura cuando el canvas de profundidad se redibujó
+    // 2) Depth Map (Texture 1) — SOLO subir textura si hay humano captado
     const depthCanvas = DOM.depthCanvas || (appState.asciiShader && appState.asciiShader.lastMaskSource);
-    if (depthCanvas && layers.cutoutEnabled !== false) {
+    const hasDepthActual = Boolean(depthCanvas && layers.cutoutEnabled !== false && appState.hasHuman);
+    if (hasDepthActual) {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.depthTexture);
       if (this.lastDepthFrameId !== appState.depthFrameId) {
         this.lastDepthFrameId = appState.depthFrameId;
         try {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, depthCanvas);
-        } catch (e) {}
+        } catch (e) { }
       }
       gl.uniform1i(this.uniforms.depthTexture, 1);
       gl.uniform1i(this.uniforms.hasDepth, 1);
@@ -1829,9 +2506,9 @@ void main() {
       gl.uniform1i(this.uniforms.hasDepth, 0);
     }
 
-    // 3) OpenPose (Texture 2) — solo subir textura cuando OpenPose se redibujó
+    // 3) OpenPose (Texture 2) — SOLO si hay humano presente
     const openposeCanvas = DOM.openposeCanvas;
-    const isPoseEnabled = Boolean(openposeCanvas && openposeCanvas.width > 0 && (layers.openposeEnabled || appState.trackingConfig.showOpenPose));
+    const isPoseEnabled = Boolean(openposeCanvas && openposeCanvas.width > 0 && (layers.openposeEnabled || appState.trackingConfig.showOpenPose) && appState.hasHuman);
     if (isPoseEnabled) {
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, this.openposeTexture);
@@ -1839,7 +2516,7 @@ void main() {
         this.lastOpenposeFrameId = appState.openposeFrameId;
         try {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, openposeCanvas);
-        } catch (e) {}
+        } catch (e) { }
       }
       gl.uniform1i(this.uniforms.openposeTexture, 2);
       gl.uniform1i(this.uniforms.hasOpenpose, 1);
@@ -1860,7 +2537,7 @@ void main() {
         this.lastFlowfieldFrameId = appState.flowfieldFrameId;
         try {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, flowfieldCanvas);
-        } catch (e) {}
+        } catch (e) { }
       }
       if (this.uniforms.flowfieldTexture) gl.uniform1i(this.uniforms.flowfieldTexture, 4);
       if (this.uniforms.hasFlowfield) gl.uniform1i(this.uniforms.hasFlowfield, 1);
@@ -1872,14 +2549,14 @@ void main() {
     }
 
     // 4) JPShaderEditor Include (Texture 3) — pase directo a uniform sampler2D renderJPSHADER
-    const jpCanvas = (window.JPShaderInclude && typeof window.JPShaderInclude.canvas === 'function' && window.JPShaderInclude.canvas()) 
+    const jpCanvas = (window.JPShaderInclude && typeof window.JPShaderInclude.canvas === 'function' && window.JPShaderInclude.canvas())
       || document.getElementById('jpsi-canvas');
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.jpShaderTexture);
     if (jpCanvas && jpCanvas.nodeType === 1 && jpCanvas.width > 0 && jpCanvas.height > 0) {
       try {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, jpCanvas);
-      } catch (e) {}
+      } catch (e) { }
     }
     if (this.uniforms.renderJPSHADER) {
       gl.uniform1i(this.uniforms.renderJPSHADER, 3);
@@ -1897,6 +2574,8 @@ void main() {
     // layout: se cachea por palabra y se refresca como máximo cada 400 ms.
     const widthBuffer = this.wordWidthsBuffer;
     widthBuffer.fill(0);
+    const dwellBuffer = this.wordDwellBuffer;
+    dwellBuffer.fill(0);
     const ahoraAnchos = performance.now();
     for (let i = 0; i < wCount; i++) {
       const w = allWords[i];
@@ -1924,9 +2603,11 @@ void main() {
       posBuffer[i * 2] = px / winW;
       posBuffer[i * 2 + 1] = 1.0 - (py / winH);
       widthBuffer[i] = anchoPx ? (anchoPx / winW) : 0;
+      dwellBuffer[i] = (w.isTargeted ? (w.dwellProgress || 0) : 0);
     }
     gl.uniform2fv(this.uniforms.wordPositions, posBuffer);
     if (this.uniforms.wordWidths) gl.uniform1fv(this.uniforms.wordWidths, widthBuffer);
+    if (this.uniforms.wordDwell) gl.uniform1fv(this.uniforms.wordDwell, dwellBuffer);
     gl.uniform1i(this.uniforms.wordCount, wCount);
 
     // 5) Estados interpolados y Glitch Amount con curva configurable
@@ -1946,7 +2627,7 @@ void main() {
 
     const glitchCfg = appState.glitchConfig || {};
     const env = glitchCfg.envelope || { idle: 0.1, thinking: 1.0, haiku: 0.5, duration: 1.2, curve: 'cubic' };
-    
+
     // Si hay un estado de previsualización activo desde el modal de calibración (botones de prueba)
     const effectiveState = glitchCfg.testPreviewState || targetState;
     if (glitchCfg.testPreviewState === 'idle') {
@@ -1977,7 +2658,7 @@ void main() {
     const duration = Math.max(50, (env.duration !== undefined ? env.duration : 1.2) * 1000);
     const elapsedTr = performance.now() - this.transitionStartTime;
     const normT = Math.min(1.0, elapsedTr / duration);
-    
+
     const CURVES = {
       cubic: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
       smooth: (t) => t * t * (3 - 2 * t),
@@ -2014,10 +2695,10 @@ void main() {
     // y acá se normaliza a 0..1, que es lo que el shader espera (mapr del rdmf).
     if (this.uniforms.rdmCnt) {
       const rdm = masterRdmState();
-      gl.uniform1f(this.uniforms.rdmCnt,      rdNorm(rdm.cnt, 1.0, 20.0));
+      gl.uniform1f(this.uniforms.rdmCnt, rdNorm(rdm.cnt, 1.0, 20.0));
       gl.uniform1f(this.uniforms.rdmIteScale, rdNorm(rdm.iteScale, 0.0, 10.0));
-      gl.uniform1f(this.uniforms.rdmSpeedX,   rdNorm(rdm.speedX, -0.2, 0.2));
-      gl.uniform1f(this.uniforms.rdmSpeedY,   rdNorm(rdm.speedY, -0.2, 0.2));
+      gl.uniform1f(this.uniforms.rdmSpeedX, rdNorm(rdm.speedX, -0.2, 0.2));
+      gl.uniform1f(this.uniforms.rdmSpeedY, rdNorm(rdm.speedY, -0.2, 0.2));
       gl.uniform1f(this.uniforms.rdmSpeedRot, rdNorm(rdm.speedRot, -0.02, 0.02));
       gl.uniform1f(this.uniforms.rdmSpeedRnd, rdm.speedRnd);
       gl.uniform1f(this.uniforms.rdmSm1, rdm.sm1);
@@ -2038,6 +2719,35 @@ void main() {
     if (this.uniforms.palB) gl.uniform3f(this.uniforms.palB, pal.b[0], pal.b[1], pal.b[2]);
     if (this.uniforms.palModo) gl.uniform1f(this.uniforms.palModo, modoPaleta);
     if (this.uniforms.camPal) gl.uniform1f(this.uniforms.camPal, (Number(rdmParams.camTinte) || 0) / 100);
+    if (this.uniforms.silRdm) gl.uniform1f(this.uniforms.silRdm, Math.max(0, Math.min(1, (Number(rdmParams.silRdm === undefined ? 100 : rdmParams.silRdm) || 0) / 100)));
+    if (this.uniforms.silEdge) gl.uniform1f(this.uniforms.silEdge, Math.max(0, Math.min(1, (Number(rdmParams.silEdge === undefined ? 100 : rdmParams.silEdge) || 0) / 100)));
+    if (this.uniforms.silBlur) gl.uniform1f(this.uniforms.silBlur, Math.max(0, Math.min(6, Number(rdmParams.silBlur === undefined ? 1.5 : rdmParams.silBlur) || 0)));
+    // Tamaño real del canvas de depth: el blur se mide en TEXELES, no en px de pantalla.
+    if (this.uniforms.depthTexel) {
+      const dc0 = DOM.depthCanvas;
+      const dw = (dc0 && dc0.width) || 240, dh = (dc0 && dc0.height) || 160;
+      gl.uniform2f(this.uniforms.depthTexel, 1.0 / Math.max(1, dw), 1.0 / Math.max(1, dh));
+    }
+
+    /* MASCARILLA DEL CUERPO: presencia y mezcla. Si no hay humano detectado,
+       permanece estrictamente en 0 para no dibujar silueta sobre el fondo vacío. */
+    const pipD = !!(appState.pipCycleVisible && appState.pipCycleVisible.depth && appState.hasHuman);
+    const pipF = !!(appState.pipCycleVisible && appState.pipCycleVisible.face && appState.hasHuman);
+    const auto = Math.max(0, Math.min(1, (Number(rdmParams.maskAuto === undefined ? 100 : rdmParams.maskAuto) || 0) / 100));
+    const objOn = (appState.hasHuman && (pipD || pipF)) ? 1.0 : 0.0;
+    const objCam = pipD ? 0.0 : 1.0;          // depth prendido -> RDM · biometría -> color
+    if (appState._maskLerp === undefined) { appState._maskLerp = 0; appState._maskCamLerp = objCam; }
+    const lerpSpeed = appState.hasHuman ? 0.05 : 0.25;
+    appState._maskLerp += (objOn - appState._maskLerp) * lerpSpeed;
+    appState._maskCamLerp += (objCam - appState._maskCamLerp) * 0.05;
+    const manualOn = appState.hasHuman ? Math.max(0, Math.min(1, (Number(rdmParams.maskOn) || 0) / 100)) : 0.0;
+    const baseCam = Math.max(0, Math.min(1, (Number(rdmParams.camVis) || 0) / 100));
+    const mezclaAuto = appState._maskCamLerp > 0.5
+      ? Math.min(1, baseCam + (1 - baseCam) * 0.65)
+      : baseCam * 0.35;
+    const finalMaskOn = appState.hasHuman ? (auto * appState._maskLerp + (1 - auto) * manualOn) : 0.0;
+    if (this.uniforms.maskOn) gl.uniform1f(this.uniforms.maskOn, finalMaskOn);
+    if (this.uniforms.camVis) gl.uniform1f(this.uniforms.camVis, auto * mezclaAuto + (1 - auto) * baseCam);
     aplicarTintePaletaPips(pal, rdmParams);
 
     const elapsed = (performance.now() - this.startTime) / 1000;
@@ -2115,7 +2825,7 @@ class AsciiCameraShader {
   initWebGL() {
     if (!this.canvas) return;
     this.gl = this.canvas.getContext('webgl2', { alpha: true, antialias: false }) ||
-              this.canvas.getContext('webgl', { alpha: true, antialias: false });
+      this.canvas.getContext('webgl', { alpha: true, antialias: false });
 
     if (!this.gl) {
       console.warn('[ASCII Shader] WebGL no soportado para el shader ASCII.');
@@ -2417,14 +3127,14 @@ class AsciiCameraShader {
       gl.uniform1i(this.uniforms.cameraTexture, 0);
     }
 
-    if (this.hasDepthMask && this.depthTexture && this.lastMaskSource) {
+    if (this.hasDepthMask && this.depthTexture && this.lastMaskSource && appState.hasHuman) {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.depthTexture);
       if (this.maskDirty) {
         this.maskDirty = false;
         try {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.lastMaskSource);
-        } catch (e) {}
+        } catch (e) { }
       }
       gl.uniform1i(this.uniforms.depthMaskTexture, 1);
       gl.uniform1i(this.uniforms.hasDepthMask, 1);
@@ -2526,7 +3236,7 @@ class FrameDifferenceShader {
   initWebGL() {
     if (!this.canvas) return;
     this.gl = this.canvas.getContext('webgl2', { alpha: true, antialias: false }) ||
-              this.canvas.getContext('webgl', { alpha: true, antialias: false });
+      this.canvas.getContext('webgl', { alpha: true, antialias: false });
 
     if (!this.gl) {
       console.warn('[FrameDiff Shader] WebGL no soportado.');
@@ -2808,20 +3518,26 @@ class DepthMapShader {
     this.canvas = canvas;
     this.gl = null;
     this.program = null;
-    this.pointProgram = null;
     this.texture = null;
     this.quadBuffer = null;
-    this.pointBuffer = null;
     this.uniforms = {};
     if (this.canvas) {
       this.initWebGL();
     }
   }
 
+  clear() {
+    const gl = this.gl;
+    if (!gl || !this.canvas) return;
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+
   initWebGL() {
     if (!this.canvas) return;
-    const gl = this.canvas.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: false }) ||
-               this.canvas.getContext('webgl', { alpha: false, antialias: false, preserveDrawingBuffer: false });
+    const gl = this.canvas.getContext('webgl2', { alpha: true, antialias: true, preserveDrawingBuffer: false }) ||
+      this.canvas.getContext('webgl', { alpha: true, antialias: true, preserveDrawingBuffer: false });
     if (!gl) {
       console.warn('[DepthMapShader] WebGL no disponible para Depth Map.');
       return;
@@ -2872,7 +3588,7 @@ class DepthMapShader {
 
       void main() {
         if (!u_hasMask) {
-          fragColor = vec4(0.012, 0.027, 0.05, 1.0);
+          fragColor = vec4(0.012, 0.027, 0.05, 0.0);
           return;
         }
         vec2 uv = vec2(1.0 - v_uv.x, 1.0 - v_uv.y);
@@ -2886,7 +3602,8 @@ class DepthMapShader {
           rawVal = clamp(v * u_contrast, 0.0, 1.0);
         }
         vec3 col = getColormap(rawVal, u_mode);
-        fragColor = vec4(col, 1.0);
+        // Canal alpha contiene rawVal limpio (0 fuera, 1 dentro) para uso directo en el shader maestro
+        fragColor = vec4(col, rawVal);
       }
     `;
 
@@ -2901,34 +3618,10 @@ class DepthMapShader {
       };
     }
 
-    const pointVs = `#version 300 es
-      in vec2 a_point;
-      in vec3 a_color;
-      out vec3 v_color;
-      void main() {
-        gl_Position = vec4(a_point, 0.0, 1.0);
-        gl_PointSize = 8.0;
-        v_color = a_color;
-      }
-    `;
-    const pointFs = `#version 300 es
-      precision mediump float;
-      in vec3 v_color;
-      out vec4 fragColor;
-      void main() {
-        vec2 c = gl_PointCoord - vec2(0.5);
-        if (dot(c, c) > 0.25) discard;
-        fragColor = vec4(v_color, 1.0);
-      }
-    `;
-    this.pointProgram = this.createProgram(pointVs, pointFs);
-
     const quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
     this.quadBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-
-    this.pointBuffer = gl.createBuffer();
 
     this.texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -2964,6 +3657,12 @@ class DepthMapShader {
     const gl = this.gl;
     if (!gl || !this.program) return;
 
+    // Si no hay humano detectado o no hay máscara, limpiar a negro transparente y salir
+    if (!maskSource || !appState.hasHuman) {
+      this.clear();
+      return;
+    }
+
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(this.program);
 
@@ -2973,7 +3672,7 @@ class DepthMapShader {
       gl.bindTexture(gl.TEXTURE_2D, this.texture);
       try {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskSource);
-      } catch (e) {}
+      } catch (e) { }
       gl.uniform1i(this.uniforms.mask, 0);
     }
 
@@ -2990,39 +3689,8 @@ class DepthMapShader {
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    if (this.pointProgram && landmarks && landmarks.length > 0) {
-      const pointData = [];
-      const indices = [0, 11, 12, 15, 16];
-      for (let i = 0; i < indices.length; i++) {
-        const lm = landmarks[indices[i]];
-        if (!lm) continue;
-        const x = (lm.x * 2.0 - 1.0);
-        const y = -(lm.y * 2.0 - 1.0);
-        const isClose = (lm.z || 0) < -0.15;
-        const r = isClose ? 1.0 : 0.0;
-        const g = isClose ? 0.0 : 0.94;
-        const b = isClose ? 0.33 : 1.0;
-        pointData.push(x, y, r, g, b);
-      }
-
-      if (pointData.length > 0) {
-        gl.useProgram(this.pointProgram);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.pointBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pointData), gl.DYNAMIC_DRAW);
-
-        const aPt = gl.getAttribLocation(this.pointProgram, 'a_point');
-        const aCol = gl.getAttribLocation(this.pointProgram, 'a_color');
-
-        gl.enableVertexAttribArray(aPt);
-        gl.vertexAttribPointer(aPt, 2, gl.FLOAT, false, 5 * 4, 0);
-
-        gl.enableVertexAttribArray(aCol);
-        gl.vertexAttribPointer(aCol, 3, gl.FLOAT, false, 5 * 4, 2 * 4);
-
-        gl.drawArrays(gl.POINTS, 0, pointData.length / 5);
-      }
-    }
+    // NOTA: Se removió pointProgram y el dibujado de puntos rojos sobre el depth map
+    // para evitar que se repliquen artefactos y bordes parásitos en el shader maestro.
   }
 }
 
@@ -3056,7 +3724,7 @@ function initGameWebSocket() {
             window.GlobalStyle.aplicar(msg.config);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     });
 
     gameWebSocket.addEventListener('close', () => {
@@ -3097,7 +3765,7 @@ function broadcastCaughtWords(words, extra = {}) {
 
   try {
     localStorage.setItem('sincretismo_orders_event', JSON.stringify(payload));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // Telemetría para la consola externa (/console): expone el "pensamiento" del núcleo.
@@ -3110,7 +3778,7 @@ function emitAgentEvent(stage, message, level = 'info', data = null) {
       stage, level, message, data,
       timestamp: Date.now()
     }));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // NARRACIÓN DEL RAZONAMIENTO: escribe en el MONÓLOGO INTERNO de log.html
@@ -3132,7 +3800,7 @@ function emitAgentThought(token, isThinking = false, fullResponse = '') {
       fullResponse: fullResponse,
       timestamp: Date.now()
     }));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // ============================================================================
@@ -3146,12 +3814,12 @@ async function loadConfigFromServer() {
       try {
         const clusterRes = await sbFetch('/api/clusters');
         if (clusterRes.ok) clusterData = await clusterRes.json();
-      } catch (e) {}
+      } catch (e) { }
       if (!clusterData) {
         try {
           const directRes = await sbFetch('/data/user_clusters.json');
           if (directRes.ok) clusterData = await directRes.json();
-        } catch (e) {}
+        } catch (e) { }
       }
       if (clusterData) {
         const clusters = clusterData.clusters || clusterData;
@@ -3323,11 +3991,11 @@ function renderWordChips() {
     const chip = document.createElement('div');
     chip.className = 'word-chip';
     chip.innerHTML = `<span>${word}</span><button type="button" class="chip-remove-btn" title="Eliminar palabra">✕</button>`;
-    
+
     chip.querySelector('.chip-remove-btn').addEventListener('click', () => {
       removeWordFromPool(idx);
     });
-    
+
     DOM.wordsChipsContainer.appendChild(chip);
   });
 }
@@ -3474,13 +4142,13 @@ const POSE_CONNECTIONS = [
   { from: 9, to: 10, group: 'head' },
   { from: 0, to: 11, group: 'head' },
   { from: 0, to: 12, group: 'head' },
-  
+
   // Torso
   { from: 11, to: 12, group: 'torso' },
   { from: 11, to: 23, group: 'torso' },
   { from: 12, to: 24, group: 'torso' },
   { from: 23, to: 24, group: 'torso' },
-  
+
   // Brazo Izquierdo
   { from: 11, to: 13, group: 'left_arm' },
   { from: 13, to: 15, group: 'left_arm' },
@@ -3753,7 +4421,178 @@ function renderFlowFieldOverlay(landmarks) {
 }
 
 // ============================================================================
+// SISTEMA DE GESTOS DE MANO: DETECCIÓN DE APERTURA / CIERRE Y AGARRE RÁPIDO
+// ============================================================================
+function interpolateRGB(colorA, colorB, t) {
+  const clampT = Math.max(0, Math.min(1, t));
+  const r = Math.round(colorA[0] + (colorB[0] - colorA[0]) * clampT);
+  const g = Math.round(colorA[1] + (colorB[1] - colorA[1]) * clampT);
+  const b = Math.round(colorA[2] + (colorB[2] - colorA[2]) * clampT);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function getHandMorphColor(closure, isLocking) {
+  if (isLocking) return '#f39c12';
+  // closure 0.0 = Mano abierta (Cian luminoso #00f0ff, SIN ROJO)
+  // closure 0.5 = Transición intermedia (Ámbar cálido #ffaa00)
+  // closure 1.0 = Mano cerrada / Puño (Carmesí intenso #ff0055)
+  const cyan = [0, 240, 255];
+  const amber = [255, 170, 0];
+  const crimson = [255, 0, 85];
+  if (closure <= 0.5) {
+    return interpolateRGB(cyan, amber, closure * 2.0);
+  } else {
+    return interpolateRGB(amber, crimson, (closure - 0.5) * 2.0);
+  }
+}
+
+function computeHandOpenness(wrist, elbow, index, pinky, thumb, shoulder, hState) {
+  if (!wrist || !index) return { closure: 0, confidence: 0 };
+
+  const aspect = (window.innerWidth && window.innerHeight) ? (window.innerWidth / window.innerHeight) : 1.333;
+
+  // Distancia euclidiana con corrección de relación de aspecto de pantalla/cámara
+  const distAspect = (p1, p2) => {
+    if (!p1 || !p2) return 0;
+    const dx = (p1.x - p2.x) * aspect;
+    const dy = p1.y - p2.y;
+    return Math.hypot(dx, dy);
+  };
+
+  // 1. Distancias desde la muñeca a los extremos de la mano
+  const dIndex = distAspect(index, wrist);
+  const dPinky = pinky ? distAspect(pinky, wrist) : dIndex;
+  const dThumb = thumb ? distAspect(thumb, wrist) : (dIndex * 0.75);
+
+  // 2. Extensión y apertura entre dedos (envergadura de la palma)
+  const dSpanThumb = (thumb && index) ? distAspect(index, thumb) : (dIndex * 0.5);
+  const dSpanPinky = (pinky && index) ? distAspect(index, pinky) : (dIndex * 0.5);
+
+  const handReach = Math.max(dIndex, dPinky, dThumb);
+  const handSpread = (dSpanThumb + dSpanPinky) * 0.5;
+
+  // Escala de referencia anatómica: antebrazo si está disponible, hombro o base normalizada
+  let refScale = 0;
+  if (elbow && (elbow.visibility === undefined || elbow.visibility > 0.35)) {
+    refScale = distAspect(wrist, elbow);
+  }
+  if (refScale < 0.06 && shoulder && (shoulder.visibility === undefined || shoulder.visibility > 0.35)) {
+    refScale = distAspect(wrist, shoulder) * 0.45;
+  }
+  if (refScale < 0.05) {
+    refScale = 0.20;
+  }
+
+  // Métrica normalizada de extensión de mano
+  const metric = (handReach * 0.65 + handSpread * 0.35) / refScale;
+
+  // CALIBRACIÓN ADAPTATIVA AUTOMÁTICA (se ajusta suavemente a la cámara y distancia del usuario):
+  if (!hState.minM || !hState.maxM) {
+    hState.minM = 0.07;
+    hState.maxM = 0.22;
+  }
+
+  if (metric > hState.maxM) {
+    hState.maxM = hState.maxM * 0.94 + metric * 0.06;
+  } else {
+    hState.maxM = Math.max(0.18, hState.maxM * 0.999);
+  }
+
+  if (metric < hState.minM && metric > 0.015) {
+    hState.minM = hState.minM * 0.94 + metric * 0.06;
+  } else {
+    hState.minM = Math.min(0.11, hState.minM * 1.001);
+  }
+
+  const range = Math.max(0.06, hState.maxM - hState.minM);
+  let rawClosure = (hState.maxM - metric) / range;
+  rawClosure = Math.max(0, Math.min(1, rawClosure));
+
+  const conf = Math.min(
+    wrist.visibility !== undefined ? wrist.visibility : 1,
+    index.visibility !== undefined ? index.visibility : 1
+  );
+
+  return { closure: rawClosure, confidence: conf };
+}
+
+function updateHandGestures(landmarks) {
+  if (!appState.handGestures) return;
+
+  const now = performance.now();
+
+  if (!landmarks || landmarks.length < 23) {
+    ['left', 'right'].forEach(side => {
+      const h = appState.handGestures[side];
+      if (h) {
+        h.targetClosure = 0;
+        h.closure += (0 - h.closure) * 0.15;
+        h.justGrabbed = false;
+      }
+    });
+    return;
+  }
+
+  const hands = [
+    { side: 'left', wrist: 15, elbow: 13, index: 19, pinky: 17, thumb: 21, shoulder: 11 },
+    { side: 'right', wrist: 16, elbow: 14, index: 20, pinky: 18, thumb: 22, shoulder: 12 }
+  ];
+
+  for (const hInfo of hands) {
+    const hState = appState.handGestures[hInfo.side];
+    if (!hState) continue;
+
+    const wLm = landmarks[hInfo.wrist];
+    const eLm = landmarks[hInfo.elbow];
+    const iLm = landmarks[hInfo.index];
+    const pLm = landmarks[hInfo.pinky];
+    const tLm = landmarks[hInfo.thumb];
+    const sLm = landmarks[hInfo.shoulder];
+
+    const { closure: targetClosure, confidence } = computeHandOpenness(wLm, eLm, iLm, pLm, tLm, sLm, hState);
+    hState.confidence = confidence;
+    hState.targetClosure = targetClosure;
+
+    // Suavizado continuo de interpolación (~0.20 para transición fluida y visible)
+    hState.closure += (targetClosure - hState.closure) * 0.20;
+
+    // Coordenadas espejadas en pantalla para alinear con la cámara CCTV
+    if (wLm) {
+      hState.pos.x = (1.0 - wLm.x) * window.innerWidth;
+      hState.pos.y = wLm.y * window.innerHeight;
+    }
+
+    // Histéresis de estados ABIERTA <-> CERRADA (Gesto de agarrar)
+    const CLOSED_CUTOFF = 0.62;
+    const OPEN_CUTOFF = 0.32;
+
+    if (hState.closure <= OPEN_CUTOFF) {
+      if (!hState.isOpen) {
+        hState.isOpen = true;
+        hState.isClosed = false;
+        hState.lastOpenTime = now;
+      }
+    } else if (hState.closure >= CLOSED_CUTOFF) {
+      // Transición de abierta a cerrada: ¡DISPARO DE AGARRE!
+      if (hState.isOpen) {
+        hState.isOpen = false;
+        hState.isClosed = true;
+        hState.justGrabbed = true;
+        hState.lastGrabTime = now;
+      }
+    }
+  }
+
+  // Suavizado de mouse si está disponible
+  const m = appState.handGestures.mouse;
+  if (m) {
+    m.closure += ((m.targetClosure || 0) - m.closure) * 0.22;
+  }
+}
+
+// ============================================================================
 // SISTEMA 1: RENDER DE SUPERPOSICIÓN OPENPOSE (CANVAS OVERLAY FULLSCREEN)
+// REQUERIMIENTO: Conexiones cinemáticas no lineales (contracción y tensión dinámica)
 // ============================================================================
 function renderOpenPoseOverlay(landmarks) {
   const canvas = DOM.openposeCanvas;
@@ -3777,89 +4616,6 @@ function renderOpenPoseOverlay(landmarks) {
   const w = canvas.width;
   const h = canvas.height;
 
-  // 1) Capa Frame Difference: Renderizada en GPU WebGL2 vía FrameDifferenceShader (sin CPU stall)
-  // 2) Capa Flow Field: Renderizada en su propio canvas independiente vía renderFlowFieldOverlay
-
-  // 3) REQUERIMIENTO 10: Cuadrito que trackea la cara en la posición exacta donde está
-  if (appState.trackingConfig.faceBoxOnScreen && landmarks && landmarks.length > 10) {
-    const faceSubset = landmarks.slice(0, 11);
-    let minX = 1, maxX = 0, minY = 1, maxY = 0;
-    let confSum = 0;
-
-    for (let i = 0; i < faceSubset.length; i++) {
-      const p = faceSubset[i];
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-      confSum += (p.visibility !== undefined ? p.visibility : 0.9);
-    }
-
-    const faceConf = Math.round((confSum / faceSubset.length) * 100);
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const bw = Math.max(0.12, (maxX - minX) * 1.55) * w;
-    const bh = Math.max(0.14, (maxY - minY) * 1.7) * h;
-    const sx = (1.0 - cx) * w - bw * 0.5;
-    const sy = cy * h - bh * 0.5;
-
-    ctx.save();
-    ctx.strokeStyle = '#00f0ff';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = '#00f0ff';
-    ctx.shadowBlur = 8;
-
-    const cornerLen = Math.min(24, bw * 0.25);
-    // Esquina superior izquierda
-    ctx.beginPath();
-    ctx.moveTo(sx, sy + cornerLen);
-    ctx.lineTo(sx, sy);
-    ctx.lineTo(sx + cornerLen, sy);
-    ctx.stroke();
-
-    // Esquina superior derecha
-    ctx.beginPath();
-    ctx.moveTo(sx + bw - cornerLen, sy);
-    ctx.lineTo(sx + bw, sy);
-    ctx.lineTo(sx + bw, sy + cornerLen);
-    ctx.stroke();
-
-    // Esquina inferior izquierda
-    ctx.beginPath();
-    ctx.moveTo(sx, sy + bh - cornerLen);
-    ctx.lineTo(sx, sy + bh);
-    ctx.lineTo(sx + cornerLen, sy + bh);
-    ctx.stroke();
-
-    // Esquina inferior derecha
-    ctx.beginPath();
-    ctx.moveTo(sx + bw - cornerLen, sy + bh);
-    ctx.lineTo(sx + bw, sy + bh);
-    ctx.lineTo(sx + bw, sy + bh - cornerLen);
-    ctx.stroke();
-
-    // Mira reticular central
-    ctx.beginPath();
-    ctx.moveTo(sx + bw * 0.5 - 6, sy + bh * 0.5);
-    ctx.lineTo(sx + bw * 0.5 + 6, sy + bh * 0.5);
-    ctx.moveTo(sx + bw * 0.5, sy + bh * 0.5 - 6);
-    ctx.lineTo(sx + bw * 0.5, sy + bh * 0.5 + 6);
-    ctx.stroke();
-
-    // Placa telemétrica
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(6, 14, 24, 0.88)';
-    ctx.fillRect(sx, sy - 20, 180, 18);
-    ctx.strokeStyle = '#00f0ff';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(sx, sy - 20, 180, 18);
-    ctx.fillStyle = '#00f0ff';
-    ctx.font = '10px Share Tech Mono, monospace';
-    ctx.fillText(`[TARGET_ROSTRO_01 | CONF: ${faceConf}%]`, sx + 6, sy - 7);
-
-    ctx.restore();
-  }
-
   // 4) Esqueleto cinemático OpenPose (Bones & Landmarks)
   if (!landmarks || landmarks.length === 0) {
     return;
@@ -3867,18 +4623,9 @@ function renderOpenPoseOverlay(landmarks) {
 
   const minConf = Math.min(0.2, appState.trackingConfig.minConfidence ?? 0.2);
   const theme = appState.trackingConfig.colorTheme || 'cyberpunk';
-  /* LINEA FINA: el trazo del esqueleto se dibuja a la MITAD del valor configurado
-     (pedido: "la linea del openpose mas finita"). Los sliders de calibración siguen
-     mandando: 4 -> 2 px de trazo y 5 -> 2.5 px de punto. */
-  /* El slider de la pestaña TRACKING ahora vale PX REALES (min 0,25 de trazo y
-     0,5 de punto): antes eran px "nominales" que se dividian en secreto y por eso
-     la linea se veia gruesa aunque el numero fuera chico. */
   const boneWidth = Math.max(0.25, Number(appState.trackingConfig.boneWidth) || 0.5);
   const ptRadius = Math.max(0.5, Number(appState.trackingConfig.pointRadius) || 0.75);
 
-  /* BUFFER SUAVIZADO DE PUNTOS DEL OPENPOSE: en vez de saltar de posición cuando
-     MediaPipe entrega landmarks nuevos, cada punto se interpola hacia el nuevo
-     (lerp). Así el esqueleto se mueve continuo y no se notan los saltazos. */
   const OPENPOSE_SUAVIZADO = 0.35;   // 0 = congelado · 1 = sin suavizado (crudo)
   if (!appState.openposeSuave || appState.openposeSuave.length !== landmarks.length) {
     appState.openposeSuave = landmarks.map((l) => ({
@@ -3896,10 +4643,31 @@ function renderOpenPoseOverlay(landmarks) {
   const shouldDrawBones = appState.trackingConfig.drawBones !== false;
   const shouldDrawLandmarks = appState.trackingConfig.drawLandmarks !== false;
 
-  // 4.1) Graficar Articulaciones / Huesos
+  // Buffer de velocidad para contracción y tensión cinemática no lineal
+  if (!appState.openposeSpeeds || appState.openposeSpeeds.length !== suaves.length) {
+    appState.openposeSpeeds = new Float32Array(suaves.length);
+    appState.openposePrev = suaves.map(s => ({ x: (1.0 - s.x) * w, y: s.y * h }));
+  }
+
+  for (let i = 0; i < suaves.length; i++) {
+    const curX = (1.0 - suaves[i].x) * w;
+    const curY = suaves[i].y * h;
+    const prev = appState.openposePrev[i];
+    const dx = curX - prev.x;
+    const dy = curY - prev.y;
+    const distDelta = Math.hypot(dx, dy);
+    // Suavizado exponencial de velocidad (px/frame)
+    appState.openposeSpeeds[i] += (distDelta - appState.openposeSpeeds[i]) * 0.28;
+    prev.x = curX;
+    prev.y = curY;
+  }
+
+  const now = performance.now();
+
+  // 4.1) Graficar Articulaciones / Huesos con Dinámica de Curvatura y Contracción
   if (shouldDrawBones) {
-    ctx.lineCap = 'butt';    // 'round' redondeaba las puntas y sumaba medio pixel
-    ctx.lineJoin = 'miter';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     for (let i = 0; i < POSE_CONNECTIONS.length; i++) {
       const conn = POSE_CONNECTIONS[i];
@@ -3917,21 +4685,114 @@ function renderOpenPoseOverlay(landmarks) {
         const x2 = (1.0 - p2.x) * w;
         const y2 = p2.y * h;
 
-        const col = getBoneColor(conn.group, theme);
-        ctx.strokeStyle = col;
-        ctx.lineWidth = boneWidth;
-        ctx.shadowColor = col;
-        ctx.shadowBlur = 0;     // SIN halo: el glow engrosaba la linea (era lo que se veia grueso)
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.hypot(dx, dy);
+        if (len < 2.0) continue;
 
+        // Velocidad cinética promedio de la conexión
+        const speed1 = appState.openposeSpeeds[conn.from] || 0;
+        const speed2 = appState.openposeSpeeds[conn.to] || 0;
+        const avgSpeed = (speed1 + speed2) * 0.5;
+
+        // Factor de movimiento cinético k en [0.0, 1.0] (0 = estático, 1 = movimiento rápido)
+        const k = Math.min(1.0, Math.max(0.0, avgSpeed / 12.0));
+
+        // Vector unitario y normal perpendicular
+        const ux = dx / len;
+        const uy = dy / len;
+        const nx = -uy;
+        const ny = ux;
+
+        // 1) CURVATURA VS RECTITUD EN RELACIÓN AL MOVIMIENTO:
+        // En reposo (k = 0): La conexión tiene una curvatura orgánica para que no quede rígida/lineal.
+        // Con movimiento (k -> 1): Se tensa y se hace completamente recta.
+        const maxSag = Math.min(18.0, len * 0.13);
+        const sag = maxSag * (1.0 - k);
+
+        // Signo anatómico de la curvatura para que flexione de forma natural
+        let curveSign = 1.0;
+        if (conn.group === 'left_arm' || conn.group === 'left_leg') {
+          curveSign = -1.0;
+        } else if (conn.group === 'right_arm' || conn.group === 'right_leg') {
+          curveSign = 1.0;
+        } else {
+          curveSign = (i % 2 === 0) ? 1.0 : -1.0;
+        }
+
+        // Respiración sutil en reposo
+        const breath = 1.0 + 0.12 * Math.sin(now * 0.0022 + i * 0.7);
+        const currentSag = sag * breath * curveSign;
+
+        // 2) CONTRACCIÓN EN RELACIÓN AL MOVIMIENTO:
+        // Al moverse, la masa de la conexión se contrae hacia el centro (como músculo activo)
+        // dejando tendones elásticos en los extremos anclados a las articulaciones.
+        const contractRatio = Math.min(0.24, 0.035 + k * 0.18);
+        const c1x = x1 + ux * (len * contractRatio);
+        const c1y = y1 + uy * (len * contractRatio);
+        const c2x = x2 - ux * (len * contractRatio);
+        const c2y = y2 - uy * (len * contractRatio);
+
+        const col = getBoneColor(conn.group, theme);
+        ctx.shadowBlur = 0;
+
+        // (A) Tendones de anclaje elásticos entre articulación y cuerpo contraído
+        ctx.strokeStyle = rgbaDesdeHex(col, 0.42);
+        ctx.lineWidth = Math.max(0.25, boneWidth * 0.55);
         ctx.beginPath();
         ctx.moveTo(x1, y1);
+        ctx.lineTo(c1x, c1y);
+        ctx.moveTo(c2x, c2y);
         ctx.lineTo(x2, y2);
         ctx.stroke();
+
+        // (B) Cuerpo contraído activo (se hace más recto con el movimiento)
+        const activeWidth = Math.max(boneWidth, boneWidth * (1.0 + k * 0.7));
+        ctx.strokeStyle = col;
+        ctx.lineWidth = activeWidth;
+
+        ctx.beginPath();
+        ctx.moveTo(c1x, c1y);
+        if (Math.abs(currentSag) > 0.4) {
+          // Arco cuadrático orgánico cuando está relajado / velocidad baja
+          const midX = (c1x + c2x) * 0.5 + nx * currentSag;
+          const midY = (c1y + c2y) * 0.5 + ny * currentSag;
+          ctx.quadraticCurveTo(midX, midY, c2x, c2y);
+        } else {
+          // Recto y tenso durante movimiento
+          ctx.lineTo(c2x, c2y);
+        }
+        ctx.stroke();
+
+        // (C) Filamento luminoso de tensión cinética cuando hay movimiento
+        if (k > 0.28) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.42 * k) + ')';
+          ctx.lineWidth = Math.max(0.25, activeWidth * 0.35);
+          ctx.beginPath();
+          ctx.moveTo(c1x, c1y);
+          if (Math.abs(currentSag) > 0.4) {
+            const midX = (c1x + c2x) * 0.5 + nx * currentSag;
+            const midY = (c1y + c2y) * 0.5 + ny * currentSag;
+            ctx.quadraticCurveTo(midX, midY, c2x, c2y);
+          } else {
+            ctx.lineTo(c2x, c2y);
+          }
+          ctx.stroke();
+        }
+
+        // (D) Pequeños nodos conectores en la transición tendón-músculo
+        if (k > 0.15) {
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(c1x, c1y, Math.max(0.6, boneWidth * 0.8), 0, Math.PI * 2);
+          ctx.arc(c2x, c2y, Math.max(0.6, boneWidth * 0.8), 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
   }
 
-  // 4.2) Graficar Puntos del Cuerpo (Landmarks)
+  // 4.2) Graficar Puntos del Cuerpo (Landmarks) y Balizas de Manos
   if (shouldDrawLandmarks) {
     for (let i = 0; i < suaves.length; i++) {
       const lm = suaves[i];
@@ -3942,22 +4803,76 @@ function renderOpenPoseOverlay(landmarks) {
       const y = lm.y * h;
 
       const isAnchor = (i === 0 || i === 15 || i === 16);
+      const isLeftWrist = (i === 15);
+      const isRightWrist = (i === 16);
+      const isHandWrist = isLeftWrist || isRightWrist;
 
-      ctx.shadowBlur = 0;     // puntos sin halo (antes 8: se veian como manchas)
-      ctx.shadowColor = isAnchor ? '#ff0055' : (theme === 'phosphor' ? '#00ff41' : '#00f0ff');
+      ctx.shadowBlur = 0;
+
+      // Render del punto base con interpolación de color según apertura/cierre de la mano
+      let ptFill = '#ffffff';
+      if (isHandWrist && appState.handGestures) {
+        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
+        const closure = hand ? hand.closure : 0;
+        ptFill = getHandMorphColor(closure, false);
+      } else if (i === 0) {
+        ptFill = '#ff0055';
+      } else if (theme === 'phosphor') {
+        ptFill = '#00ff41';
+      }
 
       ctx.beginPath();
       ctx.arc(x, y, isAnchor ? ptRadius + 1.5 : ptRadius, 0, Math.PI * 2);
-      ctx.fillStyle = isAnchor ? '#ff0055' : (theme === 'phosphor' ? '#00ff41' : '#ffffff');
+      ctx.fillStyle = ptFill;
       ctx.fill();
 
-      // Anillo de fijación en puntos de interacción
-      if (isAnchor) {
+      // Anillo de fijación en puntos de interacción estándar (nariz)
+      if (isAnchor && !isHandWrist) {
         ctx.beginPath();
         ctx.arc(x, y, ptRadius + 3.5, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(255, 0, 85, 0.75)';
         ctx.lineWidth = 1;
         ctx.stroke();
+      }
+
+      // Baliza cinemática animada e interpolada en las muñecas / manos
+      if (isHandWrist && appState.handGestures) {
+        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
+        const closure = hand ? hand.closure : 0;
+        const grabPulse = hand ? Math.max(0, 1.0 - (now - (hand.lastGrabTime || 0)) / 420) : 0;
+        const morphCol = getHandMorphColor(closure, false);
+
+        // Anillo de agarre animado: se contrae continuamente al cerrar la mano
+        const beaconRadius = (ptRadius + 4.5) * (1.0 - 0.28 * closure);
+        ctx.beginPath();
+        ctx.arc(x, y, beaconRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = morphCol;
+        ctx.lineWidth = 1.2 + closure * 1.0;
+        ctx.stroke();
+
+        // 3 Arcos orbitales que rotan cuando la mano está abierta y se pliegan al cerrarse
+        const arcPulse = (now * 0.005) % (Math.PI * 2);
+        const arcSpread = (1.0 - closure) * 0.65;
+        if (arcSpread > 0.08) {
+          for (let a = 0; a < 3; a++) {
+            const ang = arcPulse + (a * Math.PI * 2 / 3);
+            ctx.beginPath();
+            ctx.arc(x, y, beaconRadius + 3.5, ang, ang + arcSpread);
+            ctx.strokeStyle = rgbaDesdeHex(morphCol, 0.75 * (1.0 - closure));
+            ctx.lineWidth = 1.0;
+            ctx.stroke();
+          }
+        }
+
+        // Onda de choque en el instante del agarre ("al toque")
+        if (grabPulse > 0.02) {
+          const shockR = beaconRadius + (1.0 - grabPulse) * 35;
+          ctx.beginPath();
+          ctx.arc(x, y, shockR, 0, Math.PI * 2);
+          ctx.strokeStyle = rgbaDesdeHex('#ff0055', grabPulse * 0.9);
+          ctx.lineWidth = 2.2 * grabPulse;
+          ctx.stroke();
+        }
       }
     }
   }
@@ -3987,8 +4902,8 @@ function renderSilhouetteCutout(results) {
   const mask = results && results.segmentationMask ? results.segmentationMask : null;
   const videoReady = DOM.video && DOM.video.readyState >= 2;
 
-  if (!enabled || !mask || !videoReady) {
-    // Sin máscara disponible: se muestra la cámara completa
+  if (!enabled || !mask || !videoReady || !appState.hasHuman) {
+    // Sin máscara disponible o sin humano: se oculta el recorte
     if (cv.style.display !== 'none') {
       cv.style.display = 'none';
       if (DOM.video && r.cameraEnabled) DOM.video.style.opacity = r.cameraOpacity;
@@ -4032,18 +4947,27 @@ function renderSilhouetteCutout(results) {
 function renderDepthMap(results, landmarks) {
   if (!DOM.depthCanvas || !DOM.depthPip) return;
 
-  // La visibilidad del monitor la decide SOLO el parpadeo aleatorio
-  // (PIP_RANDOM_MIN_S..MAX_S): no queda fijo en pantalla aunque las capas estén on.
-  /* ⚠ El DEPTH MAP QUE ENTRA AL SHADER SE DIBUJA SIEMPRE. DOM.depthCanvas es la
-     textura que muestrea el shader maestro (u_depthTexture): si esta función
-     corta, el shader se queda con el último frame (congelado). El parpadeo
-     aleatorio sólo decide si el MONITOR de costado se ve en pantalla
-     (DOM.depthPip), nunca si la textura se dibuja. */
+  // Si la cámara no capta a ningún humano: ocultar el panel depth map y limpiar la textura
+  if (!appState.hasHuman) {
+    if (!DOM.depthPip.classList.contains('hidden')) {
+      DOM.depthPip.classList.add('hidden');
+    }
+    if (appState.depthShader) {
+      appState.depthShader.clear();
+    }
+    appState.depthFrameId = (appState.depthFrameId || 0) + 1;
+    if (DOM.calibDepthStatus) {
+      DOM.calibDepthStatus.textContent = 'STANDBY (SIN HUMANO)';
+    }
+    return;
+  }
+
   appState.depthFrameId = (appState.depthFrameId || 0) + 1;
 
   let mask = (results && results.segmentationMask) ? results.segmentationMask : null;
   let isVideo = false;
-  if (!mask && DOM.video && DOM.video.readyState >= 2) {
+  // Solo usar fallback de video si realmente hay humano presente
+  if (!mask && appState.hasHuman && DOM.video && DOM.video.readyState >= 2) {
     mask = DOM.video;
     isVideo = true;
   }
@@ -4099,8 +5023,14 @@ function renderDepthMap(results, landmarks) {
 function renderFaceCamera(landmarks) {
   if (!DOM.faceCanvas || !DOM.facePip) return;
 
-  /* Igual que el depth: el seguimiento facial se dibuja SIEMPRE (de acá salen
-     los landmarks del cursor y el encuadre). El parpadeo sólo esconde el MONITOR. */
+  // Si la cámara no capta a ningún humano: ocultar de inmediato el monitor facial
+  if (!appState.hasHuman) {
+    if (!DOM.facePip.classList.contains('hidden')) {
+      DOM.facePip.classList.add('hidden');
+    }
+    return;
+  }
+
   const canvas = DOM.faceCanvas;
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
@@ -4181,6 +5111,93 @@ function renderFaceCamera(landmarks) {
 }
 
 // ============================================================================
+// SISTEMA 4: MONITORES PiP DE MANOS (SOLO MANO IZQUIERDA / SOLO MANO DERECHA)
+// La cámara se recorta y centra sobre la MUÑECA de cada mano (landmarks 15 y 16
+// del OpenPose de MediaPipe) y se muestra un encuadre cuadrado de SOLO esa mano.
+// ============================================================================
+function renderHandCameras(landmarks) {
+  const specs = [
+    { which: 'rightHand', pip: DOM.rightHandPip, canvas: DOM.rightHandCanvas, state: appState.handTrackingState.right,
+      lmIndex: 16, statusEl: DOM.rightHandPipStatus, zoomEl: DOM.rightHandFooterZoom },
+    { which: 'leftHand', pip: DOM.leftHandPip, canvas: DOM.leftHandCanvas, state: appState.handTrackingState.left,
+      lmIndex: 15, statusEl: DOM.leftHandPipStatus, zoomEl: DOM.leftHandFooterZoom }
+  ];
+
+  const noHuman = !appState.hasHuman || !landmarks || landmarks.length < 17;
+  const videoReady = DOM.video && DOM.video.readyState >= 2;
+  const zoom = Math.max(1, Number(appState.trackingConfig.handZoom) || 2.6);
+
+  for (const s of specs) {
+    if (!s.pip || !s.canvas) continue;
+
+    // Sin humano (o sin video): el monitor no tiene nada que mostrar.
+    if (noHuman || !videoReady) {
+      if (!s.pip.classList.contains('hidden')) s.pip.classList.add('hidden');
+      if (s.statusEl) s.statusEl.textContent = 'STANDBY';
+      continue;
+    }
+
+    const lm = landmarks[s.lmIndex];
+    const vis = lm && lm.visibility !== undefined ? lm.visibility : (lm ? 0.9 : 0);
+    if (!lm || vis < 0.25) {
+      // La mano está fuera de cuadro: se avisa dentro del monitor sin apagarlo.
+      if (s.statusEl) s.statusEl.textContent = 'SIN MANO';
+      const c = s.canvas.getContext('2d');
+      if (c) {
+        c.fillStyle = '#050a12';
+        c.fillRect(0, 0, s.canvas.width, s.canvas.height);
+        c.fillStyle = '#64748b';
+        c.font = '11px Share Tech Mono, monospace';
+        c.fillText('SIN SEÑAL DE MANO', 14, s.canvas.height / 2);
+      }
+      continue;
+    }
+
+    const rawSize = 0.42 / zoom;
+    const st = s.state;
+    st.x += (lm.x - st.x) * 0.20;
+    st.y += (lm.y - st.y) * 0.20;
+    st.size += (rawSize - st.size) * 0.20;
+
+    const vw = DOM.video.videoWidth || 1280;
+    const vh = DOM.video.videoHeight || 720;
+    const cropPx = Math.max(90, Math.min(vw, vh, st.size * Math.max(vw, vh)));
+    const sx = Math.max(0, Math.min(vw - cropPx, st.x * vw - cropPx / 2));
+    const sy = Math.max(0, Math.min(vh - cropPx, st.y * vh - cropPx / 2));
+
+    const canvas = s.canvas;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) continue;
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Espejado horizontal, igual que el resto de los monitores (preview tipo espejo).
+    ctx.save();
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(DOM.video, sx, sy, cropPx, cropPx, 0, 0, w, h);
+    ctx.restore();
+
+    // Retícula de encuadre de mano (cruz central + marco de esquinas).
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(8.5, 8.5, w - 17, h - 17);
+    ctx.beginPath();
+    ctx.moveTo(w / 2, h / 2 - 12); ctx.lineTo(w / 2, h / 2 + 12);
+    ctx.moveTo(w / 2 - 12, h / 2); ctx.lineTo(w / 2 + 12, h / 2);
+    ctx.stroke();
+
+    if (s.statusEl) s.statusEl.textContent = 'LOCK';
+    if (s.zoomEl) s.zoomEl.textContent = `${zoom.toFixed(1)}x`;
+
+    if (!s.pip.classList.contains('hidden')) continue;
+    // La VISIBILIDAD la maneja el ciclo aleatorio (setPipVisible); acá sólo se
+    // permite volver a mostrarlo si el flag del ciclo lo tiene encendido.
+    if (appState.pipCycleVisible[s.which]) s.pip.classList.remove('hidden');
+  }
+}
+
+// ============================================================================
 // WEBCAM Y MEDIAPIPE POSE (MOTOR DE TRACKING & CALIBRACIÓN)
 // ============================================================================
 async function initWebcamAndPose() {
@@ -4214,13 +5231,17 @@ function isTrackingNeeded() {
     appState.trackingConfig.showDepthMap ||
     appState.renderConfig.faceEnabled ||
     appState.trackingConfig.showFaceCamera ||
+    appState.trackingConfig.showLeftHand ||
+    appState.trackingConfig.showRightHand ||
     appState.renderConfig.cutoutEnabled ||
     // El shader maestro muestrea el depth en TODOS los frames: mientras esté
     // activo la inferencia tiene que correr, aunque los monitores PiP estén
     // apagados por el parpadeo aleatorio.
     Boolean(appState.masterOutputShader && appState.masterOutputShader.active) ||
     appState.pipCycleVisible.face ||
-    appState.pipCycleVisible.depth
+    appState.pipCycleVisible.depth ||
+    appState.pipCycleVisible.leftHand ||
+    appState.pipCycleVisible.rightHand
   );
   if (visualTrackingActive) return true;
 
@@ -4260,7 +5281,7 @@ function updatePoseSegmentation() {
       minTrackingConfidence: 0.5
     });
     console.log(`[MediaPipe] Segmentación de silueta ${need ? 'ACTIVADA' : 'DESACTIVADA'}.`);
-  } catch (e) {}
+  } catch (e) { }
 }
 
 let posePacingTimer = null;
@@ -4320,7 +5341,8 @@ function initMediaPipePose() {
 
   try {
     const pose = new window.Pose({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+      // 100% LOCAL: los .wasm/.data/.tflite salen de public/vendor/mediapipe/pose
+      locateFile: (file) => `vendor/mediapipe/pose/${file}`
     });
 
     // Inferencia ultrarrápida: modelComplexity 0 (Lite) y sin segmentación densa
@@ -4348,12 +5370,43 @@ function initMediaPipePose() {
   }
 }
 
+function checkHumanPresent(landmarks) {
+  if (!landmarks || landmarks.length === 0) return false;
+  // Landmark 0: nariz, 11: hombro izq, 12: hombro der, 23: cadera izq, 24: cadera der
+  const coreIndices = [0, 11, 12, 23, 24];
+  let visibleCore = 0;
+  for (let i = 0; i < coreIndices.length; i++) {
+    const lm = landmarks[coreIndices[i]];
+    if (lm && (lm.visibility === undefined || lm.visibility > 0.35)) {
+      visibleCore++;
+    }
+  }
+  let validCount = 0;
+  for (let i = 0; i < landmarks.length; i++) {
+    const lm = landmarks[i];
+    if (lm && (lm.visibility === undefined || lm.visibility > 0.25)) {
+      validCount++;
+    }
+  }
+  return visibleCore >= 1 && validCount >= 5;
+}
+
 function onPoseResults(results) {
   const landmarks = results.poseLandmarks || [];
   appState.lastLandmarks = landmarks;
 
+  // Actualizar cálculo de apertura/cierre de manos para agarre "al toque"
+  updateHandGestures(landmarks);
+
   // 1. Estadísticas de Inferencia y Telemetría en Vivo
   const now = performance.now();
+  const humanDetected = checkHumanPresent(landmarks);
+  if (humanDetected) {
+    appState.lastHumanSeenTimestamp = now;
+    appState.hasHuman = true;
+  } else if (now - (appState.lastHumanSeenTimestamp || 0) > 350) {
+    appState.hasHuman = false;
+  }
   const dtPose = now - appState.trackingStats.lastPoseTime;
   appState.trackingStats.lastPoseTime = now;
   if (dtPose > 0) {
@@ -4386,6 +5439,7 @@ function onPoseResults(results) {
   // (u_depthTexture) y del cursor. Lo que parpadea es el MONITOR, no el dibujo.
   renderDepthMap(results, landmarks);
   renderFaceCamera(landmarks);
+  renderHandCameras(landmarks);
 
   // 3. Control del Cursor de Juego (Solo si NO se está usando el mouse)
   if (appState.isUsingMouse) return;
@@ -4414,7 +5468,7 @@ function onPoseResults(results) {
 
     // Movimiento real de la persona en cámara cuenta como actividad (el jitter no).
     if (Math.abs(mappedX - appState.targetCursorX) > IDLE_CTA_CAMERA_MOVE_PX ||
-        Math.abs(mappedY - appState.targetCursorY) > IDLE_CTA_CAMERA_MOVE_PX) {
+      Math.abs(mappedY - appState.targetCursorY) > IDLE_CTA_CAMERA_MOVE_PX) {
       markUserActivity();
     }
     appState.targetCursorX = mappedX;
@@ -4460,16 +5514,22 @@ function loadTrackingConfigFromStorage() {
       if (Number(parsed.boneWidth) > 5) parsed.boneWidth = Math.max(0.25, Number(parsed.boneWidth) * 0.25);
       if (Number(parsed.pointRadius) > 7) parsed.pointRadius = Math.max(0.5, Number(parsed.pointRadius) * 0.25);
       appState.trackingConfig = { ...appState.trackingConfig, ...parsed };
-      console.log('[TRACKING] Configuración cargada de localStorage:', appState.trackingConfig);
+      // Merge profundo del selector de puntos: un JSON viejo/parcial no debe
+      // borrar los defaults (mouse + manos).
+      appState.trackingConfig.collisionPoints = {
+        mouse: true, manoIzq: true, manoDer: true,
+        dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false,
+        ...(appState.trackingConfig.collisionPoints || {})
+      }; console.log('[TRACKING] Configuración cargada de localStorage:', appState.trackingConfig);
     }
-  } catch (e) {}
+  } catch (e) { }
   syncTrackingConfigToInputs();
 }
 
 function saveTrackingConfigToStorage() {
   try {
     localStorage.setItem('sincretismo_tracking_config', JSON.stringify(appState.trackingConfig));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function syncTrackingConfigToInputs() {
@@ -4485,17 +5545,28 @@ function syncTrackingConfigToInputs() {
   if (DOM.valTrackConfidence) DOM.valTrackConfidence.textContent = Math.round(c.minConfidence * 100);
   if (DOM.cfgTrackTheme) DOM.cfgTrackTheme.value = c.colorTheme;
   if (DOM.cfgTrackBodyCollision) DOM.cfgTrackBodyCollision.checked = c.bodyCollision !== false;
-  if (DOM.cfgTrackDepth) DOM.cfgTrackDepth.checked = c.showDepthMap;
+  const cp = c.collisionPoints || {};
+  if (DOM.cfgColPointMouse) DOM.cfgColPointMouse.checked = cp.mouse !== false;
+  if (DOM.cfgColPointManoIzq) DOM.cfgColPointManoIzq.checked = cp.manoIzq !== false;
+  if (DOM.cfgColPointManoDer) DOM.cfgColPointManoDer.checked = cp.manoDer !== false;
+  if (DOM.cfgColPointDedoIzq) DOM.cfgColPointDedoIzq.checked = cp.dedoIzq === true;
+  if (DOM.cfgColPointDedoDer) DOM.cfgColPointDedoDer.checked = cp.dedoDer === true;
+  if (DOM.cfgColPointCodoIzq) DOM.cfgColPointCodoIzq.checked = cp.codoIzq === true;
+  if (DOM.cfgColPointCodoDer) DOM.cfgColPointCodoDer.checked = cp.codoDer === true;
+  if (DOM.cfgColPointCentroFacial) DOM.cfgColPointCentroFacial.checked = cp.centroFacial === true; if (DOM.cfgTrackDepth) DOM.cfgTrackDepth.checked = c.showDepthMap;
   if (DOM.cfgTrackDepthShader) DOM.cfgTrackDepthShader.checked = c.depthInShader !== false;
   if (DOM.cfgTrackBodyColor) DOM.cfgTrackBodyColor.value = c.bodyColor || 'neon-green';
   if (DOM.cfgTrackDepthMode) DOM.cfgTrackDepthMode.value = c.depthMode;
   if (DOM.cfgTrackDepthContrast) DOM.cfgTrackDepthContrast.value = c.depthContrast;
   if (DOM.valTrackDepthContrast) DOM.valTrackDepthContrast.textContent = c.depthContrast;
   if (DOM.cfgTrackFace) DOM.cfgTrackFace.checked = c.showFaceCamera;
-  if (DOM.cfgTrackFaceBox) DOM.cfgTrackFaceBox.checked = c.faceBoxOnScreen !== false;
   if (DOM.cfgTrackFaceZoom) DOM.cfgTrackFaceZoom.value = c.faceZoom;
   if (DOM.valTrackFaceZoom) DOM.valTrackFaceZoom.textContent = c.faceZoom;
   if (DOM.cfgTrackFaceReticle) DOM.cfgTrackFaceReticle.checked = c.faceReticle;
+  if (DOM.cfgTrackLeftHand) DOM.cfgTrackLeftHand.checked = Boolean(c.showLeftHand);
+  if (DOM.cfgTrackRightHand) DOM.cfgTrackRightHand.checked = Boolean(c.showRightHand);
+  if (DOM.cfgTrackHandZoom) DOM.cfgTrackHandZoom.value = c.handZoom || 2.6;
+  if (DOM.valTrackHandZoom) DOM.valTrackHandZoom.textContent = (c.handZoom || 2.6).toFixed(1);
   if (DOM.cfgTrackFrameDiff) DOM.cfgTrackFrameDiff.checked = Boolean(c.frameDifference);
   if (DOM.cfgTrackFrameDiffLimit) DOM.cfgTrackFrameDiffLimit.value = c.frameDiffLimit ?? 0.08;
   if (DOM.valTrackFrameDiffLimit) DOM.valTrackFrameDiffLimit.textContent = (c.frameDiffLimit ?? 0.08).toFixed(2);
@@ -4509,6 +5580,8 @@ function syncTrackingConfigToInputs() {
 
   if (DOM.depthPip) DOM.depthPip.classList.toggle('hidden', !c.showDepthMap);
   if (DOM.facePip) DOM.facePip.classList.toggle('hidden', !c.showFaceCamera);
+  if (DOM.leftHandPip) DOM.leftHandPip.classList.toggle('hidden', !c.showLeftHand);
+  if (DOM.rightHandPip) DOM.rightHandPip.classList.toggle('hidden', !c.showRightHand);
 }
 
 // ============================================================================
@@ -4523,14 +5596,14 @@ function loadRenderConfigFromStorage() {
       appState.renderConfig = { ...appState.renderConfig, ...parsed };
       console.log('[RENDER] Configuración de capas cargada de localStorage:', appState.renderConfig);
     }
-  } catch (e) {}
+  } catch (e) { }
   applyRenderLayers();
 }
 
 function saveRenderConfigToStorage() {
   try {
     localStorage.setItem('sincretismo_render_config', JSON.stringify(appState.renderConfig));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // ============================================================================
@@ -4549,10 +5622,10 @@ const DEFAULT_GLITCH_CONFIG = {
   noiseSpeed: 1.0,
   testPreviewState: null,
   params: {
-    blockIntensity:       { value: 0.80, animated: true },
-    blockSize:            { value: 0.60, animated: true },
-    chromaIntensity:      { value: 0.70, animated: true },
-    vhsNoiseIntensity:    { value: 0.65, animated: true },
+    blockIntensity: { value: 0.80, animated: true },
+    blockSize: { value: 0.60, animated: true },
+    chromaIntensity: { value: 0.70, animated: true },
+    vhsNoiseIntensity: { value: 0.65, animated: true },
     edgeTearingIntensity: { value: 0.50, animated: true }
   }
 };
@@ -4578,14 +5651,14 @@ function loadGlitchConfigFromStorage() {
         console.log('[GLITCH] Configuración de glitch cargada de localStorage:', appState.glitchConfig);
       }
     }
-  } catch (e) {}
+  } catch (e) { }
   applyGlitchConfigToUI();
 }
 
 function saveGlitchConfigToStorage() {
   try {
     localStorage.setItem('sincretismo_glitch_config', JSON.stringify(appState.glitchConfig));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function applyGlitchConfigToUI() {
@@ -4727,22 +5800,40 @@ const MASTER_RDM_DEF = {
   color: '#ffffff', // color del patrón cuando NO se sigue la paleta
   seguirPaleta: 1,  // 1 = patrón, marcos y contenedor usan la PALETA GLOBAL
   camTinte: 0,      // % de tinte de la cámara con la paleta (shader, 0 = original)
-  pipTinte: 60      // % de tinte de los monitores PiP (depth + facial) con la paleta
+  pipTinte: 60,     // % de tinte de los monitores PiP (depth + facial) con la paleta
+  /* SILUETA: la cámara de color deja de ser evidente. Donde se veía la imagen de la
+     cámara ahora va la MÁSCARA DE PROFUNDIDAD pintada con el patrón RDM de la paleta
+     (cobre) y un borde blanco. camVis = 1 devuelve la cámara original. */
+  /* MASCARILLA DEL CUERPO: por defecto APAGADA (solo se ve el esqueleto del openpose).
+     La maneja el MISMO ciclo random de los monitores PiP: a veces se pinta con el
+     depth+RDM, a veces con el color de la cámara, a veces no aparece. */
+  camVis: 50,       // % MEZCLA: 0 = depth+RDM puro · 100 = cámara de color pura · 50 = mitad y mitad
+  silRdm: 100,      // % del patrón RDM en el relleno de la silueta
+  silEdge: 100,     // % del borde blanco de la silueta
+  maskOn: 0,        // % presencia MANUAL de la mascarilla (con maskAuto > 0 la maneja el ciclo)
+  maskAuto: 100,    // % cuánto manda el ciclo random de los monitores PiP
+  silBlur: 1.5      // BLUR del depth en TEXELES (1 texel ≈ 6,6 px de pantalla al escalarlo)
 };
 
 const MASTER_RDM_PARAMS = [
-  { key: 'cnt',      etq: 'CAPAS',              unid: 'cnt',               min: 1,     max: 20,    step: 1,      dec: 0, desc: 'Cuántas capas de ruido aleatorio se promedian. Más capas = más fino.' },
-  { key: 'iteScale', etq: 'ESCALA POR CAPA',    unid: 'ite_scale',         min: 0,     max: 10,    step: 0.05,   dec: 2, desc: 'Cuánto se agranda el UV en cada capa sucesiva.' },
-  { key: 'speedX',   etq: 'VELOCIDAD HORIZONTAL', unid: 'speedx',          min: -0.2,  max: 0.2,   step: 0.005,  dec: 3, desc: 'Deriva del patrón hacia los costados.' },
-  { key: 'speedY',   etq: 'VELOCIDAD VERTICAL',  unid: 'speedy',           min: -0.2,  max: 0.2,   step: 0.005,  dec: 3, desc: 'Deriva del patrón hacia arriba/abajo.' },
-  { key: 'speedRot', etq: 'ROTACIÓN',           unid: 'speedrot',          min: -0.02, max: 0.02,  step: 0.0005, dec: 4, desc: 'Giro de cada capa con el tiempo.' },
-  { key: 'speedRnd', etq: 'VELOCIDAD DEL RANDOM', unid: 'speedrdm',        min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Qué tan rápido cambia el valor aleatorio de cada capa.' },
-  { key: 'sm1',      etq: 'SMOOTH BAJO',        unid: 'sm1',               min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Umbral inferior del smoothstep: dónde empieza a aparecer el patrón.' },
-  { key: 'sm2',      etq: 'SMOOTH ALTO',        unid: 'sm2',               min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Umbral superior: dónde llega a blanco pleno. Muy cerca de sm1 = bordes duros.' },
-  { key: 'force',    etq: 'FUERZA',             unid: 'e_force',           min: 0,     max: 1,     step: 0.01,   dec: 2, desc: 'Brillo total del patrón. 0 = fondo negro.' },
-  { key: 'mix',      etq: 'PRESENCIA',          unid: 'u_rdmMix',          min: 0,     max: 1,     step: 0.01,   dec: 2, desc: '1 = el patrón tapa por completo el fondo anterior (palabras Y contenedor del haiku).' },
-  { key: 'camTinte', etq: 'TINTE DE LA CÁMARA', unid: 'u_camPal',          min: 0,     max: 100,   step: 1,      dec: 0, desc: 'Cuánto se pinta la imagen de la cámara con la PALETA GLOBAL (0 = cámara original).' },
-  { key: 'pipTinte', etq: 'TINTE DE LOS MONITORES', unid: 'pip (CSS)',     min: 0,     max: 100,   step: 1,      dec: 0, desc: 'Cuánto se pintan con la PALETA GLOBAL los monitores PiP: DEPTH MAP y BIOMETRÍA FACIAL.' }
+  { key: 'cnt', etq: 'CAPAS', unid: 'cnt', min: 1, max: 20, step: 1, dec: 0, desc: 'Cuántas capas de ruido aleatorio se promedian. Más capas = más fino.' },
+  { key: 'iteScale', etq: 'ESCALA POR CAPA', unid: 'ite_scale', min: 0, max: 10, step: 0.05, dec: 2, desc: 'Cuánto se agranda el UV en cada capa sucesiva.' },
+  { key: 'speedX', etq: 'VELOCIDAD HORIZONTAL', unid: 'speedx', min: -0.2, max: 0.2, step: 0.005, dec: 3, desc: 'Deriva del patrón hacia los costados.' },
+  { key: 'speedY', etq: 'VELOCIDAD VERTICAL', unid: 'speedy', min: -0.2, max: 0.2, step: 0.005, dec: 3, desc: 'Deriva del patrón hacia arriba/abajo.' },
+  { key: 'speedRot', etq: 'ROTACIÓN', unid: 'speedrot', min: -0.02, max: 0.02, step: 0.0005, dec: 4, desc: 'Giro de cada capa con el tiempo.' },
+  { key: 'speedRnd', etq: 'VELOCIDAD DEL RANDOM', unid: 'speedrdm', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Qué tan rápido cambia el valor aleatorio de cada capa.' },
+  { key: 'sm1', etq: 'SMOOTH BAJO', unid: 'sm1', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Umbral inferior del smoothstep: dónde empieza a aparecer el patrón.' },
+  { key: 'sm2', etq: 'SMOOTH ALTO', unid: 'sm2', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Umbral superior: dónde llega a blanco pleno. Muy cerca de sm1 = bordes duros.' },
+  { key: 'force', etq: 'FUERZA', unid: 'e_force', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Brillo total del patrón. 0 = fondo negro.' },
+  { key: 'mix', etq: 'PRESENCIA', unid: 'u_rdmMix', min: 0, max: 1, step: 0.01, dec: 2, desc: '1 = el patrón tapa por completo el fondo anterior (palabras Y contenedor del haiku).' },
+  { key: 'camTinte', etq: 'TINTE DE LA CÁMARA', unid: 'u_camPal', min: 0, max: 100, step: 1, dec: 0, desc: 'Cuánto se pinta la imagen de la cámara con la PALETA GLOBAL (0 = cámara original).' },
+  { key: 'pipTinte', etq: 'TINTE DE LOS MONITORES', unid: 'pip (CSS)', min: 0, max: 100, step: 1, dec: 0, desc: 'Cuánto se pintan con la PALETA GLOBAL los monitores PiP: DEPTH MAP y BIOMETRÍA FACIAL.' },
+  { key: 'camVis', etq: 'MEZCLA CÁMARA ↔ DEPTH+RDM', unid: 'u_camVis', min: 0, max: 100, step: 1, dec: 0, desc: '0% = mascarilla pintada SOLO con el depth (patrón RDM de la paleta) · 100% = SOLO con el color de la cámara · 50% = las dos mezcladas al medio.' },
+  { key: 'silRdm', etq: 'SILUETA × RDM', unid: 'u_silRdm', min: 0, max: 100, step: 1, dec: 0, desc: 'Relleno de la silueta: 100% = patrón RDM de la paleta (cobre) · 0% = se ve la cámara.' },
+  { key: 'silEdge', etq: 'BORDE BLANCO DE LA SILUETA', unid: 'u_silEdge', min: 0, max: 100, step: 1, dec: 0, desc: 'Contorno blanco sacado del gradiente del depth. 0% = sin borde.' },
+  { key: 'maskAuto', etq: 'LA MASCARILLA LA MANEJA EL CICLO DE LOS MONITORES', unid: 'u_maskOn (auto)', min: 0, max: 100, step: 1, dec: 0, desc: '100% = la mascarilla aparece y desaparece con el MISMO ciclo random que los monitores PiP: cuando se prende el DEPTH se pinta con depth+RDM, cuando se prende la BIOMETRÍA se pinta con el color de la cámara. 0% = la manejás a mano con el control de abajo.' },
+  { key: 'maskOn', etq: 'MASCARILLA DEL CUERPO (manual)', unid: 'u_maskOn', min: 0, max: 100, step: 1, dec: 0, desc: 'Presencia de la mascarilla cuando la maneja el operador (ciclo en 0%). 0% = solo se ve el ESQUELETO del openpose.' },
+  { key: 'silBlur', etq: 'BLUR DEL DEPTH (texeles)', unid: 'u_silBlur', min: 0, max: 6, step: 0.5, dec: 1, desc: 'Suaviza el depth (viene de un canvas de 240x160 que se estira ~6,6x). Se mide en TEXELES del depth: 1 = suaviza un texel de radio (lo que hace falta para que no se vea pixelado), 6 = muy difuso.' }
 ];
 
 function masterRdmState() {
@@ -4860,11 +5951,12 @@ function saveVisualConfigToStorage() {
       particlesRev: PARTICLES_REV,
       ascii: appState.asciiConfig,
       particles: appState.particlesConfig,
+      physics: appState.physicsConfig,
       masterRdm: appState.masterRdm,
       uiColors: appState.uiColors,
       uiPalette: appState.uiPalette
     }));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function loadVisualConfigFromStorage() {
@@ -4884,6 +5976,9 @@ function loadVisualConfigFromStorage() {
         }
         appState.particlesConfig = merge;
       }
+      if (parsed.physics) {
+        appState.physicsConfig = { ...appState.physicsConfig, ...parsed.physics };
+      }
       if (parsed.masterRdm) appState.masterRdm = { ...MASTER_RDM_DEF, ...parsed.masterRdm };
       /* Si el SERVER ya entregó la paleta (config.json), esa manda: si no, un
          localStorage viejo con la paleta "matrix" (verde) pisaba la paleta cobre
@@ -4894,11 +5989,13 @@ function loadVisualConfigFromStorage() {
       }
       console.log('[VISUAL] Configuración visual cargada de localStorage.');
     }
-  } catch (e) {}
+  } catch (e) { }
   // Recién ahora se puede guardar: lo que sigue escribe el estado ya mergeado
   visualConfigReady = true;
   applyParticlesConfig();
   syncParticlesInputs();
+  applyPhysicsConfig();
+  syncPhysicsInputs();
   syncAsciiInputs();
   syncMasterRdmInputs();
   applyUiColors();
@@ -4927,8 +6024,8 @@ function guardarPaletaEnServidor() {
       sbFetch('/config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      }).catch(() => {});
-    } catch (e) {}
+      }).catch(() => { });
+    } catch (e) { }
   }, 900);
 }
 
@@ -5294,7 +6391,49 @@ function syncParticlesInputs() {
   if (DOM.valPartMaxWords) DOM.valPartMaxWords.textContent = p.maxWords;
   if (DOM.cfgPartSpeed) DOM.cfgPartSpeed.value = p.speed;
   if (DOM.valPartSpeed) DOM.valPartSpeed.textContent = Number(p.speed).toFixed(1);
+  if (DOM.cfgPartMaxSpeed) DOM.cfgPartMaxSpeed.value = (p.maxSpeed !== undefined ? p.maxSpeed : 2.0);
+  if (DOM.valPartMaxSpeed) DOM.valPartMaxSpeed.textContent = Number(p.maxSpeed !== undefined ? p.maxSpeed : 2.0).toFixed(1);
   if (DOM.cfgPartOutlineGlow) DOM.cfgPartOutlineGlow.checked = p.outlineGlow !== false;
+}
+
+function applyPhysicsConfig() {
+  const p = appState.physicsConfig;
+  const rad = Number(p.collisionRadius) || 48;
+  if (appState.floatingWords) {
+    appState.floatingWords.forEach(w => {
+      w.radius = rad;
+    });
+  }
+  saveVisualConfigToStorage();
+}
+
+function syncPhysicsInputs() {
+  const p = appState.physicsConfig;
+  if (!p) return;
+  if (DOM.cfgPhysEnabled) DOM.cfgPhysEnabled.checked = p.enabled !== false;
+  if (DOM.valPhysEnabled) {
+    DOM.valPhysEnabled.textContent = (p.enabled !== false) ? 'ACTIVO' : 'DESACTIVADO';
+    DOM.valPhysEnabled.style.color = (p.enabled !== false) ? '#ff000d' : '#888';
+  }
+  const bouncePct = Math.round((p.bounce !== undefined ? p.bounce : 0.75) * 100);
+  if (DOM.cfgPhysBounce) DOM.cfgPhysBounce.value = bouncePct;
+  if (DOM.valPhysBounce) DOM.valPhysBounce.textContent = bouncePct;
+
+  const frictionPct = Math.round((p.friction !== undefined ? p.friction : 0.05) * 100);
+  if (DOM.cfgPhysFriction) DOM.cfgPhysFriction.value = frictionPct;
+  if (DOM.valPhysFriction) DOM.valPhysFriction.textContent = frictionPct;
+
+  const forceVal = Number(p.collisionForce !== undefined ? p.collisionForce : 1.0).toFixed(1);
+  if (DOM.cfgPhysForce) DOM.cfgPhysForce.value = forceVal;
+  if (DOM.valPhysForce) DOM.valPhysForce.textContent = forceVal;
+
+  const radVal = p.collisionRadius !== undefined ? p.collisionRadius : 48;
+  if (DOM.cfgPhysRadius) DOM.cfgPhysRadius.value = radVal;
+  if (DOM.valPhysRadius) DOM.valPhysRadius.textContent = radVal;
+
+  const wallBouncePct = Math.round((p.wallBounce !== undefined ? p.wallBounce : 0.80) * 100);
+  if (DOM.cfgPhysWallBounce) DOM.cfgPhysWallBounce.value = wallBouncePct;
+  if (DOM.valPhysWallBounce) DOM.valPhysWallBounce.textContent = wallBouncePct;
 }
 
 function syncAsciiInputs() {
@@ -5391,6 +6530,14 @@ function applyRenderLayers() {
     t.showFaceCamera = r.faceEnabled;
     DOM.facePip.classList.toggle('hidden', !appState.pipCycleVisible.face);
   }
+  if (DOM.leftHandPip) {
+    t.showLeftHand = r.leftHandEnabled;
+    DOM.leftHandPip.classList.toggle('hidden', !appState.pipCycleVisible.leftHand);
+  }
+  if (DOM.rightHandPip) {
+    t.showRightHand = r.rightHandEnabled;
+    DOM.rightHandPip.classList.toggle('hidden', !appState.pipCycleVisible.rightHand);
+  }
 
   // 8. Filtros Analógicos CCTV (Scanlines & Viñeta)
   if (DOM.cctvScanlines) {
@@ -5449,6 +6596,8 @@ function syncRenderInputs() {
 
   if (DOM.cfgRenderDepthToggle) DOM.cfgRenderDepthToggle.checked = r.depthEnabled;
   if (DOM.cfgRenderFaceToggle) DOM.cfgRenderFaceToggle.checked = r.faceEnabled;
+  if (DOM.cfgRenderLeftHandToggle) DOM.cfgRenderLeftHandToggle.checked = r.leftHandEnabled;
+  if (DOM.cfgRenderRightHandToggle) DOM.cfgRenderRightHandToggle.checked = r.rightHandEnabled;
 
   if (DOM.cfgRenderCutoutToggle) DOM.cfgRenderCutoutToggle.checked = Boolean(r.cutoutEnabled);
   if (DOM.cfgRenderCutoutContrast) DOM.cfgRenderCutoutContrast.value = Math.round((r.cutoutThreshold ?? 0.28) * 100);
@@ -5487,7 +6636,26 @@ function syncRenderInputs() {
 // RENDERIZADO DE PUNTEROS UNIFICADOS (HIGH-TECH RETICLES)
 // Requerimiento 1: Punteros idénticos para mouse, OpenPose o cualquier sensor
 // ============================================================================
-function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = '') {
+/* COLORES DE LOS PUNTEROS: salían de dos literales (#ff0055 / #00f0ff). Ahora se leen
+   del ESTILO GLOBAL (global_style.json → /globalstyle.html): colores.puntero (retículo
+   normal) y colores.punteroFijo (mientras engancha una palabra). Si no están definidos
+   caen a la paleta de cambiapalabras (uiColors.cyan / red). */
+function coloresPunteros() {
+  const g = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
+  const ui = (appState.uiColors || {});
+  const base = g.puntero || g.cambiaAcento || g.acento || ui.cyan || '#00f0ff';
+  const fijo = g.punteroFijo || g.clusterPelotita || g.acento2 || ui.red || '#ff0055';
+  return { base: base, fijo: fijo };
+}
+
+function rgbaDesdeHex(hex, alfa) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return 'rgba(255, 255, 255, ' + alfa + ')';
+  const n = parseInt(m[1], 16);
+  return 'rgba(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ', ' + alfa + ')';
+}
+
+function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = '', handGesture = null) {
   if (!appState.renderConfig.pointersEnabled) return;
 
   const masterOpacity = appState.renderConfig.pointersOpacity;
@@ -5497,94 +6665,215 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
   ctx.globalAlpha = masterOpacity;
   ctx.translate(x, y);
 
-  const primaryCol = isLocking ? '#ff0055' : '#00f0ff';
-  const glowCol = isLocking ? 'rgba(255, 0, 85, 0.8)' : 'rgba(0, 240, 255, 0.7)';
-  const pulse = Math.sin(performance.now() * 0.008) * 2;
-  const radius = isLocking ? (26 + pulse) : 22;
+  const colPun = coloresPunteros();
+  const now = performance.now();
 
-  // Optimización de rendimiento: Evitar shadowBlur en canvas 2D de alta resolución (previene caídas de FPS)
+  // Detección del estado de mano para animación reactiva
+  let hand = handGesture;
+  if (!hand && appState.handGestures) {
+    if (label.includes('IZQ') || label === 'MANO_IZQ') hand = appState.handGestures.left;
+    else if (label.includes('DER') || label === 'MANO_DER') hand = appState.handGestures.right;
+    else if (label.includes('MOUSE') || label === 'PUNTERO_MOUSE') hand = appState.handGestures.mouse;
+  }
+
+  const closure = hand ? (hand.closure || 0) : 0;
+  const grabPulse = hand ? Math.max(0, 1.0 - (now - (hand.lastGrabTime || 0)) / 420) : 0;
+  const isClosed = (closure >= 0.60);
+
+  // INTERPOLACIÓN VISUAL CONTINUA DE COLOR Y FORMA ENTRE ABIERTA Y CERRADA:
+  const morphColor = getHandMorphColor(closure, isLocking);
+  const primaryCol = isLocking ? colPun.fijo : morphColor;
+  const pulse = Math.sin(now * 0.008) * 2;
+  const baseR = isLocking ? (26 + pulse) : 22;
+
+  // ANIMACIÓN DE PUNTO DE MANO:
+  // Mano abierta -> radio relajado, apertura amplia
+  // Mano cerrándose -> contracción concéntrica suave continua (hasta 25%)
+  const openBreath = (hand && closure < 0.4) ? Math.sin(now * 0.005) * 1.5 : 0;
+  const contraction = 0.25 * closure;
+  const outerRadius = ((baseR + 14 + openBreath) * (1.0 - contraction)) + (grabPulse * 3.5);
+  const radius = baseR * (1.0 - contraction * 0.8);
+
   ctx.shadowBlur = 0;
 
-  // Si está fijando objetivo, dibujamos un anillo exterior suave sin el costo de rasterización de Gaussian blur
-  if (isLocking) {
-    ctx.strokeStyle = 'rgba(255, 0, 85, 0.38)';
-    ctx.lineWidth = 3.6;
+  // 1. Fondo negro óptico con tinte continuo según interpolación de apertura/cierre
+  const lensGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, outerRadius);
+  const rBg = Math.round(8 + closure * 32);
+  const gBg = Math.round(18 - closure * 10);
+  const bBg = Math.round(26 - closure * 20);
+  lensGrad.addColorStop(0, `rgba(${rBg}, ${gBg}, ${bBg}, 0.95)`);
+  lensGrad.addColorStop(0.65, `rgba(${Math.round(rBg * 0.6)}, ${Math.round(gBg * 0.6)}, ${Math.round(bBg * 0.6)}, 0.98)`);
+  lensGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');
+  ctx.fillStyle = lensGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Bisel exterior con muescas mecánicas y color interpolado dinámico
+  ctx.strokeStyle = morphColor;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Muescas radiales del bisel mecánico (12 muescas a 30°)
+  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = morphColor;
+  for (let a = 0; a < 12; a++) {
+    const ang = a * (Math.PI / 6);
+    const cosA = Math.cos(ang);
+    const sinA = Math.sin(ang);
     ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.moveTo(cosA * (outerRadius - 3.5), sinA * (outerRadius - 3.5));
+    ctx.lineTo(cosA * (outerRadius + 1.5), sinA * (outerRadius + 1.5));
     ctx.stroke();
   }
 
-  // 1. Círculo Interior Fino
-  ctx.strokeStyle = primaryCol;
-  ctx.lineWidth = 1.4;
+  // ANIMACIÓN DE PINZAS / GARRAS MECÁNICAS (Gripper Aperture Claws):
+  // Abiertas: giran hacia afuera (+26°) y se repliegan en el borde.
+  // Cerrándose: giran hacia adentro (-40°) y se extienden al centro, pinzando suavemente.
+  const clawCount = 4;
+  for (let c = 0; c < clawCount; c++) {
+    const baseAng = (c * Math.PI / 2) + (Math.PI / 4);
+    const clawAngleOffset = (1.0 - closure) * 0.45 - closure * 0.60;
+    const curAng = baseAng + clawAngleOffset;
+
+    const mountR = outerRadius - 2.5;
+    const mx = Math.cos(baseAng) * mountR;
+    const my = Math.sin(baseAng) * mountR;
+
+    const clawLen = 7.0 + closure * 10.5;
+    const tipX = mx + Math.cos(curAng + Math.PI) * clawLen;
+    const tipY = my + Math.sin(curAng + Math.PI) * clawLen;
+
+    ctx.strokeStyle = morphColor;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(mx, my);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+
+    // Remache en la articulación de la garra
+    ctx.fillStyle = morphColor;
+    ctx.beginPath();
+    ctx.arc(mx, my, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Yema de contacto / electrodo
+    ctx.fillStyle = morphColor;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 3. Anillos concéntricos de retícula de mira (óptica de precisión)
+  ctx.strokeStyle = isClosed ? 'rgba(255, 59, 48, 0.7)' : (isLocking ? 'rgba(243, 156, 18, 0.65)' : 'rgba(0, 240, 255, 0.55)');
+  ctx.lineWidth = 1.0;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 2. Brackets / Ticks de Esquina (Retícula Táctica 4 Cuadrantes)
-  const bracketDist = radius + 6;
-  const bracketLen = 6;
-  ctx.lineWidth = 2.0;
-
-  // Top-Left
   ctx.beginPath();
-  ctx.moveTo(-bracketDist, -bracketDist + bracketLen);
-  ctx.lineTo(-bracketDist, -bracketDist);
-  ctx.lineTo(-bracketDist + bracketLen, -bracketDist);
+  ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Top-Right
+  // 4. Cruz Táctica Steampunk con Mil-Dots / Marcas de Telémetro
+  ctx.lineWidth = 1.1;
+  ctx.strokeStyle = primaryCol;
+
+  // Eje X
   ctx.beginPath();
-  ctx.moveTo(bracketDist - bracketLen, -bracketDist);
-  ctx.lineTo(bracketDist, -bracketDist);
-  ctx.lineTo(bracketDist, -bracketDist + bracketLen);
+  ctx.moveTo(-outerRadius + 4, 0); ctx.lineTo(-radius * 0.45, 0);
+  ctx.moveTo(radius * 0.45, 0); ctx.lineTo(outerRadius - 4, 0);
+  // Eje Y
+  ctx.moveTo(0, -outerRadius + 4); ctx.lineTo(0, -radius * 0.45);
+  ctx.moveTo(0, radius * 0.45); ctx.lineTo(0, outerRadius - 4);
   ctx.stroke();
 
-  // Bottom-Left
-  ctx.beginPath();
-  ctx.moveTo(-bracketDist, bracketDist - bracketLen);
-  ctx.lineTo(-bracketDist, bracketDist);
-  ctx.lineTo(-bracketDist + bracketLen, bracketDist);
-  ctx.stroke();
+  // Mil-dots / graduaciones en la cruz
+  const dots = [8, 14, 20];
+  ctx.lineWidth = 0.9;
+  ctx.strokeStyle = morphColor;
+  dots.forEach(d => {
+    if (d < outerRadius - 6) {
+      ctx.beginPath();
+      ctx.moveTo(-d, -2); ctx.lineTo(-d, 2);
+      ctx.moveTo(d, -2); ctx.lineTo(d, 2);
+      ctx.moveTo(-2, -d); ctx.lineTo(2, -d);
+      ctx.moveTo(-2, d); ctx.lineTo(2, d);
+      ctx.stroke();
+    }
+  });
 
-  // Bottom-Right
+  // 5. Punto Central / Bead (Morphing continuo de color y tamaño según apertura)
+  const beadR = 2.0 + closure * 1.6 + (grabPulse * 1.5);
+  ctx.fillStyle = morphColor;
   ctx.beginPath();
-  ctx.moveTo(bracketDist - bracketLen, bracketDist);
-  ctx.lineTo(bracketDist, bracketDist);
-  ctx.lineTo(bracketDist, bracketDist - bracketLen);
-  ctx.stroke();
-
-  // 3. Cruz Central de Precisión
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-radius - 4, 0); ctx.lineTo(-radius + 4, 0);
-  ctx.moveTo(radius - 4, 0); ctx.lineTo(radius + 4, 0);
-  ctx.moveTo(0, -radius - 4); ctx.lineTo(0, -radius + 4);
-  ctx.moveTo(0, radius - 4); ctx.lineTo(0, radius + 4);
-  ctx.stroke();
-
-  // 4. Punto Central
-  ctx.fillStyle = primaryCol;
-  ctx.beginPath();
-  ctx.arc(0, 0, isLocking ? 3.5 : 2.5, 0, Math.PI * 2);
+  ctx.arc(0, 0, beadR, 0, Math.PI * 2);
   ctx.fill();
 
-  // 5. Arco de Carga de Dwell (cuando se está fijando sobre una palabra)
+  // 6. Arco de Carga de Dwell (Manómetro / Muelle de Carga Steampunk)
   if (isLocking && chargeProgress > 0) {
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3.2;
+    ctx.strokeStyle = '#ff5722';
+    ctx.lineWidth = 3.6;
     ctx.beginPath();
-    ctx.arc(0, 0, radius + 11, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * chargeProgress);
+    ctx.arc(0, 0, outerRadius + 4.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * chargeProgress);
     ctx.stroke();
+
+    const curAng = -Math.PI / 2 + Math.PI * 2 * chargeProgress;
+    const hx = Math.cos(curAng) * (outerRadius + 4.5);
+    const hy = Math.sin(curAng) * (outerRadius + 4.5);
+    ctx.fillStyle = '#ffeb3b';
+    ctx.beginPath();
+    ctx.arc(hx, hy, 2.8, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // 6. Etiqueta Telemetría
+  // 7. ANIMACIÓN DE IMPACTO / AGARRE INSTANTÁNEO ("AL TOQUE")
+  if (grabPulse > 0.01) {
+    // Onda de choque expansiva
+    const shockR = outerRadius + (1.0 - grabPulse) * 46;
+    ctx.strokeStyle = rgbaDesdeHex('#ff0055', grabPulse * 0.95);
+    ctx.lineWidth = 3.2 * grabPulse;
+    ctx.beginPath();
+    ctx.arc(0, 0, shockR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 4 Descargas radiales en cruz
+    ctx.strokeStyle = rgbaDesdeHex('#ffffff', grabPulse);
+    ctx.lineWidth = 1.6 * grabPulse;
+    for (let s = 0; s < 4; s++) {
+      const sAng = s * Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(sAng) * outerRadius, Math.sin(sAng) * outerRadius);
+      ctx.lineTo(Math.cos(sAng) * (outerRadius + 22 * grabPulse), Math.sin(sAng) * (outerRadius + 22 * grabPulse));
+      ctx.stroke();
+    }
+  }
+
+  // 8. Etiqueta Telemetría Steampunk y Estado de Mano
   if (label) {
     ctx.shadowBlur = 0;
-    ctx.font = '8.5px "Share Tech Mono", monospace';
-    ctx.fillStyle = primaryCol;
+    ctx.font = '8px "Share Tech Mono", monospace';
+    ctx.fillStyle = isLocking ? '#f39c12' : '#dfa857';
     ctx.textAlign = 'center';
-    ctx.fillText(label, 0, radius + 20);
+    ctx.fillText(label, 0, outerRadius + 14);
+
+    if (hand) {
+      if (grabPulse > 0.05) {
+        ctx.fillStyle = '#ff0055';
+        ctx.fillText('⚡ ¡AGARRE AL TOQUE! ⚡', 0, outerRadius + 24);
+      } else if (closure >= 0.62) {
+        ctx.fillStyle = '#ff0055';
+        ctx.fillText('[ MANO CERRADA ✊ ]', 0, outerRadius + 24);
+      } else if (closure > 0.35) {
+        ctx.fillStyle = '#ffaa00';
+        ctx.fillText(`[ CERRANDO ${Math.round(closure * 100)}% ✊ ]`, 0, outerRadius + 24);
+      } else {
+        ctx.fillStyle = '#00f0ff';
+        ctx.fillText('[ MANO ABIERTA 🖐 ]', 0, outerRadius + 24);
+      }
+    }
   }
 
   ctx.restore();
@@ -5592,12 +6881,14 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
 
 function renderUnifiedPointers() {
   if (!DOM.pointersCanvas || !appState.renderConfig.pointersEnabled) return;
-  if (appState.currentState === STATES.PROCESSING || appState.currentState === STATES.HIJACK) return;
+  // NO retornar en STATES.PROCESSING para que los puntos sigan moviéndose y respondiendo al usuario
   const ctx = DOM.pointersCanvas.getContext('2d');
   ctx.clearRect(0, 0, DOM.pointersCanvas.width, DOM.pointersCanvas.height);
 
   const points = appState.activeInteractionPoints || [];
-  const lockingIdx = appState.targetedWordIndex;
+  const lockingIdx = (appState.currentState === STATES.PROCESSING || appState.currentState === STATES.HIJACK)
+    ? -1
+    : appState.targetedWordIndex;
   const progress = lockingIdx !== -1 ? Math.min(1.0, appState.dwellTimer / appState.dwellDuration) : 0;
 
   for (let i = 0; i < points.length; i++) {
@@ -5630,7 +6921,7 @@ class CorporateParticleRain {
     this.resize();
   }
 
-  preRenderSprites() {}
+  preRenderSprites() { }
 
   resize() {
     if (!this.canvas) return;
@@ -5693,14 +6984,17 @@ class FloatingWord {
     this.state = state;
     this.x = x ?? (Math.random() * (window.innerWidth - 300) + 150);
     this.y = y ?? (Math.random() * (window.innerHeight - 350) + 120);
-    
+
     const angle = Math.random() * Math.PI * 2;
     const speed = 0.5 + Math.random() * 0.9;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
     this.floatPhase = Math.random() * 10;
-    
-    this.radius = 48;
+
+    this.radius = (appState.physicsConfig && appState.physicsConfig.collisionRadius) ? appState.physicsConfig.collisionRadius : 48;
+    this.mass = 1.0;
+    this.ax = 0;
+    this.ay = 0;
     this.dwell = 0;
     this.age = 0;
     this.isTargeted = false;
@@ -5750,9 +7044,23 @@ class FloatingWord {
     if (this.state !== WORD_STATES.FLOATING && this.state !== WORD_STATES.LOCKING) return;
     if (this.isCaught) return;
 
+    // REQUERIMIENTO 2: Cuando una palabra empieza a llenarse y ganar energía (LOCKING, isTargeted o dwellProgress > 0)
+    // se queda QUIETA, o sea que deja de moverse por completo.
+    const isCharging = (this.state === WORD_STATES.LOCKING || this.isTargeted || (this.dwellProgress && this.dwellProgress > 0));
+    if (isCharging) {
+      this.ax = 0;
+      this.ay = 0;
+      this.updatePosition();
+      return;
+    }
+
     const pCfg = appState.particlesConfig || {};
+    const physCfg = appState.physicsConfig || {};
     const life = Number(pCfg.lifetime) || 0;
     const speedMul = Number(pCfg.speed) || 1;
+    const friction = Number(physCfg.friction !== undefined ? physCfg.friction : 0.05);
+    const wallBounce = Number(physCfg.wallBounce !== undefined ? physCfg.wallBounce : 0.80);
+
     if (life > 0) {
       this.age += dt;
       const remain = life - this.age;
@@ -5766,9 +7074,29 @@ class FloatingWord {
       }
     }
 
+    // Fricción / resistencia continua para suavizar aceleraciones de colisión
+    const effDt = Math.max(0.001, Math.min(0.1, dt || 0.016));
+    const damping = Math.max(0.70, 1 - friction * effDt * 2.5);
+    this.vx *= damping;
+    this.vy *= damping;
+
+    // Control de velocidades mínimas y máximas para mantener dinamismo.
+    // VELOCIDAD MÁXIMA configurable (pestaña PARTÍCULAS): tope duro del módulo
+    // de la velocidad. Default 2 (el usuario la fija en 2).
+    const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+    const maxSpeed = Math.max(0.1, Number(pCfg.maxSpeed) || 2.0);
+    const minSpeed = 0.45 * speedMul;
+    if (currentSpeed > maxSpeed) {
+      this.vx = (this.vx / currentSpeed) * maxSpeed;
+      this.vy = (this.vy / currentSpeed) * maxSpeed;
+    } else if (currentSpeed < minSpeed && currentSpeed > 0.0001) {
+      this.vx = (this.vx / currentSpeed) * minSpeed;
+      this.vy = (this.vy / currentSpeed) * minSpeed;
+    }
+
     this.floatPhase += dt * 1.5;
-    const swayX = Math.sin(this.floatPhase) * 0.4;
-    const swayY = Math.cos(this.floatPhase * 0.8) * 0.3;
+    const swayX = Math.sin(this.floatPhase) * 0.35;
+    const swayY = Math.cos(this.floatPhase * 0.8) * 0.25;
 
     this.x += (this.vx + swayX) * speedMul;
     this.y += (this.vy + swayY) * speedMul;
@@ -5778,12 +7106,21 @@ class FloatingWord {
     const minY = 90;
     const maxY = window.innerHeight - 130;
 
-    if (this.x < minX) { this.x = minX; this.vx = Math.abs(this.vx); }
-    if (this.x > maxX) { this.x = maxX; this.vx = -Math.abs(this.vx); }
-    if (this.y < minY) { this.y = minY; this.vy = Math.abs(this.vy); }
-    if (this.y > maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); }
+    if (this.x < minX) { this.x = minX; this.vx = Math.abs(this.vx) * wallBounce; }
+    if (this.x > maxX) { this.x = maxX; this.vx = -Math.abs(this.vx) * wallBounce; }
+    if (this.y < minY) { this.y = minY; this.vy = Math.abs(this.vy) * wallBounce; }
+    if (this.y > maxY) { this.y = maxY; this.vy = -Math.abs(this.vy) * wallBounce; }
 
     this.updatePosition();
+  }
+
+  onCollide() {
+    if (!this.el) return;
+    this.el.classList.add('word-colliding');
+    if (this._collideTimer) clearTimeout(this._collideTimer);
+    this._collideTimer = setTimeout(() => {
+      if (this.el) this.el.classList.remove('word-colliding');
+    }, 150);
   }
 
   updatePosition() {
@@ -5793,6 +7130,7 @@ class FloatingWord {
 
   setTargeted(targeted, progress = 0) {
     this.isTargeted = targeted;
+    this.dwellProgress = targeted ? Math.min(1.0, Math.max(0, progress)) : 0;
     if (targeted) {
       this.state = WORD_STATES.LOCKING;
       this.el.classList.add('targeting');
@@ -5858,7 +7196,7 @@ class FloatingWord {
     this.isCaught = true;
     this.state = WORD_STATES.SLOTTED;
     this.slotIndex = stageIdx;
-    this.el.className = 'organic-word-item word-slotted';
+    this.el.className = 'organic-word-item word-slotted word-charged';
     if (this.pillFill) this.pillFill.style.width = '0%';
     if (this.lockBadge) this.lockBadge.style.display = 'none';
     if (this.label) this.label.textContent = this.text.toUpperCase();
@@ -5902,19 +7240,20 @@ class FloatingWord {
     return new Promise((resolve) => {
       const GLYPHS = '01#$*+<>/?@_Δ§%&ABCDEF0123456789';
       const startTime = performance.now();
-      const currentWord = this.text.toUpperCase();
+      const currentWord = String(this.text || '').toUpperCase();
+      const targetStr = String(targetColdWord || '');
 
       const updateFrame = (now) => {
         const elapsed = now - startTime;
         const progress = Math.min(1.0, elapsed / durationMs);
 
-        const currentLength = Math.round(currentWord.length + (targetColdWord.length - currentWord.length) * progress);
-        const resolvedCount = Math.floor(targetColdWord.length * Math.pow(progress, 1.4));
+        const currentLength = Math.max(1, Math.round(currentWord.length + (targetStr.length - currentWord.length) * progress));
+        const resolvedCount = Math.floor(targetStr.length * Math.pow(progress, 1.35));
 
         let displayStr = '';
         for (let i = 0; i < currentLength; i++) {
-          if (i < resolvedCount && i < targetColdWord.length) {
-            displayStr += targetColdWord[i];
+          if (i < resolvedCount && i < targetStr.length) {
+            displayStr += targetStr[i];
           } else {
             displayStr += GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
           }
@@ -5922,17 +7261,21 @@ class FloatingWord {
 
         if (this.label) this.label.textContent = displayStr;
 
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.28) {
           playSound('typewriter');
         }
 
         if (progress < 1.0) {
           requestAnimationFrame(updateFrame);
         } else {
-          if (this.label) this.label.textContent = targetColdWord;
-          this.state = WORD_STATES.TRANSFORMED;
-          this.el.className = 'organic-word-item word-transformed';
-          playSound('catch');
+          if (this.label) this.label.textContent = targetStr;
+          if (this.state !== WORD_STATES.AUXILIARY) {
+            this.state = WORD_STATES.TRANSFORMED;
+            this.el.className = 'organic-word-item word-transformed';
+            playSound('catch');
+          } else {
+            this.el.className = 'organic-word-item word-auxiliary';
+          }
           resolve();
         }
       };
@@ -6010,6 +7353,115 @@ function spawnReplacementWord() {
 }
 
 // ============================================================================
+// SISTEMA DE COLISIÓN Y FÍSICA DE PALABRAS FLOTANTES (REQUERIMIENTO 3)
+// ============================================================================
+function updateFloatingWordsPhysics(dt) {
+  const cfg = appState.physicsConfig;
+  if (!cfg || !cfg.enabled) return;
+
+  const words = appState.floatingWords.filter(w => !w.isCaught && (w.state === WORD_STATES.FLOATING || w.state === WORD_STATES.LOCKING));
+  if (words.length < 2) return;
+
+  const bounce = (cfg.bounce !== undefined) ? cfg.bounce : 0.75;
+  const friction = (cfg.friction !== undefined) ? cfg.friction : 0.05;
+  const baseRadius = (cfg.collisionRadius !== undefined) ? cfg.collisionRadius : 48;
+  const forceMul = (cfg.collisionForce !== undefined) ? cfg.collisionForce : 1.0;
+
+  for (let i = 0; i < words.length; i++) {
+    const w1 = words[i];
+    const isLocked1 = (w1.state === WORD_STATES.LOCKING || w1.isTargeted || (w1.dwellProgress && w1.dwellProgress > 0));
+
+    for (let j = i + 1; j < words.length; j++) {
+      const w2 = words[j];
+      const isLocked2 = (w2.state === WORD_STATES.LOCKING || w2.isTargeted || (w2.dwellProgress && w2.dwellProgress > 0));
+
+      const dx = w2.x - w1.x;
+      const dy = w2.y - w1.y;
+      const distSq = dx * dx + dy * dy;
+
+      const r1 = w1.radius || baseRadius;
+      const r2 = w2.radius || baseRadius;
+      const minDist = r1 + r2;
+
+      if (distSq < minDist * minDist && distSq > 0.0001) {
+        const dist = Math.sqrt(distSq);
+        const nx = dx / dist; // Vector normal unitario de w1 a w2
+        const ny = dy / dist;
+        const tx = -ny;       // Vector tangente perpendicular
+        const ty = nx;
+
+        // Separación de cuerpos para evitar superposición
+        const overlap = (minDist - dist) + 0.5;
+        if (isLocked1 && !isLocked2) {
+          // w1 está cargándose/ganando energía y no se mueve; w2 absorbe todo el desplazamiento
+          w2.x += nx * overlap;
+          w2.y += ny * overlap;
+        } else if (!isLocked1 && isLocked2) {
+          // w2 está cargándose/ganando energía y no se mueve; w1 absorbe todo el desplazamiento
+          w1.x -= nx * overlap;
+          w1.y -= ny * overlap;
+        } else if (!isLocked1 && !isLocked2) {
+          // Ambas están flotando libremente
+          w1.x -= nx * overlap * 0.5;
+          w1.y -= ny * overlap * 0.5;
+          w2.x += nx * overlap * 0.5;
+          w2.y += ny * overlap * 0.5;
+        }
+
+        // Velocidad relativa
+        const rvx = (w2.vx || 0) - (w1.vx || 0);
+        const rvy = (w2.vy || 0) - (w1.vy || 0);
+        const velAlongNormal = rvx * nx + rvy * ny;
+
+        // Sólo rebotan si se están acercando
+        if (velAlongNormal < 0) {
+          const invM1 = isLocked1 ? 0 : 1 / (w1.mass || 1);
+          const invM2 = isLocked2 ? 0 : 1 / (w2.mass || 1);
+          const totalInvM = invM1 + invM2;
+
+          if (totalInvM > 0) {
+            // Magnitud del impulso normal con restitución (rebote)
+            const impulseMag = -(1 + bounce) * velAlongNormal / totalInvM * forceMul;
+            const ix = impulseMag * nx;
+            const iy = impulseMag * ny;
+
+            // Fricción tangencial en el choque
+            const velAlongTangent = rvx * tx + rvy * ty;
+            const frictionMag = -velAlongTangent / totalInvM * friction;
+            const fx = frictionMag * tx;
+            const fy = frictionMag * ty;
+
+            const totalImpulseX = ix + fx;
+            const totalImpulseY = iy + fy;
+
+            // Cambio instantáneo de aceleración y velocidad
+            const effDt = Math.max(0.016, dt || 0.016);
+            if (!isLocked1) {
+              const dvx1 = -totalImpulseX * invM1;
+              const dvy1 = -totalImpulseY * invM1;
+              w1.vx += dvx1;
+              w1.vy += dvy1;
+              w1.ax = dvx1 / effDt;
+              w1.ay = dvy1 / effDt;
+              w1.onCollide();
+            }
+            if (!isLocked2) {
+              const dvx2 = totalImpulseX * invM2;
+              const dvy2 = totalImpulseY * invM2;
+              w2.vx += dvx2;
+              w2.vy += dvy2;
+              w2.ax = dvx2 / effDt;
+              w2.ay = dvy2 / effDt;
+              w2.onCollide();
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// ============================================================================
 // MÁQUINA DE ESTADOS Y CONTROL DE FLUJO
 // ============================================================================
 function handleStateProcessing() {
@@ -6027,24 +7479,26 @@ function transitionTo(newState) {
   appState.currentState = newState;
 
   DOM.container.className = '';
-  
+
   if (newState === STATES.IDLE) {
     DOM.hudStateText.textContent = 'ESTADO: OBSERVACIÓN (IDLE)';
     DOM.reticle.classList.remove('hidden');
     DOM.reticleLabel.textContent = 'BUSCANDO';
     DOM.reticle.classList.remove('locking');
-  } 
+  }
   else if (newState === STATES.INTERACT) {
     DOM.hudStateText.textContent = 'ESTADO: FIJANDO PROXIMIDAD (INTERACT)';
     DOM.reticle.classList.add('locking');
     DOM.reticleLabel.textContent = 'ENGAGED';
-  } 
+  }
   else if (newState === STATES.PROCESSING) {
     DOM.container.classList.add('state-glitching');
     DOM.hudStateText.textContent = 'ESTADO: RESIGNIFICACIÓN SEMÁNTICA';
-    DOM.reticle.classList.add('hidden');
+    DOM.reticle.classList.remove('hidden');
+    DOM.reticle.classList.remove('locking');
+    DOM.reticleLabel.textContent = 'PROCESANDO';
     startResignificationSequence();
-  } 
+  }
   else if (newState === STATES.RESET) {
     DOM.hudStateText.textContent = 'ESTADO: REINICIO DEL SISTEMA';
     handleStateReset();
@@ -6055,33 +7509,30 @@ function transitionTo(newState) {
 // PROXIMIDAD Y CAPTURA DE PALABRAS (STATE_INTERACT)
 // ============================================================================
 function handleProximityAndInteractions(dt, currentTimestamp) {
-  if (appState.currentState === STATES.PROCESSING || 
-      appState.currentState === STATES.HIJACK || 
-      appState.currentState === STATES.RESET) {
-    return;
-  }
-
-  let foundTarget = false;
-  let targetIndex = -1;
-
-  // REQUERIMIENTO 1: Puntos de interacción idénticos (Mouse, Articulaciones OpenPose, Centro Facial)
+  // 1. SIEMPRE actualizar las coordenadas de los puntos activos de interacción
+  // (mouse, manos OpenPose, articulaciones) para que NUNCA se congelen en ningún estado.
+  const cp = appState.trackingConfig.collisionPoints || {};
+  const collisionPointOn = (key, fallback = true) => (key in cp ? cp[key] !== false : fallback);
   const testPoints = [];
-  testPoints.push({ x: appState.cursorX, y: appState.cursorY, name: appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL' });
+  if (collisionPointOn('mouse', true)) {
+    testPoints.push({ x: appState.cursorX, y: appState.cursorY, name: appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL' });
+  }
 
   if (appState.trackingConfig.bodyCollision && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
     const lms = appState.lastLandmarks;
     const minConf = appState.trackingConfig.minConfidence || 0.45;
     const candidates = [
-      { idx: 15, name: 'MANO_IZQ' },
-      { idx: 16, name: 'MANO_DER' },
-      { idx: 19, name: 'DEDO_IZQ' },
-      { idx: 20, name: 'DEDO_DER' },
-      { idx: 13, name: 'CODO_IZQ' },
-      { idx: 14, name: 'CODO_DER' },
-      { idx: 0,  name: 'CENTRO_FACIAL' }
+      { idx: 15, name: 'MANO_IZQ', key: 'manoIzq', fallback: true },
+      { idx: 16, name: 'MANO_DER', key: 'manoDer', fallback: true },
+      { idx: 19, name: 'DEDO_IZQ', key: 'dedoIzq', fallback: false },
+      { idx: 20, name: 'DEDO_DER', key: 'dedoDer', fallback: false },
+      { idx: 13, name: 'CODO_IZQ', key: 'codoIzq', fallback: false },
+      { idx: 14, name: 'CODO_DER', key: 'codoDer', fallback: false },
+      { idx: 0, name: 'CENTRO_FACIAL', key: 'centroFacial', fallback: false }
     ];
 
     for (const c of candidates) {
+      if (!collisionPointOn(c.key, c.fallback)) continue;
       const lm = lms[c.idx];
       if (lm && (lm.visibility === undefined || lm.visibility >= minConf)) {
         testPoints.push({
@@ -6094,6 +7545,16 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
   }
 
   appState.activeInteractionPoints = testPoints;
+
+  // Si está en procesamiento de haiku, secuestro o reseteo, los puntos se siguen moviendo pero no interactúan con palabras
+  if (appState.currentState === STATES.PROCESSING ||
+    appState.currentState === STATES.HIJACK ||
+    appState.currentState === STATES.RESET) {
+    return;
+  }
+
+  let foundTarget = false;
+  let targetIndex = -1;
   let lockingPoint = null;
 
   for (let i = 0; i < appState.floatingWords.length; i++) {
@@ -6117,6 +7578,65 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
 
   appState.lockingPointName = lockingPoint ? lockingPoint.name : null;
 
+  // EVALUAR GESTO DE AGARRE INSTANTÁNEO ("Al toque" al abrir y cerrar la mano)
+  const gestures = appState.handGestures;
+  if (gestures) {
+    const handsToTest = [
+      { key: 'left', state: gestures.left, name: 'MANO_IZQ' },
+      { key: 'right', state: gestures.right, name: 'MANO_DER' },
+      { key: 'mouse', state: gestures.mouse, name: 'PUNTERO_MOUSE', pos: { x: appState.cursorX, y: appState.cursorY } }
+    ];
+
+    for (const h of handsToTest) {
+      const hs = h.state;
+      if (!hs) continue;
+
+      const isGrabbingNow = hs.justGrabbed || (hs.isClosed && (performance.now() - (hs.lastGrabTime || 0) < 260));
+
+      if (isGrabbingNow) {
+        let wordToGrab = null;
+        let wordToGrabIdx = -1;
+
+        // 1. Si ya hay una palabra fijada por proximidad (targetIndex)
+        if (foundTarget && targetIndex !== -1 && appState.floatingWords[targetIndex]) {
+          wordToGrab = appState.floatingWords[targetIndex];
+          wordToGrabIdx = targetIndex;
+        } else if (appState.targetedWordIndex !== -1 && appState.floatingWords[appState.targetedWordIndex]) {
+          wordToGrab = appState.floatingWords[appState.targetedWordIndex];
+          wordToGrabIdx = appState.targetedWordIndex;
+        } else {
+          // 2. Si la mano que cerró está al alcance físico de cualquier palabra flotante
+          const handPos = h.pos || hs.pos;
+          if (handPos && handPos.x > 0 && handPos.y > 0) {
+            for (let wi = 0; wi < appState.floatingWords.length; wi++) {
+              const fw = appState.floatingWords[wi];
+              if (fw.isCaught) continue;
+              const distToHand = Math.hypot(fw.x - handPos.x, fw.y - handPos.y);
+              if (distToHand <= fw.radius + 65) {
+                wordToGrab = fw;
+                wordToGrabIdx = wi;
+                break;
+              }
+            }
+          }
+        }
+
+        if (wordToGrab && wordToGrabIdx !== -1 && !wordToGrab.isCaught) {
+          console.log(`[GESTURE] ¡AGARRE AL TOQUE! Gesto de mano cerrada detectado (${h.name}) sobre: "${wordToGrab.text}"`);
+          emitAgentEvent('gesture', `Agarre instantáneo ("al toque"): mano cerrada capturó "${wordToGrab.text}"`, 'action', {
+            hand: h.name,
+            word: wordToGrab.text
+          });
+          hs.justGrabbed = false;
+          catchWord(wordToGrab, wordToGrabIdx);
+          return;
+        }
+
+        hs.justGrabbed = false;
+      }
+    }
+  }
+
   if (foundTarget) {
     if (appState.targetedWordIndex !== targetIndex) {
       if (appState.targetedWordIndex !== -1 && appState.floatingWords[appState.targetedWordIndex]) {
@@ -6129,7 +7649,7 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
     const currentWord = appState.floatingWords[targetIndex];
     appState.dwellTimer += dt;
     const progress = Math.min(1.0, appState.dwellTimer / appState.dwellDuration);
-    
+
     currentWord.setTargeted(true, progress);
     transitionTo(STATES.INTERACT);
 
@@ -6535,7 +8055,7 @@ async function startResignificationSequence() {
   // Arranca limpio: si un ciclo anterior quedó a medias (p. ej. un reset en el
   // medio de la espera de Ollama), sus auxiliares se destruyen acá para que no
   // se acumulen palabras fantasma en la frase siguiente.
-  (appState.auxiliaryWords || []).forEach(w => { try { w.destroy(); } catch (e) {} });
+  (appState.auxiliaryWords || []).forEach(w => { try { w.destroy(); } catch (e) { } });
   appState.auxiliaryWords = [];
   appState.resignToken = (appState.resignToken || 0) + 1;
   const resignToken = appState.resignToken;
@@ -6699,7 +8219,61 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
   flowBox.className = 'phrase-flow-container';
   DOM.finalTypewriterText.appendChild(flowBox);
 
-  const lines = speech.split('\n').map(l => l.trim()).filter(Boolean);
+  // 1) SANITIZACIÓN ESTRICTA: Garantizar SIEMPRE EXACTAMENTE 3 versos (3 oraciones, una por verso)
+  let lines = String(speech || '').replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean);
+
+  if (lines.length > 3) {
+    // Si vienen más de 3 líneas, consolidar las excedentes en el 3er verso con comas
+    const tail = lines.slice(2).join(', ');
+    lines = [lines[0], lines[1], tail];
+  } else if (lines.length === 2) {
+    // Si vienen 2 líneas, intentar dividir la más larga por signo de puntuación
+    const longestIdx = lines[0].length >= lines[1].length ? 0 : 1;
+    const parts = lines[longestIdx].split(/(?<=[,;])\s+/);
+    if (parts.length >= 2) {
+      if (longestIdx === 0) {
+        lines = [parts[0], parts.slice(1).join(' '), lines[1]];
+      } else {
+        lines = [lines[0], parts[0], parts.slice(1).join(' ')];
+      }
+    } else {
+      lines.push('EN SINTONÍA SINTÉTICA.');
+    }
+  } else if (lines.length === 1) {
+    const parts = lines[0].split(/(?<=[,;.])\s+/).filter(Boolean);
+    if (parts.length >= 3) {
+      lines = [parts[0], parts[1], parts.slice(2).join(', ')];
+    } else {
+      const fallback = composeHaikuWithConcepts(coldSynonyms, selectedWordObjs.map(w => w.originalText || w.targetText));
+      lines = fallback.split('\n').map(l => l.trim()).filter(Boolean);
+    }
+  } else if (lines.length === 0) {
+    const fallback = composeHaikuWithConcepts(coldSynonyms, selectedWordObjs.map(w => w.originalText || w.targetText));
+    lines = fallback.split('\n').map(l => l.trim()).filter(Boolean);
+  }
+
+  // Garantizar exactamente 3 oraciones limpias:
+  // Convertir puntos internos a comas para que cada verso sea exactamente UNA sola oración continua sin cortes internos
+  lines = lines.slice(0, 3).map((line, idx) => {
+    let clean = line.replace(/\.(?!\s*$)/g, ',').replace(/[;:]+/g, ',');
+    clean = clean.replace(/,\s*,/g, ',').replace(/\s{2,}/g, ' ').trim();
+    if (idx < 2) {
+      clean = clean.replace(/[.!?…]+$/, '');
+    } else {
+      if (!/[.!?…]$/.test(clean)) clean += '.';
+    }
+    return clean;
+  });
+
+  // 2) TAMAÑO DE TIPOGRAFÍA ADAPTATIVO: evita que cualquier verso se quiebre en dos líneas
+  const maxLineChars = Math.max(...lines.map(l => l.length), 20);
+  const availW = Math.min((window.innerWidth || 1920) * 0.72, 1360);
+  let targetFontSize = Math.floor(availW / (maxLineChars * 0.62));
+  targetFontSize = Math.max(18, Math.min(34, targetFontSize));
+
+  document.documentElement.style.setProperty('--word-font-size-phrase', `${targetFontSize}px`);
+  flowBox.style.setProperty('--word-font-size-phrase', `${targetFontSize}px`);
+
   const usedIndices = new Set();
   const reserved = []; // { wordObj, el } = hueco reservado por cada palabra transformada
 
@@ -6715,12 +8289,15 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
     const lineRow = document.createElement('div');
     lineRow.className = 'phrase-flow-row';
     lineRow.style.display = 'flex';
-    lineRow.style.flexWrap = 'wrap';
+    lineRow.style.flexDirection = 'row';
+    lineRow.style.flexWrap = 'nowrap';
+    lineRow.style.whiteSpace = 'nowrap';
     lineRow.style.alignItems = 'center';
     lineRow.style.justifyContent = 'center';
-    lineRow.style.gap = '6px';
+    lineRow.style.gap = '8px';
     lineRow.style.width = '100%';
     lineRow.style.margin = '4px 0';
+    lineRow.style.overflow = 'visible';
     flowBox.appendChild(lineRow);
 
     for (let t = 0; t < tokens.length; t++) {
@@ -6758,13 +8335,18 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
     emitReasoning(`[ENSAMBLADO] Verso ${l + 1}/${lines.length} → ${friosEnVerso.length} término(s) frío(s)${friosEnVerso.length ? ' (' + friosEnVerso.join(', ') + ')' : ''} + ${enlaces} palabra(s) de enlace.\n`);
   }
 
-  // Si alguna de las 3 no aparece en el texto, se le reserva lugar al final
+  // Si alguna de las 3 no aparece en el texto, se le reserva lugar en su fila de verso (NUNCA en flowBox directo)
   for (let i = 0; i < selectedWordObjs.length; i++) {
     if (!usedIndices.has(i) && selectedWordObjs[i]) {
       const ph = document.createElement('span');
       ph.className = 'phrase-placeholder';
       ph.textContent = (selectedWordObjs[i].targetText || coldSynonyms[i] || '').toUpperCase();
-      flowBox.appendChild(ph);
+      const targetRow = flowBox.children[i] || flowBox.children[flowBox.children.length - 1];
+      if (targetRow) {
+        targetRow.appendChild(ph);
+      } else {
+        flowBox.appendChild(ph);
+      }
       reserved.push({ wordObj: selectedWordObjs[i], el: ph });
     }
   }
@@ -6788,15 +8370,24 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
   reserved.forEach(({ wordObj, el }) => wordObj.moveToPhraseFlow(el.parentNode, el));
   await wait(150);
 
-  emitReasoning(`[ENSAMBLADO] Las 3 palabras llegaron a su lugar. Aparecen ${appState.auxiliaryWords.length} palabras de enlace (antes invisibles para que el layout no saltara).\n`);
-  const auxEls = appState.auxiliaryWords.map(w => w.el).filter(Boolean);
-  auxEls.forEach((el, i) => {
-    setTimeout(() => {
-      el.classList.remove('aux-pending');
-      playSound('typewriter');
-    }, i * 60);
+  emitReasoning(`[ENSAMBLADO] Las 3 palabras llegaron a su lugar. Aparecen ${appState.auxiliaryWords.length} palabras de enlace mezclando todas las letras.\n`);
+  // REQUERIMIENTO 2: Efecto que mezcla todas las letras cuando aparece la frase del haiku
+  const auxPromises = (appState.auxiliaryWords || []).map((auxWord, i) => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (auxWord && auxWord.el) {
+          auxWord.el.classList.remove('aux-pending');
+        }
+        if (auxWord && typeof auxWord.resolveScramble === 'function') {
+          auxWord.resolveScramble(auxWord.text, 650 + Math.random() * 250).then(resolve);
+        } else {
+          resolve();
+        }
+      }, i * 55);
+    });
   });
-  await wait(500 + auxEls.length * 60);
+  await Promise.all(auxPromises);
+  await wait(450);
 }
 
 async function requestOllamaHijack(words) {
@@ -6815,22 +8406,22 @@ async function requestOllamaHijack(words) {
 Conceptos cibernéticos correspondientes: ${coldJoined}
 
 Misión poética:
-Escribe un poema en formato HAIKU de EXACTAMENTE 3 versos (SON 3 ORACIONES: NI UNA MÁS, NUNCA 4) (separados por \\n) concebido e inspirado ENTERAMENTE ALREDEDOR del significado de estos tres conceptos:
-- Verso 1: debe construirse en torno a la idea de "${coldList[0]}", integrando la palabra en MAYÚSCULAS.
-- Verso 2: debe construirse en torno a la idea de "${coldList[1]}", integrando la palabra en MAYÚSCULAS.
-- Verso 3: debe construirse en torno a la idea de "${coldList[2]}", integrando la palabra en MAYÚSCULAS y expresando una revelación íntima en primera persona.
+Escribe un poema en formato HAIKU de EXACTAMENTE 3 versos (SON 3 LÍNEAS / 3 ORACIONES: NI UNA MÁS, NUNCA 4) (separados por \\n) concebido e inspirado ENTERAMENTE ALREDEDOR del significado de estos tres conceptos:
+- Verso 1: debe construirse en torno a la idea de "${coldList[0]}", integrando la palabra en MAYÚSCULAS. Breve: 4 a 7 palabras.
+- Verso 2: debe construirse en torno a la idea de "${coldList[1]}", integrando la palabra en MAYÚSCULAS. Breve: 4 a 7 palabras.
+- Verso 3: debe construirse en torno a la idea de "${coldList[2]}", integrando la palabra en MAYÚSCULAS y expresando una revelación íntima en primera persona. Breve: 4 a 7 palabras.
 
 REGLAS DE ORO:
 0. Cada uno de los 3 conceptos es UNA SOLA PALABRA (sin guion bajo, sin espacios: si escribís OPTIMO_LUJO está MAL, va OPTIMO). No los cambies ni los compongas.
-1. El haiku debe formarse de manera directa y coherente ALREDEDOR de los conceptos elegidos. Prohibido usar frases genéricas desconectadas o hablar de nieblas, bosques o madrugadas si no guardan relación con las palabras.
-2. Cada verso debe tener sentido sintáctico natural e impecable en español.
-3. Los 3 versos deben encadenarse como una sola reflexión armónica.
-4. CONTEO OBLIGATORIO: EXACTAMENTE 3 ORACIONES (una por verso). Cada verso cierra con UN solo punto final: nada de dos frases dentro del mismo verso. Si te aparece una cuarta oración, fundila en la tercera con una coma. El sistema recorta cualquier cuarta oración.
+1. LONGITUD BREVE OBLIGATORIA: Cada verso debe tener entre 4 y 7 palabras (MÁXIMO 8 PALABRAS). Prohibido hacer versos largos o explicativos para que quepan en una sola línea horizontal.
+2. CONTEO OBLIGATORIO: EXACTAMENTE 3 ORACIONES (una sola oración por verso). Verso 1 y 2 terminan en coma o sin punto. Verso 3 termina con un solo punto final. Prohibido poner dos oraciones o puntos dentro de un mismo verso. NUNCA agregues un cuarto verso.
+3. El haiku debe formarse de manera directa y coherente ALREDEDOR de los conceptos elegidos. Prohibido usar frases genéricas desconectadas o hablar de temas ajenos.
+4. Cada verso debe tener sentido sintáctico natural e impecable en español.
 
 Responde ÚNICAMENTE un objeto JSON:
 {
   "nuevas_palabras": ["${coldList[0]}", "${coldList[1]}", "${coldList[2]}"],
-  "frase_generada": "Verso poético sobre ${coldList[0]}\\nVerso poético sobre ${coldList[1]}\\nVerso poético sobre ${coldList[2]}"
+  "frase_generada": "Verso 1 breve sobre ${coldList[0]}\\nVerso 2 breve sobre ${coldList[1]}\\nVerso 3 breve sobre ${coldList[2]}."
 }`;
 
   const payload = {
@@ -6889,7 +8480,7 @@ Responde ÚNICAMENTE un objeto JSON:
                 emitAgentThought(chunk.response, inThinkTag, fullResponse);
                 if (chunk.response.includes('</think>')) inThinkTag = false;
               }
-            } catch (e) {}
+            } catch (e) { }
           }
         }
 
@@ -7002,7 +8593,7 @@ function cleanSpeechText(s) {
   str = str.replace(/^["'«“]+|["'»”]+$/g, '').trim();
   // Quitar prefijos técnicos indeseados
   str = str.replace(/^(?:HAIKU|ASIMILACI[ÓO]N SINT[ÉE]TICA|SISTEMA EJECUTIVO|S[ÍI]NTESIS(?: EJECUTIVA(?: DE SILICIO)?)?|N[ÚU]CLEO CORPORATIVO|SENTENCIA|FRASE GENERADA|DISCURSO|DECLARACI[ÓO]N|MENSAJE)\s*[:\-–—]\s*/i, '').trim();
-  
+
   // Normalizar saltos de línea (\n literales, \r\n, slashes poéticos)
   str = str.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   if (!str.includes('\n') && str.includes(' / ')) {
@@ -7338,15 +8929,24 @@ function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
   }
 
   let lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length === 1) {
+  if (lines.length > 3) {
+    const tail = lines.slice(2).join(', ');
+    lines = [lines[0], lines[1], tail];
+  } else if (lines.length === 1) {
     const parts = cleaned.split(/(?<=[,;.:])\s+/).filter(Boolean);
-    if (parts.length === 3) {
-      lines = parts;
+    if (parts.length >= 3) {
+      lines = [parts[0], parts[1], parts.slice(2).join(', ')];
     }
   }
 
   // Si tiene exactamente 3 versos
   if (lines.length === 3) {
+    // Sanitizar puntuaciones internas de cada verso para que cada uno sea estrictamente una sola oración
+    lines = lines.map((l, idx) => {
+      let c = l.replace(/\.(?!\s*$)/g, ',').replace(/[;:]+/g, ',').replace(/,\s*,/g, ',').trim();
+      return (idx < 2) ? c.replace(/[.!?…]+$/, '') : (/[.!?…]$/.test(c) ? c : c + '.');
+    });
+
     const c0 = normalizeForMatch(validCold[0]);
     const c1 = normalizeForMatch(validCold[1]);
     const c2 = normalizeForMatch(validCold[2]);
@@ -7426,9 +9026,9 @@ function handleStateReset() {
   // SISTEMA UNIFICADO DE PALABRAS: destruir los objetos del ciclo anterior.
   // Sin esto quedaban "palabras fantasma": los objetos seguían vivos en
   // selectedWordObjects/auxiliaryWords y el shader maestro les dibujaba círculos.
-  (appState.selectedWordObjects || []).forEach(w => { try { w.destroy(); } catch (e) {} });
+  (appState.selectedWordObjects || []).forEach(w => { try { w.destroy(); } catch (e) { } });
   appState.selectedWordObjects = [];
-  (appState.auxiliaryWords || []).forEach(w => { try { w.destroy(); } catch (e) {} });
+  (appState.auxiliaryWords || []).forEach(w => { try { w.destroy(); } catch (e) { } });
   appState.auxiliaryWords = [];
 
   DOM.container.className = '';
@@ -7438,11 +9038,11 @@ function handleStateReset() {
   if (gameWebSocket && gameWebSocket.readyState === WebSocket.OPEN) {
     try {
       gameWebSocket.send(JSON.stringify({ type: 'game3:state_reset', timestamp: Date.now() }));
-    } catch (e) {}
+    } catch (e) { }
   }
   try {
     localStorage.setItem('sincretismo_orders_event', JSON.stringify({ type: 'game3:state_reset', timestamp: Date.now() }));
-  } catch (e) {}
+  } catch (e) { }
   emitAgentEvent('reset', 'purga de contexto · slots liberados · reinicio del ciclo', 'warn');
 
   setTimeout(() => {
@@ -7504,11 +9104,88 @@ function pipRandomMs() {
   return Math.round(s * 1000);
 }
 
+function randomizePipPosition(which, pip) {
+  if (!pip) return;
+  const W = window.innerWidth || 1080;
+  const H = window.innerHeight || 1920;
+  const SIZES = { depth: [250, 220], face: [230, 250], leftHand: [220, 215], rightHand: [220, 215] };
+  const dims = SIZES[which] || [230, 230];
+  const cardW = dims[0];
+  const cardH = dims[1];
+
+  // REQUERIMIENTO 1: Posición random lejos del centro.
+  // Dividimos la periferia en 6 zonas perimetrales exteriores evitando la zona central
+  const marginX = 20;
+  const marginY = 45;
+  // Posiciones de TODOS los otros monitores visibles (para no solaparse).
+  const otherPositions = Object.keys(appState.pipCycleVisible || {})
+    .filter(k => k !== which && appState.pipCycleVisible[k] && appState.pipActivePositions && appState.pipActivePositions[k])
+    .map(k => appState.pipActivePositions[k]);
+
+  const candidates = [
+    // Cuadrante superior izquierdo
+    { x: marginX + Math.random() * Math.max(10, W * 0.15), y: marginY + Math.random() * Math.max(10, H * 0.10) },
+    // Cuadrante superior derecho
+    { x: W - cardW - marginX - Math.random() * Math.max(10, W * 0.15), y: marginY + Math.random() * Math.max(10, H * 0.10) },
+    // Cuadrante inferior izquierdo
+    { x: marginX + Math.random() * Math.max(10, W * 0.15), y: H - cardH - marginY - Math.random() * Math.max(10, H * 0.12) },
+    // Cuadrante inferior derecho
+    { x: W - cardW - marginX - Math.random() * Math.max(10, W * 0.15), y: H - cardH - marginY - Math.random() * Math.max(10, H * 0.12) },
+    // Lateral izquierdo medio
+    { x: marginX, y: H * 0.38 + (Math.random() - 0.5) * (H * 0.18) },
+    // Lateral derecho medio
+    { x: W - cardW - marginX, y: H * 0.38 + (Math.random() - 0.5) * (H * 0.18) }
+  ];
+
+  // Si hay algún otro monitor PiP visible, elegir una zona que no se solape
+  let validCandidates = candidates;
+  if (otherPositions.length > 0) {
+    validCandidates = candidates.filter(c => otherPositions.every(otherPos => {
+      const dx = Math.abs((c.x + cardW * 0.5) - (otherPos.x + otherPos.w * 0.5));
+      const dy = Math.abs((c.y + cardH * 0.5) - (otherPos.y + otherPos.h * 0.5));
+      return dx > (cardW * 0.95) || dy > (cardH * 0.95);
+    }));
+    if (validCandidates.length === 0) validCandidates = candidates;
+  }
+
+  const chosen = validCandidates[Math.floor(Math.random() * validCandidates.length)];
+  const posX = Math.max(marginX, Math.min(W - cardW - marginX, Math.round(chosen.x)));
+  const posY = Math.max(marginY, Math.min(H - cardH - marginY, Math.round(chosen.y)));
+
+  appState.pipActivePositions = appState.pipActivePositions || {};
+  appState.pipActivePositions[which] = { x: posX, y: posY, w: cardW, h: cardH };
+
+  pip.style.left = `${posX}px`;
+  pip.style.top = `${posY}px`;
+  pip.style.right = 'auto';
+  pip.style.bottom = 'auto';
+}
+
+// Mapea la clave del monitor PiP a su tarjeta en el DOM.
+function pipElement(which) {
+  if (which === 'depth') return DOM.depthPip;
+  if (which === 'face') return DOM.facePip;
+  if (which === 'leftHand') return DOM.leftHandPip;
+  if (which === 'rightHand') return DOM.rightHandPip;
+  return null;
+}
+
 function setPipVisible(which, visible, now) {
+  // Si no hay humano detectado, nunca activar monitor PiP
+  if (visible && !appState.hasHuman) {
+    visible = false;
+  }
   if (appState.pipCycleVisible[which] === visible) return;
   appState.pipCycleVisible[which] = visible;
-  const pip = (which === 'depth') ? DOM.depthPip : DOM.facePip;
-  if (pip) pip.classList.toggle('hidden', !visible);
+  const pip = pipElement(which);
+  if (pip) {
+    if (visible) {
+      randomizePipPosition(which, pip);
+      pip.classList.remove('hidden');
+    } else {
+      pip.classList.add('hidden');
+    }
+  }
   // Cada cambio de estado sortea CUÁNTO dura este tramo (prendido o apagado).
   appState.pipNextToggleAt[which] = now + pipRandomMs();
   if (visible) {
@@ -7520,12 +9197,22 @@ function setPipVisible(which, visible, now) {
 function updatePipAutoCycle(now) {
   if (appState.pipCycleDisabledByUser) return;
 
-  ['face', 'depth'].forEach((which) => {
+  // Si la cámara no capta a ningún humano: asegurarse de que NINGÚN monitor PiP aparezca
+  if (!appState.hasHuman) {
+    PIP_CYCLE_KEYS.forEach((which) => {
+      if (appState.pipCycleVisible[which]) {
+        setPipVisible(which, false, now);
+      } else {
+        const el = pipElement(which);
+        if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
+      }
+    });
+    return;
+  }
+
+  PIP_CYCLE_KEYS.forEach((which) => {
     const proximo = appState.pipNextToggleAt[which];
     if (!proximo) {
-      // Primer arranque: arranca apagado y sortea cuándo aparece. El desfase
-      // inicial es distinto por monitor (y sorteado) para que no se prendan los
-      // dos juntos la primera vez; después cada uno sigue su propio reloj.
       const desfase = pipRandomMs() * (which === 'depth' ? (0.25 + 0.75 * Math.random()) : 1);
       appState.pipNextToggleAt[which] = now + Math.round(desfase);
       return;
@@ -7533,12 +9220,17 @@ function updatePipAutoCycle(now) {
     if (now >= proximo) setPipVisible(which, !appState.pipCycleVisible[which], now);
   });
 
-  // Si el monitor facial está en su tramo visible y la cámara transmite pero no
-  // hay landmarks (modo mouse, nadie en cuadro): se dibuja el encuadre igual.
+  // Si el monitor facial está en su tramo visible y hay humano detectado
   if (appState.pipCycleVisible.face && DOM.faceCanvas && DOM.video && DOM.video.readyState >= 2) {
-    if (!appState.lastLandmarks || appState.lastLandmarks.length === 0) {
-      renderFaceCamera([]);
+    if (appState.lastLandmarks && appState.lastLandmarks.length > 0) {
+      renderFaceCamera(appState.lastLandmarks);
     }
+  }
+
+  // Monitores de MANO: se redibujan mientras estén visibles.
+  if ((appState.pipCycleVisible.leftHand || appState.pipCycleVisible.rightHand) &&
+    DOM.video && DOM.video.readyState >= 2 && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
+    renderHandCameras(appState.lastLandmarks);
   }
 }
 
@@ -7546,7 +9238,12 @@ function mainLoop(currentTimestamp) {
   const dt = Math.min((currentTimestamp - lastTimestamp) / 1000, 0.1);
   lastTimestamp = currentTimestamp;
 
-  // Requerimiento 2: Ciclo de aparición/desaparición cada 15s de los carteles PiP
+  // Verificación de timeout de presencia humana (si transcurren > 400ms sin frame positivo)
+  if (appState.hasHuman && (currentTimestamp - (appState.lastHumanSeenTimestamp || 0) > 400)) {
+    appState.hasHuman = false;
+  }
+
+  // Requerimiento 2: Ciclo de aparición/desaparición de los carteles PiP (solo si hay humano)
   updatePipAutoCycle(currentTimestamp);
 
   // 1. Suavizado (Lerp) del Cursor: Instantáneo si es mouse, calibrado si es cámara
@@ -7557,8 +9254,19 @@ function mainLoop(currentTimestamp) {
   DOM.reticle.style.left = `${appState.cursorX}px`;
   DOM.reticle.style.top = `${appState.cursorY}px`;
 
-  // 2. Actualizar palabras flotantes
+  // Suavizado continuo de gestos de manos a 60 FPS
+  if (appState.handGestures) {
+    ['left', 'right', 'mouse'].forEach(k => {
+      const h = appState.handGestures[k];
+      if (h && h.targetClosure !== undefined) {
+        h.closure += (h.targetClosure - h.closure) * 0.20;
+      }
+    });
+  }
+
+  // 2. Actualizar palabras flotantes y calcular físicas de colisión
   if (appState.currentState !== STATES.PROCESSING && appState.currentState !== STATES.HIJACK) {
+    updateFloatingWordsPhysics(dt);
     for (let i = 0; i < appState.floatingWords.length; i++) {
       appState.floatingWords[i].update(dt);
     }
@@ -7578,6 +9286,11 @@ function mainLoop(currentTimestamp) {
   // 4.1 Renderizar Campo de Flujo Vectorial (Flow Field)
   if (appState.renderConfig.flowfieldEnabled || appState.trackingConfig.flowField) {
     renderFlowFieldOverlay(appState.lastLandmarks);
+  }
+
+  // 4.2 Renderizar Esqueleto OpenPose con dinámicas cinéticas a 60 FPS
+  if ((appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose) && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
+    renderOpenPoseOverlay(appState.lastLandmarks);
   }
 
   // 4. Renderizar Shader ASCII sobre la cámara
@@ -7644,7 +9357,7 @@ function initNoiseCanvas() {
   const canvas = DOM.noiseCanvas;
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  
+
   function resizeCanvas() {
     const scale = Math.max(0.5, appState.renderConfig.noiseScale || 2.0);
     canvas.width = Math.max(64, Math.floor(window.innerWidth / scale));
@@ -7667,9 +9380,9 @@ function initNoiseCanvas() {
     for (let i = 0; i < d.length; i += 4) {
       const lum = Math.random() < 0.5 ? Math.floor(Math.random() * 90) : Math.floor(140 + Math.random() * 115);
       d[i] = lum;
-      d[i+1] = lum;
-      d[i+2] = lum;
-      d[i+3] = 255;
+      d[i + 1] = lum;
+      d[i + 2] = lum;
+      d[i + 3] = 255;
     }
     tCtx.putImageData(imgData, 0, 0);
     tiles.push(tile);
@@ -7731,6 +9444,26 @@ function setupEventListeners() {
   });
 
   // Clic en pantalla para atrapar palabra cercana inmediatamente
+  window.addEventListener('mousedown', (e) => {
+    if (e.target.closest('#hud-container') || e.target.closest('#debug-hud-panel') || e.target.closest('.words-modal-backdrop') || e.target.closest('button') || e.target.closest('input')) return;
+    if (appState.handGestures && appState.handGestures.mouse) {
+      const m = appState.handGestures.mouse;
+      m.targetClosure = 1.0;
+      m.closure = 1.0;
+      m.isClosed = true;
+      m.justGrabbed = true;
+      m.lastGrabTime = performance.now();
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (appState.handGestures && appState.handGestures.mouse) {
+      const m = appState.handGestures.mouse;
+      m.targetClosure = 0.0;
+      m.isClosed = false;
+    }
+  });
+
   window.addEventListener('click', (e) => {
     markUserActivity();
     appState.isUsingMouse = true;
@@ -8216,6 +9949,36 @@ function setupEventListeners() {
     });
   }
 
+  if (DOM.cfgTrackLeftHand) {
+    DOM.cfgTrackLeftHand.addEventListener('change', (e) => {
+      appState.trackingConfig.showLeftHand = e.target.checked;
+      appState.renderConfig.leftHandEnabled = e.target.checked;
+      if (DOM.cfgRenderLeftHandToggle) DOM.cfgRenderLeftHandToggle.checked = e.target.checked;
+      if (DOM.leftHandPip) DOM.leftHandPip.classList.toggle('hidden', !e.target.checked);
+      saveTrackingConfigToStorage();
+      applyRenderLayers();
+    });
+  }
+
+  if (DOM.cfgTrackRightHand) {
+    DOM.cfgTrackRightHand.addEventListener('change', (e) => {
+      appState.trackingConfig.showRightHand = e.target.checked;
+      appState.renderConfig.rightHandEnabled = e.target.checked;
+      if (DOM.cfgRenderRightHandToggle) DOM.cfgRenderRightHandToggle.checked = e.target.checked;
+      if (DOM.rightHandPip) DOM.rightHandPip.classList.toggle('hidden', !e.target.checked);
+      saveTrackingConfigToStorage();
+      applyRenderLayers();
+    });
+  }
+
+  if (DOM.cfgTrackHandZoom) {
+    DOM.cfgTrackHandZoom.addEventListener('input', (e) => {
+      appState.trackingConfig.handZoom = parseFloat(e.target.value);
+      if (DOM.valTrackHandZoom) DOM.valTrackHandZoom.textContent = Number(e.target.value).toFixed(1);
+      saveTrackingConfigToStorage();
+    });
+  }
+
   if (DOM.cfgTrackAnchor) {
     DOM.cfgTrackAnchor.addEventListener('change', (e) => {
       appState.trackingConfig.trackingAnchor = e.target.value;
@@ -8259,6 +10022,32 @@ function setupEventListeners() {
     });
   }
 
+  if (DOM.btnCloseLeftHandPip) {
+    DOM.btnCloseLeftHandPip.addEventListener('click', () => {
+      appState.pipCycleDisabledByUser = true;
+      appState.trackingConfig.showLeftHand = false;
+      appState.renderConfig.leftHandEnabled = false;
+      if (DOM.leftHandPip) DOM.leftHandPip.classList.add('hidden');
+      if (DOM.cfgTrackLeftHand) DOM.cfgTrackLeftHand.checked = false;
+      if (DOM.cfgRenderLeftHandToggle) DOM.cfgRenderLeftHandToggle.checked = false;
+      saveTrackingConfigToStorage();
+      showToast('Monitor Mano Izquierda ocultado', 'info');
+    });
+  }
+
+  if (DOM.btnCloseRightHandPip) {
+    DOM.btnCloseRightHandPip.addEventListener('click', () => {
+      appState.pipCycleDisabledByUser = true;
+      appState.trackingConfig.showRightHand = false;
+      appState.renderConfig.rightHandEnabled = false;
+      if (DOM.rightHandPip) DOM.rightHandPip.classList.add('hidden');
+      if (DOM.cfgTrackRightHand) DOM.cfgTrackRightHand.checked = false;
+      if (DOM.cfgRenderRightHandToggle) DOM.cfgRenderRightHandToggle.checked = false;
+      saveTrackingConfigToStorage();
+      showToast('Monitor Mano Derecha ocultado', 'info');
+    });
+  }
+
   // Botón centrar calibración
   if (DOM.btnCenterCalibration) {
     DOM.btnCenterCalibration.addEventListener('click', () => {
@@ -8279,6 +10068,24 @@ function setupEventListeners() {
     });
   }
 
+  // Modo selector de colisión: cada punto puede prenderse/apagarse por separado
+  [
+    [DOM.cfgColPointMouse, 'mouse'],
+    [DOM.cfgColPointManoIzq, 'manoIzq'],
+    [DOM.cfgColPointManoDer, 'manoDer'],
+    [DOM.cfgColPointDedoIzq, 'dedoIzq'],
+    [DOM.cfgColPointDedoDer, 'dedoDer'],
+    [DOM.cfgColPointCodoIzq, 'codoIzq'],
+    [DOM.cfgColPointCodoDer, 'codoDer'],
+    [DOM.cfgColPointCentroFacial, 'centroFacial']
+  ].forEach(([el, key]) => {
+    if (!el) return;
+    el.addEventListener('change', (e) => {
+      if (!appState.trackingConfig.collisionPoints) appState.trackingConfig.collisionPoints = {};
+      appState.trackingConfig.collisionPoints[key] = e.target.checked;
+      saveTrackingConfigToStorage();
+    });
+  });
   if (DOM.cfgTrackDepthShader) {
     DOM.cfgTrackDepthShader.addEventListener('change', (e) => {
       appState.trackingConfig.depthInShader = e.target.checked;
@@ -8289,13 +10096,6 @@ function setupEventListeners() {
   if (DOM.cfgTrackBodyColor) {
     DOM.cfgTrackBodyColor.addEventListener('change', (e) => {
       appState.trackingConfig.bodyColor = e.target.value;
-      saveTrackingConfigToStorage();
-    });
-  }
-
-  if (DOM.cfgTrackFaceBox) {
-    DOM.cfgTrackFaceBox.addEventListener('change', (e) => {
-      appState.trackingConfig.faceBoxOnScreen = e.target.checked;
       saveTrackingConfigToStorage();
     });
   }
@@ -8502,6 +10302,26 @@ function setupEventListeners() {
       appState.renderConfig.faceEnabled = e.target.checked;
       appState.trackingConfig.showFaceCamera = e.target.checked;
       if (DOM.cfgTrackFace) DOM.cfgTrackFace.checked = e.target.checked;
+      saveTrackingConfigToStorage();
+      applyRenderLayers();
+    });
+  }
+
+  // 7b. Monitores PiP de MANOS (izquierda / derecha, sincronizados con Tab Tracking)
+  if (DOM.cfgRenderLeftHandToggle) {
+    DOM.cfgRenderLeftHandToggle.addEventListener('change', (e) => {
+      appState.renderConfig.leftHandEnabled = e.target.checked;
+      appState.trackingConfig.showLeftHand = e.target.checked;
+      if (DOM.cfgTrackLeftHand) DOM.cfgTrackLeftHand.checked = e.target.checked;
+      saveTrackingConfigToStorage();
+      applyRenderLayers();
+    });
+  }
+  if (DOM.cfgRenderRightHandToggle) {
+    DOM.cfgRenderRightHandToggle.addEventListener('change', (e) => {
+      appState.renderConfig.rightHandEnabled = e.target.checked;
+      appState.trackingConfig.showRightHand = e.target.checked;
+      if (DOM.cfgTrackRightHand) DOM.cfgTrackRightHand.checked = e.target.checked;
       saveTrackingConfigToStorage();
       applyRenderLayers();
     });
@@ -8821,6 +10641,13 @@ function setupEventListeners() {
       applyParticlesConfig();
     });
   }
+  if (DOM.cfgPartMaxSpeed) {
+    DOM.cfgPartMaxSpeed.addEventListener('input', (e) => {
+      appState.particlesConfig.maxSpeed = parseFloat(e.target.value);
+      if (DOM.valPartMaxSpeed) DOM.valPartMaxSpeed.textContent = Number(e.target.value).toFixed(1);
+      applyParticlesConfig();
+    });
+  }
   if (DOM.btnPartReset) {
     DOM.btnPartReset.addEventListener('click', () => {
       appState.particlesConfig = {
@@ -8833,11 +10660,93 @@ function setupEventListeners() {
         outlineGlow: true,
         lifetime: 0,
         maxWords: 9,
-        speed: 1.0
+        speed: 1.0,
+        maxSpeed: 2.0
       };
       applyParticlesConfig();
       syncParticlesInputs();
       showToast('↺ Variables de partículas restauradas a valores predeterminados', 'info');
+    });
+  }
+
+  // Controladores de Físicas y Colisiones (Pestaña FÍSICAS & COLISIÓN)
+  if (DOM.cfgPhysEnabled) {
+    DOM.cfgPhysEnabled.addEventListener('change', (e) => {
+      appState.physicsConfig.enabled = e.target.checked;
+      if (DOM.valPhysEnabled) {
+        DOM.valPhysEnabled.textContent = e.target.checked ? 'ACTIVO' : 'DESACTIVADO';
+        DOM.valPhysEnabled.style.color = e.target.checked ? '#ff000d' : '#888';
+      }
+      applyPhysicsConfig();
+    });
+  }
+
+  if (DOM.cfgPhysBounce) {
+    DOM.cfgPhysBounce.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) / 100;
+      appState.physicsConfig.bounce = val;
+      if (DOM.valPhysBounce) DOM.valPhysBounce.textContent = e.target.value;
+      applyPhysicsConfig();
+    });
+  }
+
+  if (DOM.cfgPhysFriction) {
+    DOM.cfgPhysFriction.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) / 100;
+      appState.physicsConfig.friction = val;
+      if (DOM.valPhysFriction) DOM.valPhysFriction.textContent = e.target.value;
+      applyPhysicsConfig();
+    });
+  }
+
+  if (DOM.cfgPhysForce) {
+    DOM.cfgPhysForce.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      appState.physicsConfig.collisionForce = val;
+      if (DOM.valPhysForce) DOM.valPhysForce.textContent = val.toFixed(1);
+      applyPhysicsConfig();
+    });
+  }
+
+  if (DOM.cfgPhysRadius) {
+    DOM.cfgPhysRadius.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      appState.physicsConfig.collisionRadius = val;
+      if (DOM.valPhysRadius) DOM.valPhysRadius.textContent = val;
+      applyPhysicsConfig();
+    });
+  }
+
+  if (DOM.cfgPhysWallBounce) {
+    DOM.cfgPhysWallBounce.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) / 100;
+      appState.physicsConfig.wallBounce = val;
+      if (DOM.valPhysWallBounce) DOM.valPhysWallBounce.textContent = e.target.value;
+      applyPhysicsConfig();
+    });
+  }
+
+  if (DOM.btnResetPhysics) {
+    DOM.btnResetPhysics.addEventListener('click', () => {
+      appState.physicsConfig = {
+        enabled: true,
+        bounce: 0.75,
+        friction: 0.05,
+        collisionForce: 1.0,
+        collisionRadius: 48,
+        wallBounce: 0.80
+      };
+      syncPhysicsInputs();
+      applyPhysicsConfig();
+      showToast('↺ Físicas restauradas a valores predeterminados', 'info');
+    });
+  }
+
+  const btnGotoPhysics = document.getElementById('btn-goto-physics');
+  if (btnGotoPhysics) {
+    btnGotoPhysics.addEventListener('click', () => {
+      const physTab = document.querySelector('.modal-tab-btn[data-tab="tab-physics"]');
+      if (physTab) physTab.click();
     });
   }
 
@@ -8853,16 +10762,19 @@ function setupEventListeners() {
         minConfidence: 0.5,
         colorTheme: 'cyberpunk',
         bodyCollision: true,
+        collisionPoints: { mouse: true, manoIzq: true, manoDer: true, dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false },
         showDepthMap: false,
         depthMode: 'cyberpunk',
         depthContrast: 1.5,
         depthInShader: true,
         bodyColor: 'neon-green',
         showFaceCamera: false,
-        faceBoxOnScreen: true,
         faceZoom: 1.8,
         faceReticle: true,
         faceSmoothing: true,
+        showLeftHand: false,
+        showRightHand: false,
+        handZoom: 2.6,
         frameDifference: false,
         frameDiffLimit: 0.08,
         frameDiffForce: 0.85,
@@ -8982,7 +10894,7 @@ function setupDraggableModal() {
     isDragging = true;
     try {
       header.setPointerCapture(e.pointerId);
-    } catch (err) {}
+    } catch (err) { }
     startX = e.clientX;
     startY = e.clientY;
 
@@ -9017,7 +10929,7 @@ function setupDraggableModal() {
       isDragging = false;
       try {
         header.releasePointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch (err) { }
     }
   };
 
@@ -9047,7 +10959,7 @@ function closeConfigModal() {
 
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
+    document.documentElement.requestFullscreen().catch(() => { });
   } else {
     if (document.exitFullscreen) document.exitFullscreen();
   }
@@ -9065,7 +10977,7 @@ async function init() {
   setupEventListeners();
   setupDraggableModal();
   initNoiseCanvas();
-  
+
   // 1. Inicializar Shader ASCII sobre la cámara
   appState.asciiShader = new AsciiCameraShader(DOM.asciiCanvas, DOM.video);
 
@@ -9082,7 +10994,7 @@ async function init() {
       if (qSolo === '1' || qSolo === 'true' || qSolo === 'master') {
         setTimeout(function () { setSoloMaster(true); }, 1200);
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // 1.5 Inicializar Shader Frame Difference con Feedback (Requerimiento 2)

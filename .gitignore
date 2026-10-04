@@ -25,3 +25,6 @@ dist-ssr
 
 # Registro de JSONs guardados (lo genera el server en runtime)
 public/data/jsons_guardados.json
+
+# Modelos ONNX pesados (superan el limite de 100MB de GitHub)
+public/models/**/*.onnx

@@ -142,24 +142,12 @@
   }
 
   function inyectarFuente(fuente) {
-    var goog = FUENTES[fuente];
+    // 100% LOCAL: la tipografia ya viene de public/css/fonts-local.css (vendorizada,
+    // public/fonts/webfonts/*.woff2). NO se pide nada a fonts.googleapis.com.
     var viejo = document.getElementById(ID_FUENTE);
     if (viejo && viejo.getAttribute('data-fuente') === fuente) return;
     if (viejo && viejo.parentNode) viejo.parentNode.removeChild(viejo);
-
-    var l = document.createElement('link');
-    l.id = ID_FUENTE;
-    l.rel = 'stylesheet';
-    l.setAttribute('data-fuente', fuente);
-
-    l.onload = function () {
-      refrescarVisualizadores();
-    };
-
-    if (goog) {
-      l.href = 'https://fonts.googleapis.com/css2?family=' + goog + '&display=swap';
-      document.head.appendChild(l);
-    }
+    refrescarVisualizadores();
   }
 
   function reglas(cfg, pagina) {
@@ -233,6 +221,10 @@
     s.push('  --gs-cambia-hud:' + cambiaHudRgba + ';');
     s.push('  --gs-cambia-acento:' + cambiaAcento + ';');
     s.push('  --gs-cambia-palabra:' + cambiaPalabra + ';');
+    // PUNTEROS (retículos de mouse / tracking de cambiapalabras): se pueden fijar
+    // desde /globalstyle.html y el JS los lee de GlobalStyleConfig.colores.
+    s.push('  --gs-puntero:' + (c.puntero || cambiaAcento) + ';');
+    s.push('  --gs-puntero-fijo:' + (c.punteroFijo || cambiaPalabra) + ';');
 
     s.push('  --gs-radio:' + d.radio + 'px;');
     s.push('  --gs-borde-ancho:' + d.bordeAncho + 'px;');

@@ -1,27 +1,27 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sincretismo de Silicio - CambiaPalabras</title>
-  <meta name="description" content="Instalación interactiva: captura palabras humanas con tu cuerpo antes de que el núcleo corporativo secuestre el sistema.">
+  <meta name="description"
+    content="Instalación interactiva: captura palabras humanas con tu cuerpo antes de que el núcleo corporativo secuestre el sistema.">
   <!-- Los assets viven en ./cambiapalabras/ y son RELATIVOS a esta página: funciona
        en la raíz (/cambiapalabras.html), en subpath (/sincretismo/cambiapalabras.html)
        y en el hosting estático del FTP, sin <base> ni recompilar nada. -->
-  <script src="js/base-path.js?v=3.38"></script>
-  <script src="js/global-style.js?v=1.1"></script>
+  <script src="js/base-path.js?v=3.51"></script>
+  <script src="js/global-style.js?v=1.3"></script>
+  <script src="js/control-remoto.js?v=1"></script>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.38">
+  <link rel="stylesheet" href="css/fonts-local.css?v=1">
+  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.51">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <script src="vendor/mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="vendor/mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
   <!-- JPShaderEditor Include (Engine embebible de Nodos y Shaders de Galería) -->
   <script>
@@ -33,8 +33,12 @@
         var st = JSON.parse(localStorage.getItem('jpsi:config') || '{}');
         if (st && st.baseManual && st.base) elegido = st.base;
       } catch (e) { }
+      // 100% LOCAL: en la maquina de la instalacion el engine sale del
+      // jpshadereditor LOCAL (puerto 3250), no del VPS. Sin esto la app
+      // dependia de internet para dibujar el fondo de nodos.
+      var LOCAL_EDITOR = 'http://localhost:3250/jpshadereditor';
       var base = elegido || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
-        ? location.origin + '/jpshadereditor'
+        ? LOCAL_EDITOR
         : 'https://vps-4455523-x.dattaweb.com/jpshadereditor');
 
       function loadScript(url, next) {
@@ -42,19 +46,9 @@
         s.src = url;
         s.async = false;
         s.onload = next;
-        s.onerror = function () {
-          if (!url.startsWith('https://vps-4455523-x')) {
-            var vpsUrl = 'https://vps-4455523-x.dattaweb.com/jpshadereditor' + url.replace(/^.*?\/jpshadereditor/, '');
-            var fb = document.createElement('script');
-            fb.src = vpsUrl;
-            fb.async = false;
-            fb.onload = next;
-            fb.onerror = next;
-            document.head.appendChild(fb);
-          } else {
-            next();
-          }
-        };
+        // 100% LOCAL: sin fallback a internet. Si el engine local no esta, se
+        // sigue sin fondo en vez de pedirle el include al VPS.
+        s.onerror = function () { next(); };
         document.head.appendChild(s);
       }
 
@@ -77,6 +71,7 @@
     })();
   </script>
 </head>
+
 <body>
 
   <!-- Contenedor Principal de la Instalación -->
@@ -131,7 +126,8 @@
         </div>
 
         <!-- Indicador LIVE de Ollama (IA Local) -->
-        <div class="hud-ollama-pill checking" id="hud-ollama-pill" title="Estado de conexión con Ollama Local (Click para verificar/reintentar)">
+        <div class="hud-ollama-pill checking" id="hud-ollama-pill"
+          title="Estado de conexión con Ollama Local (Click para verificar/reintentar)">
           <span class="ollama-live-dot"></span>
           <span class="ollama-live-text" id="hud-ollama-text">OLLAMA: CHEQUEANDO...</span>
         </div>
@@ -160,7 +156,8 @@
         </button>
 
         <!-- Botón Diseño global (GLOBALSTYLE) -->
-        <a class="cctv-btn" id="btn-open-globalstyle" href="./globalstyle.html" target="_blank" rel="noopener noreferrer" title="Diseño global: tipografía, paleta y contenedores (se aplica en vivo)">
+        <a class="cctv-btn" id="btn-open-globalstyle" href="./globalstyle.html" target="_blank"
+          rel="noopener noreferrer" title="Diseño global: tipografía, paleta y contenedores (se aplica en vivo)">
           <span class="btn-icon">&#127899;</span>
           <span>DISEÑO</span>
         </a>
@@ -191,15 +188,6 @@
       </div>
     </header>
 
-    <!-- Marco de Medición y Miras Telemétricas en Esquinas -->
-    <div class="cctv-frame-corners">
-      <div class="corner corner-tl"></div>
-      <div class="corner corner-tr"></div>
-      <div class="corner corner-bl"></div>
-      <div class="corner corner-br"></div>
-    </div>
-
-
     <!-- Capa 4: Contenedor de Palabras Orgánicas Flotantes -->
     <div id="floating-words-layer"></div>
 
@@ -229,7 +217,7 @@
       <div class="mutation-backdrop-glitch"></div>
       <!-- Lluvia de partículas corporativas de fondo (desactivada) -->
       <canvas id="corporate-rain-canvas" style="display: none; pointer-events: none;"></canvas>
-      
+
 
       <!-- Las 3 tarjetas del medio se eliminaron: las palabras son el mismo
            objeto unificado que baja al centro y luego vuela a su lugar en la frase. -->
@@ -252,11 +240,12 @@
         </div>
         <div class="pip-actions">
           <span class="pip-tag" id="depth-pip-fps">60 FPS</span>
-          <button type="button" class="pip-close-btn" id="btn-close-depth-pip" title="Ocultar monitor PiP (Configurable en P)">✕</button>
+          <button type="button" class="pip-close-btn" id="btn-close-depth-pip"
+            title="Ocultar monitor PiP (Configurable en P)">✕</button>
         </div>
       </div>
       <div class="pip-canvas-wrapper">
-        <canvas id="depth-map-canvas" width="240" height="160"></canvas>
+        <canvas id="depth-map-canvas" width="480" height="320"></canvas>
         <div class="pip-paleta-tint" id="depth-pip-tint"></div>
         <div class="pip-scanline"></div>
         <div class="pip-overlay-meta">
@@ -266,7 +255,7 @@
       </div>
       <div class="pip-footer">
         <span>MODO: <span id="depth-footer-mode">CYBERPUNK</span></span>
-        <span>RES: 240x160</span>
+        <span>RES: 480x320</span>
       </div>
     </div>
 
@@ -278,7 +267,8 @@
         </div>
         <div class="pip-actions">
           <span class="pip-tag" id="face-pip-status">LOCK</span>
-          <button type="button" class="pip-close-btn" id="btn-close-face-pip" title="Ocultar monitor PiP (Configurable en P)">✕</button>
+          <button type="button" class="pip-close-btn" id="btn-close-face-pip"
+            title="Ocultar monitor PiP (Configurable en P)">✕</button>
         </div>
       </div>
       <div class="pip-canvas-wrapper">
@@ -301,6 +291,52 @@
       <div class="pip-footer">
         <span>ZOOM: <span id="face-footer-zoom">1.8x</span></span>
         <span id="face-footer-tracking">TRACKING: ACTIVO</span>
+      </div>
+    </div>
+
+    <div id="left-hand-pip" class="tactical-pip-card pip-bottom-left hidden">
+      <div class="pip-header">
+        <div class="pip-title">
+          <span class="pip-status-dot"></span>
+          <span class="pip-title-text">MANO IZQUIERDA</span>
+        </div>
+        <div class="pip-actions">
+          <span class="pip-tag" id="left-hand-pip-status">STANDBY</span>
+          <button type="button" class="pip-close-btn" id="btn-close-left-hand-pip"
+            title="Ocultar monitor PiP (Configurable en P)">✕</button>
+        </div>
+      </div>
+      <div class="pip-canvas-wrapper">
+        <canvas id="left-hand-canvas" width="220" height="220"></canvas>
+        <div class="pip-paleta-tint" id="left-hand-pip-tint"></div>
+        <div class="pip-scanline"></div>
+      </div>
+      <div class="pip-footer">
+        <span>ZOOM: <span id="left-hand-footer-zoom">2.6x</span></span>
+        <span>RECORTE: MUÑECA IZQ</span>
+      </div>
+    </div>
+
+    <div id="right-hand-pip" class="tactical-pip-card pip-top-right hidden">
+      <div class="pip-header">
+        <div class="pip-title">
+          <span class="pip-status-dot"></span>
+          <span class="pip-title-text">MANO DERECHA</span>
+        </div>
+        <div class="pip-actions">
+          <span class="pip-tag" id="right-hand-pip-status">STANDBY</span>
+          <button type="button" class="pip-close-btn" id="btn-close-right-hand-pip"
+            title="Ocultar monitor PiP (Configurable en P)">✕</button>
+        </div>
+      </div>
+      <div class="pip-canvas-wrapper">
+        <canvas id="right-hand-canvas" width="220" height="220"></canvas>
+        <div class="pip-paleta-tint" id="right-hand-pip-tint"></div>
+        <div class="pip-scanline"></div>
+      </div>
+      <div class="pip-footer">
+        <span>ZOOM: <span id="right-hand-footer-zoom">2.6x</span></span>
+        <span>RECORTE: MUÑECA DER</span>
       </div>
     </div>
 
@@ -346,6 +382,10 @@
             <span class="tab-icon">✨</span>
             <span class="tab-text">PARTÍCULAS</span>
           </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-physics">
+            <span class="tab-icon">⚛️</span>
+            <span class="tab-text">FÍSICAS &amp; COLISIÓN</span>
+          </button>
           <button type="button" class="modal-tab-btn" data-tab="tab-masterrdm">
             <span class="tab-icon">🌀</span>
             <span class="tab-text">MASTER OUTPUT SHADER</span>
@@ -375,7 +415,8 @@
                   <span>Modelos Detectados en Ollama:</span>
                   <small>(Detectados automáticamente en tu sistema http://localhost:11434)</small>
                 </label>
-                <button type="button" class="btn-refresh-models" id="btn-refresh-models" title="Refrescar lista desde Ollama">
+                <button type="button" class="btn-refresh-models" id="btn-refresh-models"
+                  title="Refrescar lista desde Ollama">
                   <span>🔄 Buscar Modelos</span>
                 </button>
               </div>
@@ -425,7 +466,8 @@
                   <span>SYSTEM PROMPT (Instrucción de Resignificación &amp; Motivación):</span>
                   <small>(Indica al modelo generar las 3 nuevas palabras y la frase inspiracional)</small>
                 </label>
-                <button type="button" class="btn-toggle-expand" id="btn-toggle-prompt-expand" title="Expandir o colapsar vista amplia del prompt">
+                <button type="button" class="btn-toggle-expand" id="btn-toggle-prompt-expand"
+                  title="Expandir o colapsar vista amplia del prompt">
                   <span class="expand-icon">⤢</span>
                   <span class="expand-label">Expandir</span>
                 </button>
@@ -441,10 +483,12 @@
                 <span>🌐 BANCO DE PALABRAS ORGÁNICAS (<span id="words-count-badge">154</span> ACTIVAS)</span>
               </div>
               <p class="words-help-text">
-                Pega o escribe múltiples palabras separadas por comas o saltos de línea para que floten en la pantalla interactiva:
+                Pega o escribe múltiples palabras separadas por comas o saltos de línea para que floten en la pantalla
+                interactiva:
               </p>
               <div class="words-input-group">
-                <textarea id="cfg-words-input" rows="3" placeholder="ej. amor, nostalgia, recuerdo, latido, esperanza, silencio, libertad, ternura..."></textarea>
+                <textarea id="cfg-words-input" rows="3"
+                  placeholder="ej. amor, nostalgia, recuerdo, latido, esperanza, silencio, libertad, ternura..."></textarea>
                 <div class="words-actions-row">
                   <button type="button" class="btn-word-action btn-add-words" id="btn-add-words">
                     ➕ Agregar al Banco
@@ -469,7 +513,8 @@
                 <span>⚡ SHADER ASCII SOBRE CÁMARA (WEBGL)</span>
               </div>
               <p class="words-help-text">
-                Efecto visual que renderiza el feed de video en tiempo real mediante una matriz tipográfica procedural de fósforo CCTV:
+                Efecto visual que renderiza el feed de video en tiempo real mediante una matriz tipográfica procedural
+                de fósforo CCTV:
               </p>
               <div class="ascii-row-stacked">
                 <label class="checkbox-label">
@@ -478,12 +523,14 @@
                 </label>
 
                 <div class="ascii-slider-group">
-                  <label for="cfg-ascii-size">Densidad de Caracteres ASCII: <span id="val-ascii-size">11</span>px</label>
+                  <label for="cfg-ascii-size">Densidad de Caracteres ASCII: <span
+                      id="val-ascii-size">11</span>px</label>
                   <input type="range" id="cfg-ascii-size" min="6" max="26" step="1" value="11">
                 </div>
 
                 <div class="ascii-slider-group">
-                  <label for="cfg-ascii-glyph-scale">Escala de las Letras (glifos): <span id="val-ascii-glyph-scale">0.90</span>x</label>
+                  <label for="cfg-ascii-glyph-scale">Escala de las Letras (glifos): <span
+                      id="val-ascii-glyph-scale">0.90</span>x</label>
                   <input type="range" id="cfg-ascii-glyph-scale" min="0.30" max="1.40" step="0.05" value="0.90">
                 </div>
 
@@ -521,7 +568,8 @@
                 </div>
 
                 <div class="ascii-slider-group">
-                  <label for="cfg-ascii-bg-alpha">Opacidad del Fondo del Shader: <span id="val-ascii-bg-alpha">0</span>%</label>
+                  <label for="cfg-ascii-bg-alpha">Opacidad del Fondo del Shader: <span
+                      id="val-ascii-bg-alpha">0</span>%</label>
                   <input type="range" id="cfg-ascii-bg-alpha" min="0" max="100" step="1" value="0">
                 </div>
 
@@ -547,7 +595,8 @@
                 </label>
               </div>
               <p class="words-help-text">
-                Proyecta el esqueleto cinemático y los 33 nodos anatómicos calculados por MediaPipe Pose en tiempo real sobre el feed interactivo.
+                Proyecta el esqueleto cinemático y los 33 nodos anatómicos calculados por MediaPipe Pose en tiempo real
+                sobre el feed interactivo.
               </p>
 
               <div class="calibration-grid">
@@ -558,7 +607,8 @@
                     <strong>Graficar Articulaciones / Huesos</strong>
                   </label>
                   <div class="calib-subslider">
-                    <label for="cfg-track-bone-width">Grosor de líneas (px): <span id="val-track-bone-width">0.5</span></label>
+                    <label for="cfg-track-bone-width">Grosor de líneas (px): <span
+                        id="val-track-bone-width">0.5</span></label>
                     <input type="range" id="cfg-track-bone-width" min="0.25" max="5" step="0.25" value="0.5">
                   </div>
                 </div>
@@ -570,7 +620,8 @@
                     <strong>Graficar Puntos del Cuerpo (33 Nodos)</strong>
                   </label>
                   <div class="calib-subslider">
-                    <label for="cfg-track-point-radius">Radio de articulación (px): <span id="val-track-point-radius">0.75</span></label>
+                    <label for="cfg-track-point-radius">Radio de articulación (px): <span
+                        id="val-track-point-radius">0.75</span></label>
                     <input type="range" id="cfg-track-point-radius" min="0.5" max="7" step="0.25" value="0.75">
                   </div>
                 </div>
@@ -603,7 +654,33 @@
                     <input type="checkbox" id="cfg-track-body-collision" checked>
                     <strong>6) Colisión Corporal con Palabras</strong>
                   </label>
-                  <small class="item-desc">Tus manos (muñecas e índices) y articulaciones pueden tocar y atrapar palabras directamente</small>
+                  <small class="item-desc">Los puntos habilitados abajo pueden tocar y atrapar palabras directamente.
+                    Por defecto: el puntero y las dos manos.</small>
+
+                  <!-- Modo selector: qué puntos SÍ colisionan y cuáles NO -->
+                  <div class="collision-points">
+                    <div class="collision-points-title">PUNTOS QUE CAPTURAN PALABRAS</div>
+                    <div class="collision-points-grid">
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mouse" checked><span>PUNTERO /
+                          MOUSE</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mano-izq" checked><span>MANO
+                          IZQUIERDA</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mano-der" checked><span>MANO
+                          DERECHA</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-dedo-izq"><span>ÍNDICE
+                          IZQUIERDO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-dedo-der"><span>ÍNDICE
+                          DERECHO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-codo-izq"><span>CODO
+                          IZQUIERDO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-codo-der"><span>CODO
+                          DERECHO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-centro-facial"><span>CENTRO
+                          FACIAL</span></label>
+                    </div>
+                    <small class="item-desc">Por defecto sólo el <strong>puntero</strong> y las <strong>dos
+                        manos</strong> del OpenPose capturan. Destildá un punto para que NO colisione.</small>
+                  </div>
                 </div>
               </div>
             </div>
@@ -620,7 +697,8 @@
                 </label>
               </div>
               <p class="words-help-text">
-                Procesa la máscara de segmentación humana de MediaPipe para aislar tu cuerpo del fondo y proyectar la profundidad espacial Z.
+                Procesa la máscara de segmentación humana de MediaPipe para aislar tu cuerpo del fondo y proyectar la
+                profundidad espacial Z.
               </p>
 
               <div class="calibration-grid">
@@ -630,7 +708,8 @@
                     <input type="checkbox" id="cfg-track-depth-shader" checked>
                     <strong>3) Máscara Depth en Shader ASCII</strong>
                   </label>
-                  <small class="item-desc">Pinta las letras de tu silueta corporal en un color diferente al fondo</small>
+                  <small class="item-desc">Pinta las letras de tu silueta corporal en un color diferente al
+                    fondo</small>
                 </div>
 
                 <div class="calib-item">
@@ -655,7 +734,8 @@
 
                 <div class="calib-item">
                   <label for="cfg-track-depth-contrast">
-                    <strong>Ganancia de Contraste / Profundidad:</strong> <span id="val-track-depth-contrast">1.5</span>x
+                    <strong>Ganancia de Contraste / Profundidad:</strong> <span
+                      id="val-track-depth-contrast">1.5</span>x
                   </label>
                   <input type="range" id="cfg-track-depth-contrast" min="0.5" max="3.0" step="0.1" value="1.5">
                 </div>
@@ -674,18 +754,12 @@
                 </label>
               </div>
               <p class="words-help-text">
-                Rastreo cefálico de alta precisión. Dibuja el cuadrito de telemetría directamente sobre tu rostro en pantalla y permite activar la cámara facial PiP.
+                Rastreo cefálico de alta precisión. Dibuja el cuadrito de telemetría directamente sobre tu rostro en
+                pantalla y permite activar la cámara facial PiP.
               </p>
 
               <div class="calibration-grid">
-                <!-- 10) Cuadrito de rastreo facial en la posición donde está -->
-                <div class="calib-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="cfg-track-face-box" checked>
-                    <strong>10) Dibujar Cuadro Facial en Pantalla</strong>
-                  </label>
-                  <small class="item-desc">Dibuja el marco de fijación biométrica en la posición real de tu rostro</small>
-                </div>
+
 
                 <div class="calib-item">
                   <label for="cfg-track-face-zoom">
@@ -712,6 +786,48 @@
               </div>
             </div>
 
+            <!-- 3b) MONITORES PiP DE MANOS (SOLO MANO IZQUIERDA / SOLO MANO DERECHA) -->
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>🖐️ 3b) MONITORES DE MANOS (RECORTE DE CÁMARA POR MANO)</span>
+                </div>
+              </div>
+              <p class="words-help-text">
+                Cada monitor recorta la cámara y la centra SOLO sobre una mano (la muñeca que detecta
+                MediaPipe): uno muestra únicamente la mano izquierda y otro únicamente la derecha.
+              </p>
+
+              <div class="calibration-grid">
+                <div class="calib-item">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label class="checkbox-label" style="margin: 0;">
+                      <input type="checkbox" id="cfg-track-left-hand">
+                      <strong>Mostrar Monitor PiP Mano IZQUIERDA</strong>
+                    </label>
+                  </div>
+                  <small class="item-desc">Encuadre de la cámara recortado sobre la muñeca izquierda.</small>
+                </div>
+
+                <div class="calib-item">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label class="checkbox-label" style="margin: 0;">
+                      <input type="checkbox" id="cfg-track-right-hand">
+                      <strong>Mostrar Monitor PiP Mano DERECHA</strong>
+                    </label>
+                  </div>
+                  <small class="item-desc">Encuadre de la cámara recortado sobre la muñeca derecha.</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-hand-zoom">
+                    <strong>Zoom de los Monitores de Mano:</strong> <span id="val-track-hand-zoom">2.6</span>x
+                  </label>
+                  <input type="range" id="cfg-track-hand-zoom" min="1.5" max="5.0" step="0.1" value="2.6">
+                </div>
+              </div>
+            </div>
+
             <!-- 7) CAPAS DE ANÁLISIS ÓPTICO (FRAME DIFFERENCE & FLOW FIELD) -->
             <div class="tracking-card">
               <div class="section-subtitle">
@@ -727,7 +843,8 @@
                     <input type="checkbox" id="cfg-track-frame-diff">
                     <strong>Capa FRAME DIFFERENCE (Shader con Feedback)</strong>
                   </label>
-                  <small class="item-desc">Compara cuadros sucesivos en GPU con buffer de feedback para generar estelas de movimiento espectrales</small>
+                  <small class="item-desc">Compara cuadros sucesivos en GPU con buffer de feedback para generar estelas
+                    de movimiento espectrales</small>
                 </div>
 
                 <div class="calib-item">
@@ -749,7 +866,8 @@
                     <input type="checkbox" id="cfg-track-framediff-orig">
                     <strong>Pintar con Color Original del Video (origcolor)</strong>
                   </label>
-                  <small class="item-desc">Si está desactivado, proyecta la diferencia cromática pura de los vectores</small>
+                  <small class="item-desc">Si está desactivado, proyecta la diferencia cromática pura de los
+                    vectores</small>
                 </div>
 
                 <div class="calib-item">
@@ -757,7 +875,8 @@
                     <input type="checkbox" id="cfg-track-flow-field">
                     <strong>Capa FLOW FIELD (Campo de Flujo Vectorial)</strong>
                   </label>
-                  <small class="item-desc">Matriz de vectores direccionales que se orientan e impulsan con tu movimiento</small>
+                  <small class="item-desc">Matriz de vectores direccionales que se orientan e impulsan con tu
+                    movimiento</small>
                 </div>
               </div>
             </div>
@@ -767,7 +886,7 @@
               <div class="section-subtitle">
                 <span>⚙️ 4) CALIBRACIÓN DEL SENSOR &amp; TELEMETRÍA EN TIEMPO REAL</span>
               </div>
-              
+
               <div class="calibration-grid">
                 <div class="calib-item">
                   <label for="cfg-track-anchor"><strong>Punto de Control para el Cursor:</strong></label>
@@ -825,7 +944,8 @@
                 <span>🎛️ MATRIZ DE COMPOSICIÓN &amp; CONTROL DE OPACIDAD DE CAPAS</span>
               </div>
               <p class="words-help-text">
-                Enciende, apaga y gradúa individualmente la opacidad de cada capa de renderizado. Los interruptores se sincronizan continuamente en tiempo real con las pestañas de Tracking y Shader.
+                Enciende, apaga y gradúa individualmente la opacidad de cada capa de renderizado. Los interruptores se
+                sincronizan continuamente en tiempo real con las pestañas de Tracking y Shader.
               </p>
 
               <div class="render-layers-grid">
@@ -839,7 +959,8 @@
                     <span class="layer-title">1. Cámara de Video (Fondo CCTV)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-camera-opacity">Opacidad: <span id="val-render-camera-opacity">100</span>%</label>
+                    <label for="cfg-render-camera-opacity">Opacidad: <span
+                        id="val-render-camera-opacity">100</span>%</label>
                     <input type="range" id="cfg-render-camera-opacity" min="0" max="100" step="1" value="100">
                   </div>
                 </div>
@@ -853,9 +974,11 @@
                     </label>
                     <span class="layer-title">1b. Recorte de Silueta (Depth Cutout)</span>
                   </div>
-                  <small class="item-desc">Aísla tu cuerpo del fondo usando el mapa de profundidad / segmentación humana</small>
+                  <small class="item-desc">Aísla tu cuerpo del fondo usando el mapa de profundidad / segmentación
+                    humana</small>
                   <div class="layer-slider-group" style="margin-top: 6px;">
-                    <label for="cfg-render-cutout-contrast">Umbral de Máscara: <span id="val-render-cutout-contrast">28</span>%</label>
+                    <label for="cfg-render-cutout-contrast">Umbral de Máscara: <span
+                        id="val-render-cutout-contrast">28</span>%</label>
                     <input type="range" id="cfg-render-cutout-contrast" min="5" max="90" step="1" value="28">
                   </div>
                 </div>
@@ -870,7 +993,8 @@
                     <span class="layer-title">2. Shader ASCII (WebGL)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-ascii-opacity">Opacidad: <span id="val-render-ascii-opacity">92</span>%</label>
+                    <label for="cfg-render-ascii-opacity">Opacidad: <span
+                        id="val-render-ascii-opacity">92</span>%</label>
                     <input type="range" id="cfg-render-ascii-opacity" min="0" max="100" step="1" value="92">
                   </div>
                 </div>
@@ -885,7 +1009,8 @@
                     <span class="layer-title">3. Shader Frame Difference (Feedback)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-framediff-opacity">Opacidad: <span id="val-render-framediff-opacity">88</span>%</label>
+                    <label for="cfg-render-framediff-opacity">Opacidad: <span
+                        id="val-render-framediff-opacity">88</span>%</label>
                     <input type="range" id="cfg-render-framediff-opacity" min="0" max="100" step="1" value="88">
                   </div>
                 </div>
@@ -900,7 +1025,8 @@
                     <span class="layer-title">4. Esqueleto OpenPose (Huesos &amp; Nodos)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-openpose-opacity">Opacidad: <span id="val-render-openpose-opacity">100</span>%</label>
+                    <label for="cfg-render-openpose-opacity">Opacidad: <span
+                        id="val-render-openpose-opacity">100</span>%</label>
                     <input type="range" id="cfg-render-openpose-opacity" min="0" max="100" step="1" value="100">
                   </div>
                 </div>
@@ -915,7 +1041,8 @@
                     <span class="layer-title">4b. Vectores Flow Field (Flujo Óptico)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-flowfield-opacity">Opacidad: <span id="val-render-flowfield-opacity">100</span>%</label>
+                    <label for="cfg-render-flowfield-opacity">Opacidad: <span
+                        id="val-render-flowfield-opacity">100</span>%</label>
                     <input type="range" id="cfg-render-flowfield-opacity" min="0" max="100" step="1" value="100">
                   </div>
                 </div>
@@ -930,7 +1057,8 @@
                     <span class="layer-title">5. Punteros de Selección (Retículas HUD)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-pointers-opacity">Opacidad: <span id="val-render-pointers-opacity">100</span>%</label>
+                    <label for="cfg-render-pointers-opacity">Opacidad: <span
+                        id="val-render-pointers-opacity">100</span>%</label>
                     <input type="range" id="cfg-render-pointers-opacity" min="0" max="100" step="1" value="100">
                   </div>
                 </div>
@@ -959,6 +1087,29 @@
                   <small class="item-desc">Visor biométrico en esquina superior derecha</small>
                 </div>
 
+                <!-- Capa 7b: Monitores PiP de MANOS (izquierda / derecha) -->
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Monitor PiP Mano Izquierda">
+                      <input type="checkbox" id="cfg-render-lefthand-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">7b. Monitor PiP Mano Izquierda</span>
+                  </div>
+                  <small class="item-desc">Recorte de la cámara SOLO sobre la mano izquierda</small>
+                </div>
+
+                <div class="render-layer-item">
+                  <div class="layer-header">
+                    <label class="switch-toggle" title="Activar/Desactivar Monitor PiP Mano Derecha">
+                      <input type="checkbox" id="cfg-render-righthand-toggle">
+                      <span class="slider-round"></span>
+                    </label>
+                    <span class="layer-title">7c. Monitor PiP Mano Derecha</span>
+                  </div>
+                  <small class="item-desc">Recorte de la cámara SOLO sobre la mano derecha</small>
+                </div>
+
                 <!-- Capa 8: Scanlines & Viñeta CCTV -->
                 <div class="render-layer-item">
                   <div class="layer-header">
@@ -969,7 +1120,8 @@
                     <span class="layer-title">8. Filtro Analógico CCTV (Scanlines &amp; Viñeta)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-scanlines-opacity">Opacidad: <span id="val-render-scanlines-opacity">85</span>%</label>
+                    <label for="cfg-render-scanlines-opacity">Opacidad: <span
+                        id="val-render-scanlines-opacity">85</span>%</label>
                     <input type="range" id="cfg-render-scanlines-opacity" min="0" max="100" step="1" value="85">
                   </div>
                 </div>
@@ -984,11 +1136,13 @@
                     <span class="layer-title">9. Ruido Estático &amp; Grano Analógico</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-noise-opacity">Opacidad: <span id="val-render-noise-opacity">40</span>%</label>
+                    <label for="cfg-render-noise-opacity">Opacidad: <span
+                        id="val-render-noise-opacity">40</span>%</label>
                     <input type="range" id="cfg-render-noise-opacity" min="0" max="100" step="1" value="40">
                   </div>
                   <div class="layer-slider-group" style="margin-top: 6px;">
-                    <label for="cfg-render-noise-scale">Escala / Grano: <span id="val-render-noise-scale">2.0</span>x</label>
+                    <label for="cfg-render-noise-scale">Escala / Grano: <span
+                        id="val-render-noise-scale">2.0</span>x</label>
                     <input type="range" id="cfg-render-noise-scale" min="0.5" max="6" step="0.5" value="2.0">
                   </div>
                 </div>
@@ -1003,22 +1157,27 @@
                     <span class="layer-title">10. Partículas Corporativas (👔 😊 💪 💵)</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-corpparticles-opacity">Opacidad: <span id="val-render-corpparticles-opacity">80</span>%</label>
+                    <label for="cfg-render-corpparticles-opacity">Opacidad: <span
+                        id="val-render-corpparticles-opacity">80</span>%</label>
                     <input type="range" id="cfg-render-corpparticles-opacity" min="0" max="100" step="1" value="80">
                   </div>
                   <small class="item-desc">Lluvia de íconos que cae durante el discurso final inspiracional</small>
                 </div>
 
                 <!-- Capa 11: Control de Velocidad de Noise (Glitch Shader Master Output) -->
-                <div class="render-layer-item master-noise-control-item" style="grid-column: 1 / -1; border: 1px solid #ff000d; background: rgba(255, 0, 13, 0.07); padding: 12px; border-radius: 4px; margin-top: 6px;">
+                <div class="render-layer-item master-noise-control-item"
+                  style="grid-column: 1 / -1; border: 1px solid #ff000d; background: rgba(255, 0, 13, 0.07); padding: 12px; border-radius: 4px; margin-top: 6px;">
                   <div class="layer-header" style="margin-bottom: 6px;">
-                    <span class="layer-title" style="color: #ff3b45; font-weight: 700; font-size: 13px;">⚡ VELOCIDAD DE ANIMACIÓN NOISE // SHADER MASTER OUTPUT</span>
+                    <span class="layer-title" style="color: #ff3b45; font-weight: 700; font-size: 13px;">⚡ VELOCIDAD DE
+                      ANIMACIÓN NOISE // SHADER MASTER OUTPUT</span>
                   </div>
                   <div class="layer-slider-group">
-                    <label for="cfg-render-noise-speed">Velocidad Noise (Sutil ×10): <span id="val-render-noise-speed">1.0</span>×</label>
+                    <label for="cfg-render-noise-speed">Velocidad Noise (Sutil ×10): <span
+                        id="val-render-noise-speed">1.0</span>×</label>
                     <input type="range" id="cfg-render-noise-speed" min="0" max="3" step="0.05" value="1.0">
                   </div>
-                  <small class="item-desc" style="color: #c9888c; display: block; margin-top: 4px;">Modula la velocidad del ruido procedural continuo (glitch). Reducido 10× para una animación sutil y orgánica.</small>
+                  <small class="item-desc" style="color: #c9888c; display: block; margin-top: 4px;">Modula la velocidad
+                    del ruido procedural continuo (glitch). Reducido 10× para una animación sutil y orgánica.</small>
                 </div>
               </div>
             </div>
@@ -1031,42 +1190,55 @@
                 <span>⚡ ENVELOPE DE SECUENCIA &amp; CALIBRACIÓN DE GLITCH</span>
               </div>
               <p class="words-help-text">
-                Calibra la intensidad y el comportamiento del efecto Glitch en cada fase de la performance interactiva (Reposo, Procesamiento del modelo, y Síntesis poética final).
+                Calibra la intensidad y el comportamiento del efecto Glitch en cada fase de la performance interactiva
+                (Reposo, Procesamiento del modelo, y Síntesis poética final).
               </p>
 
               <!-- Botones de Test / Previsualización de Estado -->
               <div style="margin: 12px 0 16px;">
-                <div style="font-size: 11px; font-weight: 700; color: #ff3b45; margin-bottom: 8px; letter-spacing: 0.06em;">PREVISUALIZAR FASE DE SECUENCIA EN VIVO:</div>
+                <div
+                  style="font-size: 11px; font-weight: 700; color: #ff3b45; margin-bottom: 8px; letter-spacing: 0.06em;">
+                  PREVISUALIZAR FASE DE SECUENCIA EN VIVO:</div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-idle" style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ REPOSO (IDLE)</button>
-                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-thinking" style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ PENSANDO (THINKING)</button>
-                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-haiku" style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ SECUESTRO (HAIKU)</button>
-                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-auto" style="flex: 0.8; min-width: 100px; font-size: 11px; padding: 7px 10px;">↺ EN VIVO (AUTO)</button>
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-idle"
+                    style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ REPOSO (IDLE)</button>
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-thinking"
+                    style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ PENSANDO
+                    (THINKING)</button>
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-haiku"
+                    style="flex: 1; min-width: 110px; font-size: 11px; padding: 7px 10px;">▶ SECUESTRO (HAIKU)</button>
+                  <button type="button" class="btn-word-action pa-cp-btn-test" id="cfg-glitch-test-auto"
+                    style="flex: 0.8; min-width: 100px; font-size: 11px; padding: 7px 10px;">↺ EN VIVO (AUTO)</button>
                 </div>
               </div>
 
               <!-- Sliders de Envelope -->
               <div class="calibration-grid">
                 <div class="calib-item">
-                  <label for="cfg-env-idle"><strong>Nivel en REPOSO (IDLE):</strong> <span id="val-env-idle">0.10</span></label>
+                  <label for="cfg-env-idle"><strong>Nivel en REPOSO (IDLE):</strong> <span
+                      id="val-env-idle">0.10</span></label>
                   <input type="range" id="cfg-env-idle" min="0" max="1" step="0.02" value="0.10">
-                  <small class="item-desc">Intensidad de glitch mientras la obra espera interacción (0.00 a 1.00)</small>
+                  <small class="item-desc">Intensidad de glitch mientras la obra espera interacción (0.00 a
+                    1.00)</small>
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-env-thinking"><strong>Nivel en RAZONAMIENTO (THINKING):</strong> <span id="val-env-thinking">1.00</span></label>
+                  <label for="cfg-env-thinking"><strong>Nivel en RAZONAMIENTO (THINKING):</strong> <span
+                      id="val-env-thinking">1.00</span></label>
                   <input type="range" id="cfg-env-thinking" min="0" max="1" step="0.02" value="1.00">
                   <small class="item-desc">Intensidad máxima durante la inferencia y procesamiento cognitivo</small>
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-env-haiku"><strong>Nivel en POEMA SINTETIZADO (HAIKU):</strong> <span id="val-env-haiku">0.50</span></label>
+                  <label for="cfg-env-haiku"><strong>Nivel en POEMA SINTETIZADO (HAIKU):</strong> <span
+                      id="val-env-haiku">0.50</span></label>
                   <input type="range" id="cfg-env-haiku" min="0" max="1" step="0.02" value="0.50">
                   <small class="item-desc">Intensidad durante el secuestro final de pantalla y declamación</small>
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-env-dur"><strong>Duración de Transición (Envelope Time):</strong> <span id="val-env-dur">1.2</span>s</label>
+                  <label for="cfg-env-dur"><strong>Duración de Transición (Envelope Time):</strong> <span
+                      id="val-env-dur">1.2</span>s</label>
                   <input type="range" id="cfg-env-dur" min="0.1" max="4.0" step="0.1" value="1.2">
                   <small class="item-desc">Tiempo de fundido y aceleración entre cada fase</small>
                 </div>
@@ -1082,13 +1254,16 @@
                 </div>
 
                 <!-- Bypass / Override Manual -->
-                <div class="calib-item" style="grid-column: 1 / -1; background: rgba(255, 0, 13, 0.08); border: 1px solid #ff000d; border-radius: 4px; padding: 10px;">
+                <div class="calib-item"
+                  style="grid-column: 1 / -1; background: rgba(255, 0, 13, 0.08); border: 1px solid #ff000d; border-radius: 4px; padding: 10px;">
                   <label class="checkbox-label" style="font-weight: 700; color: #ff3b45;">
                     <input type="checkbox" id="cfg-glitch-manual-override">
                     <span>FORZAR GLITCH MANUAL (Bypass de Envelope de Secuencia)</span>
                   </label>
-                  <div id="cfg-glitch-manual-group" style="opacity: 0.4; pointer-events: none; transition: opacity .2s; margin-top: 8px;">
-                    <label for="cfg-glitch-manual-val">Intensidad Fija Manual: <span id="val-glitch-manual">0.50</span></label>
+                  <div id="cfg-glitch-manual-group"
+                    style="opacity: 0.4; pointer-events: none; transition: opacity .2s; margin-top: 8px;">
+                    <label for="cfg-glitch-manual-val">Intensidad Fija Manual: <span
+                        id="val-glitch-manual">0.50</span></label>
                     <input type="range" id="cfg-glitch-manual-val" min="0" max="1" step="0.01" value="0.50">
                   </div>
                 </div>
@@ -1099,19 +1274,24 @@
                 <span>🎛️ CONTROL DE UNIFORMS DEL EFECTO GLITCH (ANIMACIÓN VS MANUAL)</span>
               </div>
               <p class="words-help-text">
-                Activa o desactiva la animación por ruido procedural continuo para cada uniform individualmente. Si la animación está desactivada, el parámetro responde estáticamente al valor manual elegido.
+                Activa o desactiva la animación por ruido procedural continuo para cada uniform individualmente. Si la
+                animación está desactivada, el parámetro responde estáticamente al valor manual elegido.
               </p>
 
               <!-- Velocidad de Noise -->
-              <div class="render-layer-item" style="border: 1px solid #ff000d; background: rgba(255, 0, 13, 0.07); padding: 12px; border-radius: 4px; margin-bottom: 14px;">
+              <div class="render-layer-item"
+                style="border: 1px solid #ff000d; background: rgba(255, 0, 13, 0.07); padding: 12px; border-radius: 4px; margin-bottom: 14px;">
                 <div class="layer-header" style="margin-bottom: 6px;">
-                  <span class="layer-title" style="color: #ff3b45; font-weight: 700; font-size: 13px;">⚡ VELOCIDAD GLOBAL DE NOISE (×0.1 BASE SUTIL)</span>
+                  <span class="layer-title" style="color: #ff3b45; font-weight: 700; font-size: 13px;">⚡ VELOCIDAD
+                    GLOBAL DE NOISE (×0.1 BASE SUTIL)</span>
                 </div>
                 <div class="layer-slider-group">
-                  <label for="cfg-glitch-noise-speed">Velocidad Noise: <span id="val-glitch-noise-speed">1.00</span>×</label>
+                  <label for="cfg-glitch-noise-speed">Velocidad Noise: <span
+                      id="val-glitch-noise-speed">1.00</span>×</label>
                   <input type="range" id="cfg-glitch-noise-speed" min="0" max="3" step="0.05" value="1.00">
                 </div>
-                <small class="item-desc" style="color: #c9888c; display: block; margin-top: 4px;">Modula la frecuencia de animación de todos los uniforms activados con ruido.</small>
+                <small class="item-desc" style="color: #c9888c; display: block; margin-top: 4px;">Modula la frecuencia
+                  de animación de todos los uniforms activados con ruido.</small>
               </div>
 
               <div class="calibration-grid">
@@ -1124,7 +1304,8 @@
                     </label>
                     <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-block">0.80</span>
                   </div>
-                  <label for="cfg-glitch-param-block" style="font-size: 11px; color: #a0aec0;">Intensidad de Bloques Rotos (blockIntensity):</label>
+                  <label for="cfg-glitch-param-block" style="font-size: 11px; color: #a0aec0;">Intensidad de Bloques
+                    Rotos (blockIntensity):</label>
                   <input type="range" id="cfg-glitch-param-block" min="0" max="1" step="0.02" value="0.80">
                 </div>
 
@@ -1137,7 +1318,8 @@
                     </label>
                     <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-size">0.60</span>
                   </div>
-                  <label for="cfg-glitch-param-size" style="font-size: 11px; color: #a0aec0;">Tamaño de Cuadrados (blockSize):</label>
+                  <label for="cfg-glitch-param-size" style="font-size: 11px; color: #a0aec0;">Tamaño de Cuadrados
+                    (blockSize):</label>
                   <input type="range" id="cfg-glitch-param-size" min="0.05" max="1" step="0.02" value="0.60">
                 </div>
 
@@ -1150,7 +1332,8 @@
                     </label>
                     <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-chroma">0.70</span>
                   </div>
-                  <label for="cfg-glitch-param-chroma" style="font-size: 11px; color: #a0aec0;">Aberración Cromática RGB (chromaIntensity):</label>
+                  <label for="cfg-glitch-param-chroma" style="font-size: 11px; color: #a0aec0;">Aberración Cromática RGB
+                    (chromaIntensity):</label>
                   <input type="range" id="cfg-glitch-param-chroma" min="0" max="1" step="0.02" value="0.70">
                 </div>
 
@@ -1163,7 +1346,8 @@
                     </label>
                     <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-vhs">0.65</span>
                   </div>
-                  <label for="cfg-glitch-param-vhs" style="font-size: 11px; color: #a0aec0;">Ruido VHS &amp; Scanlines (vhsNoiseIntensity):</label>
+                  <label for="cfg-glitch-param-vhs" style="font-size: 11px; color: #a0aec0;">Ruido VHS &amp; Scanlines
+                    (vhsNoiseIntensity):</label>
                   <input type="range" id="cfg-glitch-param-vhs" min="0" max="1" step="0.02" value="0.65">
                 </div>
 
@@ -1176,7 +1360,8 @@
                     </label>
                     <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-glitch-tearing">0.50</span>
                   </div>
-                  <label for="cfg-glitch-param-tearing" style="font-size: 11px; color: #a0aec0;">Desgarro Lateral / Tearing (edgeTearingIntensity):</label>
+                  <label for="cfg-glitch-param-tearing" style="font-size: 11px; color: #a0aec0;">Desgarro Lateral /
+                    Tearing (edgeTearingIntensity):</label>
                   <input type="range" id="cfg-glitch-param-tearing" min="0" max="1" step="0.02" value="0.50">
                 </div>
               </div>
@@ -1196,22 +1381,26 @@
                 <span>✨ MOTOR DE PARTÍCULAS Y PALABRAS ORGÁNICAS</span>
               </div>
               <p class="words-help-text">
-                Controla cada variable de las palabras: tipografía, tamaño EN CADA ESTADO (flotando, en el centro girando, y en la frase final), color, contorno, tiempo de vida, cantidad máxima y velocidad.
+                Controla cada variable de las palabras: tipografía, tamaño EN CADA ESTADO (flotando, en el centro
+                girando, y en la frase final), color, contorno, tiempo de vida, cantidad máxima y velocidad.
               </p>
 
               <div class="calibration-grid">
                 <div class="calib-item">
-                  <label for="cfg-part-fontsize"><strong>Tamaño en FLOTACIÓN</strong> (antes de agarrarlas): <span id="val-part-fontsize">16</span>px</label>
+                  <label for="cfg-part-fontsize"><strong>Tamaño en FLOTACIÓN</strong> (antes de agarrarlas): <span
+                      id="val-part-fontsize">16</span>px</label>
                   <input type="range" id="cfg-part-fontsize" min="12" max="90" step="1" value="16">
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-part-fontsize-center"><strong>Tamaño en el CENTRO</strong> (girando y transformándose): <span id="val-part-fontsize-center">52</span>px</label>
+                  <label for="cfg-part-fontsize-center"><strong>Tamaño en el CENTRO</strong> (girando y
+                    transformándose): <span id="val-part-fontsize-center">52</span>px</label>
                   <input type="range" id="cfg-part-fontsize-center" min="12" max="140" step="1" value="52">
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-part-fontsize-phrase"><strong>Tamaño en la FRASE FINAL</strong>: <span id="val-part-fontsize-phrase">62</span>px</label>
+                  <label for="cfg-part-fontsize-phrase"><strong>Tamaño en la FRASE FINAL</strong>: <span
+                      id="val-part-fontsize-phrase">62</span>px</label>
                   <input type="range" id="cfg-part-fontsize-phrase" min="10" max="90" step="1" value="62">
                   <small class="item-desc">Las palabras auxiliares de la frase se escalan al 86% de este valor.</small>
                 </div>
@@ -1229,7 +1418,8 @@
 
                 <div class="calib-item calib-item-inline">
                   <label for="cfg-part-color"><strong>Color de la Palabra:</strong></label>
-                  <input type="color" id="cfg-part-color" class="word-color-swatch" value="#ffffff" title="Elegir color de la palabra">
+                  <input type="color" id="cfg-part-color" class="word-color-swatch" value="#ffffff"
+                    title="Elegir color de la palabra">
                 </div>
 
                 <div class="calib-item">
@@ -1238,12 +1428,14 @@
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-part-lifetime">Tiempo de Vida de cada Palabra: <span id="val-part-lifetime">0</span>s <small>(0 = infinita)</small></label>
+                  <label for="cfg-part-lifetime">Tiempo de Vida de cada Palabra: <span id="val-part-lifetime">0</span>s
+                    <small>(0 = infinita)</small></label>
                   <input type="range" id="cfg-part-lifetime" min="0" max="60" step="1" value="0">
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-part-maxwords">Máxima Cantidad de Palabras en Pantalla: <span id="val-part-maxwords">9</span></label>
+                  <label for="cfg-part-maxwords">Máxima Cantidad de Palabras en Pantalla: <span
+                      id="val-part-maxwords">9</span></label>
                   <input type="range" id="cfg-part-maxwords" min="3" max="30" step="1" value="9">
                 </div>
 
@@ -1253,17 +1445,129 @@
                 </div>
 
                 <div class="calib-item">
+                  <label for="cfg-part-maxspeed">Velocidad MÁXIMA de las Palabras: <span
+                      id="val-part-maxspeed">2.0</span></label>
+                  <input type="range" id="cfg-part-maxspeed" min="0.5" max="2" step="0.1" value="2.0">
+                  <small class="item-desc">Tope duro de velocidad de cada palabra (no pueden ir más rápido que
+                    esto).</small>
+                </div>
+
+                <div class="calib-item">
                   <label class="checkbox-label">
                     <input type="checkbox" id="cfg-part-outline-glow" checked>
                     <strong>Resplandor del Reborde (Glow Neón)</strong>
                   </label>
                   <small class="item-desc">Aplica halo luminoso alrededor del contorno de cada palabra</small>
                 </div>
+
+                <div class="calib-item"
+                  style="grid-column: 1 / -1; background: rgba(255, 0, 13, 0.06); border: 1px solid rgba(255, 0, 13, 0.25); display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+                  <div>
+                    <strong style="color: #ff3b45;">⚛️ FÍSICA Y SISTEMA DE COLISIONES</strong>
+                    <div style="font-size: 11px; color: #a0aec0; margin-top: 2px;">Ajusta rebote, fricción, aceleración
+                      y radio de choque de las palabras flotantes.</div>
+                  </div>
+                  <button type="button" class="btn-calib-action" id="btn-goto-physics"
+                    style="white-space: nowrap; margin-left: 12px;">
+                    Ir a Físicas ➔
+                  </button>
+                </div>
               </div>
 
               <div class="calib-actions-row">
                 <button type="button" class="btn-calib-action" id="btn-part-reset">
                   ↺ Restaurar Valores Predeterminados
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: FÍSICAS & COMPORTAMIENTO DE COLISIÓN DE PALABRAS -->
+          <div class="modal-tab-pane" id="tab-physics">
+            <div class="particles-controls-card">
+              <div class="section-subtitle">
+                <span>⚛️ COMPORTAMIENTO FÍSICO Y SISTEMA DE COLISIONES</span>
+              </div>
+              <p class="words-help-text">
+                Controla la física dinámica de las palabras: colisión elástica entre palabras, rebote, fricción
+                tangencial y resistencia de choque.
+              </p>
+
+              <div class="calibration-grid">
+                <!-- 1. Activar Colisiones -->
+                <div class="calib-item" style="grid-column: 1 / -1;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label class="checkbox-label" style="margin: 0; font-weight: 700; color: #ff000d;">
+                      <input type="checkbox" id="cfg-phys-enabled" checked>
+                      <span>Habilitar Sistema de Colisiones entre Palabras</span>
+                    </label>
+                    <span style="font-size: 11px; color: #ff000d; font-weight: 700;" id="val-phys-enabled">ACTIVO</span>
+                  </div>
+                  <small class="item-desc">Las palabras colisionan e intercambian aceleración e impulso elástico en vez
+                    de atravesarse.</small>
+                </div>
+
+                <!-- 2. Rebote / Elasticidad (Restitución) -->
+                <div class="calib-item">
+                  <label for="cfg-phys-bounce">
+                    <strong>Rebote / Elasticidad (Restitución):</strong> <span id="val-phys-bounce">75</span>%
+                  </label>
+                  <input type="range" id="cfg-phys-bounce" min="0" max="120" step="5" value="75">
+                  <small class="item-desc">0% = choque inelástico · 100% = conservación total de energía cinética ·
+                    >100% = rebote explosivo.</small>
+                </div>
+
+                <!-- 3. Fricción / Amortiguamiento -->
+                <div class="calib-item">
+                  <label for="cfg-phys-friction">
+                    <strong>Fricción &amp; Amortiguamiento:</strong> <span id="val-phys-friction">5</span>%
+                  </label>
+                  <input type="range" id="cfg-phys-friction" min="0" max="40" step="1" value="5">
+                  <small class="item-desc">Fricción de contacto y resistencia continua que atenúa la velocidad tras los
+                    choques.</small>
+                </div>
+
+                <!-- 4. Fuerza de Aceleración / Impacto -->
+                <div class="calib-item">
+                  <label for="cfg-phys-force">
+                    <strong>Fuerza de Choque / Aceleración:</strong> <span id="val-phys-force">1.0</span>x
+                  </label>
+                  <input type="range" id="cfg-phys-force" min="0.2" max="3.0" step="0.1" value="1.0">
+                  <small class="item-desc">Multiplicador del cambio de aceleración e impulso aplicado a los cuerpos en
+                    cada colisión.</small>
+                </div>
+
+                <!-- 5. Radio de Colisión -->
+                <div class="calib-item">
+                  <label for="cfg-phys-radius">
+                    <strong>Radio del Cuerpo Físico:</strong> <span id="val-phys-radius">48</span>px
+                  </label>
+                  <input type="range" id="cfg-phys-radius" min="20" max="100" step="2" value="48">
+                  <small class="item-desc">Radio de contacto de cada palabra para detectar el impacto.</small>
+                </div>
+
+                <!-- 6. Rebote en Bordes de Pantalla -->
+                <div class="calib-item">
+                  <label for="cfg-phys-wall-bounce">
+                    <strong>Rebote en Bordes de Pantalla:</strong> <span id="val-phys-wall-bounce">80</span>%
+                  </label>
+                  <input type="range" id="cfg-phys-wall-bounce" min="0" max="120" step="5" value="80">
+                  <small class="item-desc">Elasticidad al rebotar contra los bordes exteriores de la pantalla.</small>
+                </div>
+
+                <!-- 7. Anclaje de Energía -->
+                <div class="calib-item"
+                  style="grid-column: 1 / -1; background: rgba(0, 240, 255, 0.05); border: 1px solid rgba(0, 240, 255, 0.2);">
+                  <div style="font-weight: 700; color: #00f0ff; margin-bottom: 4px;">⚡ ANCLAJE DE ENERGÍA (PALABRA EN
+                    CARGA):</div>
+                  <small style="color: #a0aec0; font-size: 11px;">Al acumular energía, la palabra se queda completamente
+                    inmóvil; actúa como obstáculo sólido y las demás palabras rebotan sin desplazarla.</small>
+                </div>
+              </div>
+
+              <div class="calib-actions-row">
+                <button type="button" class="btn-calib-action" id="btn-reset-physics">
+                  ↺ Restaurar Físicas Predeterminadas
                 </button>
               </div>
             </div>
@@ -1276,7 +1580,8 @@
                 <span>🌀 MASTER OUTPUT SHADER · PATRÓN RDM DEL FONDO + PALETA UNIFICADA</span>
               </div>
               <p class="words-help-text">
-                El fondo de las <strong>cajas de palabras</strong> y del <strong>contenedor del HAIKU</strong> ya no es un FBM:
+                El fondo de las <strong>cajas de palabras</strong> y del <strong>contenedor del HAIKU</strong> ya no es
+                un FBM:
                 es el patrón <em>random multi-capa</em> del shader <strong>rdmf</strong> de jpShadereditor.
                 Los deslizadores son los <strong>uniformes de FORMA</strong> de ese shader, en su escala real.
                 El <strong>COLOR</strong> arranca en blanco. Se guarda solo en este navegador (localStorage).
@@ -1288,7 +1593,8 @@
             <div class="ascii-controls-card">
               <div class="section-subtitle"><span>🎚️ PALETAS GLOBALES (3 COLORES)</span></div>
               <p class="words-help-text">
-                Elegí una paleta: se recalcularán <strong>todos los colores de todos los elementos</strong> de la interfaz y el fondo general. Después podés afinar color por color.
+                Elegí una paleta: se recalcularán <strong>todos los colores de todos los elementos</strong> de la
+                interfaz y el fondo general. Después podés afinar color por color.
               </p>
               <div class="palette-grid" id="palette-grid"></div>
               <div class="palette-status">
@@ -1300,51 +1606,84 @@
               <details class="color-advanced">
                 <summary>⚙️ Ajuste fino por elemento (modo avanzado)</summary>
                 <div class="color-advanced-body">
-              <div class="section-subtitle"><span>🎨 COLORES GLOBALES DE LA INTERFAZ</span></div>
-              <p class="words-help-text">
-                Todos los colores de la aplicación como variables CSS. Se guardan en el navegador (localStorage).<br>
-                Al tocar cualquier color se pasa a <em>paleta personalizada</em>.
-              </p>
-              <div class="ascii-colors-grid">
-                <div class="ascii-color-item"><label for="cfg-ui-cyan">Cian Principal (acentos, HUD, palabras)</label><input type="color" id="cfg-ui-cyan"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-green">Verde (éxito, texto CCTV)</label><input type="color" id="cfg-ui-green"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-neon-green">Verde Neón (silueta, secuestro)</label><input type="color" id="cfg-ui-neon-green"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-red">Rojo (alertas, desprocesamiento)</label><input type="color" id="cfg-ui-red"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-amber">Ámbar (advertencias)</label><input type="color" id="cfg-ui-amber"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-purple">Violeta (acentos secundarios)</label><input type="color" id="cfg-ui-purple"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-text">Texto Principal</label><input type="color" id="cfg-ui-colors-text"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-muted">Texto Secundario (labels, HUD)</label><input type="color" id="cfg-ui-muted"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-dark">Fondo Base de la App</label><input type="color" id="cfg-ui-bg-dark"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-border-cyan">Bordes Cian (marcos, botones)</label><input type="color" id="cfg-ui-border-cyan"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-border-green">Bordes Verdes (estado secuestrado)</label><input type="color" id="cfg-ui-border-green"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-border-red">Bordes Rojos (alertas)</label><input type="color" id="cfg-ui-border-red"></div>
-              </div>
+                  <div class="section-subtitle"><span>🎨 COLORES GLOBALES DE LA INTERFAZ</span></div>
+                  <p class="words-help-text">
+                    Todos los colores de la aplicación como variables CSS. Se guardan en el navegador
+                    (localStorage).<br>
+                    Al tocar cualquier color se pasa a <em>paleta personalizada</em>.
+                  </p>
+                  <div class="ascii-colors-grid">
+                    <div class="ascii-color-item"><label for="cfg-ui-cyan">Cian Principal (acentos, HUD,
+                        palabras)</label><input type="color" id="cfg-ui-cyan"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-green">Verde (éxito, texto CCTV)</label><input
+                        type="color" id="cfg-ui-green"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-neon-green">Verde Neón (silueta,
+                        secuestro)</label><input type="color" id="cfg-ui-neon-green"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-red">Rojo (alertas, desprocesamiento)</label><input
+                        type="color" id="cfg-ui-red"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-amber">Ámbar (advertencias)</label><input
+                        type="color" id="cfg-ui-amber"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-purple">Violeta (acentos secundarios)</label><input
+                        type="color" id="cfg-ui-purple"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-text">Texto Principal</label><input type="color"
+                        id="cfg-ui-colors-text"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-muted">Texto Secundario (labels, HUD)</label><input
+                        type="color" id="cfg-ui-muted"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-dark">Fondo Base de la App</label><input
+                        type="color" id="cfg-ui-bg-dark"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-border-cyan">Bordes Cian (marcos,
+                        botones)</label><input type="color" id="cfg-ui-border-cyan"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-border-green">Bordes Verdes (estado
+                        secuestrado)</label><input type="color" id="cfg-ui-border-green"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-border-red">Bordes Rojos (alertas)</label><input
+                        type="color" id="cfg-ui-border-red"></div>
+                  </div>
 
-              <div class="section-subtitle"><span>🖼️ FONDOS DE LA INTERFAZ</span></div>
-              <p class="words-help-text">Cada fondo de la app. Los translúcidos conservan su opacidad original; solo cambia el tono.</p>
-              <div class="ascii-colors-grid">
-                <div class="ascii-color-item"><label for="cfg-ui-bg-hud">Fondo HUD / CCTV</label><input type="color" id="cfg-ui-bg-hud"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-surface-btn">Fondo Botones HUD</label><input type="color" id="cfg-ui-bg-surface-btn"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-accent-soft">Fondo Acento Suave</label><input type="color" id="cfg-ui-bg-accent-soft"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-accent">Fondo Acento (tabs, chips)</label><input type="color" id="cfg-ui-bg-accent"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-accent-strong">Fondo Acento Fuerte (hover)</label><input type="color" id="cfg-ui-bg-accent-strong"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-panel">Fondo Paneles / Tarjetas</label><input type="color" id="cfg-ui-bg-panel"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-panel-deep">Fondo Paneles Profundos</label><input type="color" id="cfg-ui-bg-panel-deep"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-slot">Fondo Slots de Palabras</label><input type="color" id="cfg-ui-bg-slot"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-card">Fondo Tarjeta de Palabra</label><input type="color" id="cfg-ui-bg-card"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-mutated">Fondo Palabra Resignificada</label><input type="color" id="cfg-ui-bg-mutated"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-final">Fondo Discurso Final</label><input type="color" id="cfg-ui-bg-final"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-modal">Fondo Modal de Config</label><input type="color" id="cfg-ui-bg-modal"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-overlay">Fondo Overlay del Modal</label><input type="color" id="cfg-ui-bg-overlay"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-toast">Fondo Notificaciones (toast)</label><input type="color" id="cfg-ui-bg-toast"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-desp">Fondo Banner DESPROCESANDO</label><input type="color" id="cfg-ui-bg-desp"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-input">Fondo Inputs / Selects</label><input type="color" id="cfg-ui-bg-input"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-success">Fondo Estado Online / Éxito</label><input type="color" id="cfg-ui-bg-success"></div>
-                <div class="ascii-color-item"><label for="cfg-ui-bg-danger">Fondo Estado Offline / Alerta</label><input type="color" id="cfg-ui-bg-danger"></div>
-              </div>
-              <div class="calib-actions-row">
-                <button type="button" class="btn-calib-action" id="btn-ui-colors-reset">↺ Restaurar Colores Predeterminados</button>
-              </div>
+                  <div class="section-subtitle"><span>🖼️ FONDOS DE LA INTERFAZ</span></div>
+                  <p class="words-help-text">Cada fondo de la app. Los translúcidos conservan su opacidad original; solo
+                    cambia el tono.</p>
+                  <div class="ascii-colors-grid">
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-hud">Fondo HUD / CCTV</label><input type="color"
+                        id="cfg-ui-bg-hud"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-surface-btn">Fondo Botones HUD</label><input
+                        type="color" id="cfg-ui-bg-surface-btn"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-accent-soft">Fondo Acento Suave</label><input
+                        type="color" id="cfg-ui-bg-accent-soft"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-accent">Fondo Acento (tabs, chips)</label><input
+                        type="color" id="cfg-ui-bg-accent"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-accent-strong">Fondo Acento Fuerte
+                        (hover)</label><input type="color" id="cfg-ui-bg-accent-strong"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-panel">Fondo Paneles / Tarjetas</label><input
+                        type="color" id="cfg-ui-bg-panel"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-panel-deep">Fondo Paneles
+                        Profundos</label><input type="color" id="cfg-ui-bg-panel-deep"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-slot">Fondo Slots de Palabras</label><input
+                        type="color" id="cfg-ui-bg-slot"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-card">Fondo Tarjeta de Palabra</label><input
+                        type="color" id="cfg-ui-bg-card"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-mutated">Fondo Palabra
+                        Resignificada</label><input type="color" id="cfg-ui-bg-mutated"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-final">Fondo Discurso Final</label><input
+                        type="color" id="cfg-ui-bg-final"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-modal">Fondo Modal de Config</label><input
+                        type="color" id="cfg-ui-bg-modal"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-overlay">Fondo Overlay del Modal</label><input
+                        type="color" id="cfg-ui-bg-overlay"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-toast">Fondo Notificaciones
+                        (toast)</label><input type="color" id="cfg-ui-bg-toast"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-desp">Fondo Banner DESPROCESANDO</label><input
+                        type="color" id="cfg-ui-bg-desp"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-input">Fondo Inputs / Selects</label><input
+                        type="color" id="cfg-ui-bg-input"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-success">Fondo Estado Online /
+                        Éxito</label><input type="color" id="cfg-ui-bg-success"></div>
+                    <div class="ascii-color-item"><label for="cfg-ui-bg-danger">Fondo Estado Offline /
+                        Alerta</label><input type="color" id="cfg-ui-bg-danger"></div>
+                  </div>
+                  <div class="calib-actions-row">
+                    <button type="button" class="btn-calib-action" id="btn-ui-colors-reset">↺ Restaurar Colores
+                      Predeterminados</button>
+                  </div>
                 </div>
               </details>
             </div>
@@ -1373,6 +1712,7 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="cambiapalabras/script.js?v=3.38"></script>
+  <script src="cambiapalabras/script.js?v=3.51"></script>
 </body>
+
 </html>

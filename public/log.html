@@ -5,11 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>S·S // CONSOLA COGNITIVA & LOG DEL AGENTE</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/fonts-local.css?v=1">
 <script src="js/base-path.js?v=3.8"></script>
-<script src="js/global-style.js?v=1.1"></script>
+<script src="js/global-style.js?v=1.3"></script>
+<script src="js/control-remoto.js?v=1"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; text-transform: uppercase !important; }
   html, body, button, input, select, textarea, div, p, span, h1, h2, h3, h4, h5, h6, a, label, pre, code {
@@ -46,7 +45,7 @@
     display: flex;
     flex-direction: column;
     padding: 8px 16px 10px;
-    background: var(--gs-panel, #080202);
+    background: var(--gs-panel-trans, rgba(10, 3, 4, 0.68));
     border-bottom: var(--gs-borde-ancho, 1px) solid var(--gs-borde, #331416);
     position: relative;
     z-index: 2;
@@ -135,7 +134,7 @@
     flex-direction: column;
     min-height: 0;
     padding: 0;
-    background: transparent;
+    background: rgba(6, 2, 3, 0.55);
     position: relative;
     box-sizing: border-box;
   }
@@ -603,7 +602,7 @@
       <div class="pa-label"><span>OPACIDAD DE LA CONSOLA (CAPTURA)</span><span class="pa-valor" id="pa-consola-opacity-val">0.94</span></div>
       <input type="range" class="pa-slider" id="pa-consola-opacity" min="0.15" max="1" step="0.01" value="0.94" />
       <div class="pa-pistas"><span>0.15 · deja ver el fondo</span><span>1.00 · consola plena</span></div>
-      <div class="pa-nota">El ASCII de fondo se dibuja POR ENCIMA con mezcla SCREEN, así se ve a través del texto. Bajá esto si querés que el fondo asome más.</div>
+      <div class="pa-nota">La consola se dibuja en primer plano, con el shader ASCII animado detrás de ella y delante del ascii art de robots en el fondo.</div>
     </div>
 
     <div class="pa-grupo">
@@ -1086,8 +1085,13 @@
         poemDiv.style.marginTop = '18px';
         poemDiv.innerHTML = fullFormattedLines.join('<br>');
         thoughtContent.appendChild(poemDiv);
-        thoughtTerminal.scrollTop = thoughtTerminal.scrollHeight;
-        if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+        state.thinkingActive = false;
+        // Watchdog de retorno garantizado: 11s después de escribir el haiku,
+        // si no llegó game3:state_reset, volver seguro al manifiesto
+        if (state.haikuAutoReturnTimer) clearTimeout(state.haikuAutoReturnTimer);
+        state.haikuAutoReturnTimer = setTimeout(function () {
+          resumeManifest('fin de lectura del haiku (retorno garantizado)');
+        }, 11000);
         return;
       }
       var curRaw = rawLines[lineIdx];
@@ -1214,6 +1218,27 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     return Math.max(0, Math.round(ms * state.ritmo));   // el ritmo lo elige el operador con la P (0 = instantaneo)
   }
 
+  /* AJUSTE A PANTALLA: el manifiesto en modo IDLE ocupa TODA la pantalla, pero el
+     texto es mucho mas largo que la ventana: si se deja crecer, la captura muestra
+     la caja recortada y el texto aparece CORTADO. Esta funcion deja en el terminal
+     solo las ULTIMAS lineas que entran completas, asi lo que se ve siempre termina
+     en el cursor y no hay ninguna linea partida. */
+  function ajustarManifiestoAPantalla() {
+    if (!manifestTerminal || !manifestContent) return;
+    var cs = getComputedStyle(manifestTerminal);
+    var lh = parseFloat(cs.lineHeight);
+    if (!isFinite(lh) || lh <= 0) lh = (parseFloat(cs.fontSize) || 30) * 1.55;
+    var alto = manifestTerminal.clientHeight;
+    if (!alto) return;
+    var caben = Math.max(3, Math.floor((alto - 8) / lh));
+    var txt = manifestContent.textContent || '';
+    var lineas = txt.split('\n');
+    if (lineas.length > caben) {
+      manifestContent.textContent = lineas.slice(lineas.length - caben).join('\n');
+    }
+    manifestTerminal.scrollTop = manifestTerminal.scrollHeight;
+  }
+
   function renderManifest() {
     var previousLines = state.manifestLines.slice(0, state.manifestIndex);
     var currentLine = state.manifestLines[state.manifestIndex];
@@ -1223,6 +1248,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       shown = (previousLines.length > 0 ? shown + '\n' : '') + typedPart;
     }
     manifestContent.textContent = shown;
+    ajustarManifiestoAPantalla();
     manifestTerminal.scrollTop = manifestTerminal.scrollHeight;
     /* Lo que el visitante VE es el canvas WebGL (#log-glitch-canvas: position fixed,
        inset 0, z-index 9999, opaco) que dibuja una CAPTURA del DOM. renderManifest
@@ -1321,9 +1347,22 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   }
 
   /* Modo de la consola: false = SOLO MANIFIESTO (pantalla completa);
-     true = ARMANDO PALABRAS (manifiesto arriba + pensamiento abajo). */
+     true = ARMANDO PALABRAS (manifiesto arriba + pensamiento abajo).
+     OJO: lo que el visitante VE es una RASTERIZACION del DOM dentro de un <svg>
+     (foreignObject). Ahi NO existe <body>, asi que las reglas CSS
+     `body:not(.modo-armado)` NO se aplican y la captura seguia mostrando la pantalla
+     partida al 40% con su linea divisoria. Por eso el modo se aplica con ESTILOS
+     INLINE, que si viajan en la serializacion. */
   function setModoArmado(on) {
     try { document.body.classList.toggle('modo-armado', !!on); } catch (e) {}
+    try {
+      if (manifestPanel) {
+        manifestPanel.style.flex = on ? '0 0 40%' : '1 1 100%';
+        manifestPanel.style.borderBottom = on ? '' : 'none';
+      }
+      var pens = document.querySelector('.thought-stream-container');
+      if (pens) pens.style.display = on ? 'flex' : 'none';
+    } catch (e) {}
   }
 
   function stopManifest(reason) {
@@ -1507,6 +1546,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       if (msg.config && window.GlobalStyle && typeof window.GlobalStyle.aplicar === 'function') {
         window.GlobalStyle.aplicar(msg.config);
       }
+      if (typeof actualizarColoresAsciiShader === 'function') actualizarColoresAsciiShader();
       if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
       return;
     }
@@ -1668,38 +1708,66 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
      obra vuelve a explicarse en vez de quedar muda para siempre.
      ====================================================================== */
   function resumeManifest(motivo) {
-    if (!state.sequenceStarted) return;      // ya está corriendo
+    if (state.haikuAutoReturnTimer) {
+      clearTimeout(state.haikuAutoReturnTimer);
+      state.haikuAutoReturnTimer = null;
+    }
     setModoArmado(false);                    // vuelve a verse SOLO el manifiesto
+    resetAgentSlots();
     state.sequenceStarted = false;
+    state.thinkingActive = false;
     state.captured = 0;                      // el ciclo viejo ya no cuenta
-    state.manifestLines = [];
-    state.manifestIndex = 0;
     if (motivo) write('MANIFIESTO', 'la sala vuelve al silencio · ' + motivo + ' · se reanuda el manifiesto', 'm-dim');
-    startManifest();
+
+    // Asegurar que el goteo del manifiesto esté activo
+    if (state.manifestLines && state.manifestLines.length > 0) {
+      if (!state.manifestTimer) {
+        state.manifestTimer = setTimeout(tickManifest, 80);
+      }
+    } else {
+      startManifest();
+    }
   }
 
   function checkIdleManifest() {
-    if (!state.sequenceStarted) return;                                   // el manifiesto ya corre
+    var estaArmado = document.body.classList.contains('modo-armado') || state.captured > 0 || state.thinkingActive;
+    if (!estaArmado && !state.sequenceStarted) return; // ya está en manifiesto puro y corriendo
+
     var quieto = Date.now() - (state.lastEventAt || 0);
-    // La obra dijo que esta en reposo y no hay monologo en curso: la consola
-    // vuelve a contar la obra en 15 s, sin esperar los 60/180 s de bus mudo.
-    if (state.appStateName === 'STATE_IDLE' && !state.thinkingActive && quieto > MANIFEST_MS_REPOSO) {
-      resumeManifest('la obra quedó en reposo');
+
+    // La obra dijo que esta en reposo y pasaron unos segundos: volver al manifiesto
+    if (state.appStateName === 'STATE_IDLE' && quieto > 10000) {
+      resumeManifest('la obra quedó en reposo (STATE_IDLE)');
       return;
     }
-    // Con un ciclo a medias alcanza con que el bus quede mudo N minutos: si la
-    // secuencia se abandonó sin game3:state_reset (app recargada, error de
-    // Ollama, reset perdido) el manifiesto volvía NUNCA. Ahora se auto-cura.
-    if (state.captured > 0) {
-      if (quieto < MANIFEST_MS_CICLO_MUERTO) return;
+
+    // Con un ciclo a medias o colgado, auto-recuperar si no hay actividad
+    if (estaArmado && quieto > 18000) {
       resumeManifest('el ciclo quedó colgado · ' + Math.round(quieto / 1000) + ' s sin eventos');
       return;
     }
-    if (quieto < MANIFEST_MS_IDLE_VUELVE) return;
-    resumeManifest('sin actividad en el bus');
+
+    if (quieto > MANIFEST_MS_IDLE_VUELVE) {
+      resumeManifest('sin actividad en el bus');
+    }
   }
 
-  setInterval(checkIdleManifest, 5000);
+  // Al cambiar el tamano de la ventana se recalcula cuantas lineas entran.
+  window.addEventListener('resize', function () { try { ajustarManifiestoAPantalla(); } catch (e) {} });
+
+  // Sincronización multi-pestaña: si cambiapalabras emite game3:state_reset vía localStorage
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'sincretismo_orders_event' && e.newValue) {
+      try {
+        var evData = JSON.parse(e.newValue);
+        if (evData && evData.type === 'game3:state_reset') {
+          handle(evData);
+        }
+      } catch (err) {}
+    }
+  });
+
+  setInterval(checkIdleManifest, 4000);
 
   /* ======================================================================
      6. CONFIGURACIÓN DE GLITCH & PANEL DE AJUSTES (tecla P)
@@ -1938,6 +2006,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   function aplicarFontPx(px) {
     thoughtTerminal.style.fontSize = px + 'px';
     if (manifestTerminal) manifestTerminal.style.fontSize = px + 'px';
+    if (typeof ajustarManifiestoAPantalla === 'function') setTimeout(ajustarManifiestoAPantalla, 30);
     var pv = $('#pa-preview');   if (pv) pv.style.fontSize = px + 'px';
     var val = $('#pa-font-val'); if (val) val.textContent = px + 'px';
     var sl = $('#pa-font');      if (sl && Number(sl.value) !== px) sl.value = px;
@@ -2004,6 +2073,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   aplicarRitmo(ajustes.ritmo);
   aplicarConsolaAlpha(ajustes.consolaAlpha === undefined ? AJUSTES_DEF.consolaAlpha : ajustes.consolaAlpha);
   aplicarNoiseSpeed(logGlitch.config.noiseSpeed !== undefined ? logGlitch.config.noiseSpeed : ajustes.noiseSpeed);
+  setModoArmado(false);   // arranca en SOLO MANIFIESTO (inline: viaja a la captura)
   aplicarDibujos();
   aplicarGlitchUI();
   applyGlitchEnvelopeTarget('idle');
@@ -2213,6 +2283,19 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     guardarAjustes();
     guardarGlitchConfig();
     applyGlitchEnvelopeTarget('idle');
+
+    if (window.__asciiShaderBg) {
+      window.__asciiShaderBg.config.enabled = true;
+      window.__asciiShaderBg.config.opacity = 0.75;
+      window.__asciiShaderBg.config.speed = 0.35;
+      window.__asciiShaderBg.config.charSize = 14;
+      window.__asciiShaderBg.config.glyphScale = 0.85;
+      window.__asciiShaderBg.config.tile = 2.0;
+      window.__asciiShaderBg.config.fontMode = 0;
+      window.__asciiShaderBg.config.asciiNoiseOnly = false;
+      try { localStorage.removeItem('sincretismo_log_ascii_shader'); } catch (e) {}
+      if (typeof initAsciiShaderUI === 'function') initAsciiShaderUI(window.__asciiShaderBg);
+    }
   });
 
   var btnCerrar = $('#pa-cerrar');
@@ -2324,7 +2407,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
           ? window.GlobalStyle.getBase64DataUri(fuente)
           : null);
 
-      var rootOverrides = ':root { --gs-fuente: "' + fuente + '", monospace !important; --gs-fondo: ' + fondo + ' !important; --gs-texto: ' + texto + ' !important; --gs-panel: ' + (gsCol.logPanel || gsCol.panel || '#140708') + ' !important; --gs-acento: ' + (gsCol.logAcento || gsCol.acento || '#ff000d') + ' !important; }\n' +
+      var rootOverrides = ':root { --gs-fuente: "' + fuente + '", monospace !important; --gs-fondo: ' + fondo + ' !important; --gs-texto: ' + texto + ' !important; --gs-panel: ' + (gsCol.logPanel || gsCol.panel || '#140708') + ' !important; --gs-panel-trans: rgba(10, 3, 4, 0.68) !important; --gs-acento: ' + (gsCol.logAcento || gsCol.acento || '#ff000d') + ' !important; }\n' +
         '* { font-family: "' + fuente + '", monospace !important; }\n' +
         '#thought-terminal, #thought-terminal *, #thought-content, .thought-chunk-output, .thought-chunk-narr, .haiku-text { font-family: "' + fuente + '", monospace !important; }\n';
 
@@ -2334,10 +2417,18 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
           '@font-face { font-family: "' + fuente + '"; src: url("' + fontB64 + '") format("' + formato + '"); font-weight: 900; font-style: normal; }\n'
         : '') + rootOverrides;
 
+      var consoleLayerOverrides = '\n' +
+        '*, [data-gs-pagina] #main-container, div[data-gs-pagina] #main-container, #main-container, #agent-monitor, [data-gs-pagina] #agent-monitor, div[data-gs-pagina] #agent-monitor { background: transparent !important; background-color: transparent !important; box-shadow: none !important; }\n' +
+        '[data-gs-pagina] #status, div[data-gs-pagina] #status, #status { background: rgba(10, 3, 4, 0.45) !important; border-bottom: 1px solid var(--gs-acento, #ff000d) !important; }\n' +
+        '[data-gs-pagina] .manifest-panel, div[data-gs-pagina] .manifest-panel, .manifest-panel { background: rgba(10, 3, 4, 0.15) !important; }\n' +
+        '[data-gs-pagina] .thought-stream-container, div[data-gs-pagina] .thought-stream-container, .thought-stream-container { background: rgba(10, 3, 4, 0.15) !important; }\n' +
+        '[data-gs-pagina] #manifest-terminal, [data-gs-pagina] #thought-terminal, #manifest-terminal, #thought-terminal { background: transparent !important; background-color: transparent !important; }\n' +
+        '[data-gs-pagina] #manifest-graph, #manifest-graph { background: rgba(10, 3, 4, 0.35) !important; }\n';
+
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
         '<foreignObject width="100%" height="100%">' +
-          '<div xmlns="http://www.w3.org/1999/xhtml" data-gs-pagina="log" style="width:100%;height:100%;margin:0;padding:0;background:' + fondo + ';color:' + texto + ';font-family:' + fontFam.replace(/"/g, '&quot;') + ';box-sizing:border-box;">' +
-            '<style>' + fontFaceCss + styles + '</style>' +
+          '<div xmlns="http://www.w3.org/1999/xhtml" class="log-svg-capture" style="width:100%;height:100%;margin:0;padding:0;background:transparent;color:' + texto + ';font-family:' + fontFam.replace(/"/g, '&quot;') + ';box-sizing:border-box;">' +
+            '<style>' + fontFaceCss + styles + consoleLayerOverrides + '</style>' +
             statusXml +
             mainXml +
           '</div>' +
@@ -2403,8 +2494,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     var panel = gsCol.panel || '#080202';
     var fontFam = window.GS_FONT_FAMILY || '"Share Tech Mono", monospace';
 
-    ctx.fillStyle = fondo;
-    ctx.fillRect(0, 0, w, h);
+    ctx.clearRect(0, 0, w, h);
 
     // Texto de espera inicial (limpio y sin barra superior)
     ctx.fillStyle = texto;
@@ -2720,7 +2810,11 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   /* DIBUJOS DEL FONDO DE LA CONSOLA — SIN PALABRAS.
      Pedido explicito del usuario: nada de texto en ASCII (ni banners ni
      letras sueltas). Solo FIGURAS: camara, ojo, robot, monitor, teclado,
-     puntero, antena, chip, dron, bobina, router, lente, onda y lluvia binaria. */
+     puntero, antena, chip, dron, bobina, router, lente, onda y lluvia binaria.
+     AMPLIADO (03-Oct): +15 figuras mas (celular, robo/encapuchado con bolsa,
+     teclado de teclas, candado, llave, huella digital, ojo escaner, mano
+     robotica, disquete, pendrive, engranaje, satelite, casco VR, caja fuerte y
+     corazon con cable) porque el pool de 14 se repetia muy seguido. */
   var ASCII_DIBUJOS = [
     `
   .-----------------.
@@ -2859,7 +2953,176 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   1011001 0010110 100101
   |1|1|0| 0101 |1|0|1|1|
   0101100 1101001 001101
+    `,
     `
+   .--------------.
+   |  .--------.  |
+   |  | ###### |  |
+   |  | ###### |  |
+   |  |        |  |
+   |  |        |  |
+   |  '--------'  |
+   |     (  )     |
+   '--------------'
+    `,
+    `
+      .-----------.
+     / .--.  .--.  \\
+    |  |##|  |##|   |
+    |  '--'  '--'   |
+    |     ____      |
+     \\   '----'    /
+      '._________.'
+     .-'   |   '-.
+    /  |   |   |  \\    .-""-.
+   |   |   |   |   |  /  ##  \\
+   |   '---'---'   |  | #### |
+    '-------------'    \\ ## /
+                        '--'
+    `,
+    `
+  .--------------------------.
+  | .-. .-. .-. .-. .-. .-.  |
+  | '-' '-' '-' '-' '-' '-'  |
+  | .-. .-. .-. .-. .-. .-.  |
+  | '-' '-' '-' '-' '-' '-'  |
+  | .-. .-. .-. .-. .-. .-.  |
+  | '-' '-' '-' '-' '-' '-'  |
+  |       '-----------'      |
+  '--------------------------'
+    `,
+    `
+       .------.
+      /  .--.  \\
+     |   |  |   |
+     |   |  |   |
+      \\  '--'  /
+       '------'
+     .------------.
+     |            |
+     |    .--.    |
+     |    |##|    |
+     |    '--'    |
+     |            |
+     '------------'
+    `,
+    `
+    .-------.
+   /  .---.  \\
+  |  |     |  |=========.
+  |  |     |  |    __   |
+   \\  '---'  /    |  |  |
+    '-------'     |  |__|
+                  |     |
+                  '-----'
+    `,
+    `
+        .-...-.
+      .'  .-.  '.
+     /   /   \\   \\
+    |   | .-. |   |
+    |   ||   ||   |
+    |   | '-' |   |
+     \\   \\   /   /
+      '.  '-'  .'
+        '-...-'
+    `,
+    `
+    .-----------------.
+  .'  .-------------.  '.
+ /   /    .---.      \\   \\
+|   |   .' ### '.     |   |
+|   |   | ##### |     |   |
+|   |   '. ### .'     |   |
+ \\   \\    '---'      /   /
+  '.  '-------------'  .'
+    '-----------------'
+    `,
+    `
+       _  _  _  _
+      (_)(_)(_)(_)
+      |  ||  ||  ||
+      |  ||  ||  ||
+      '------------'
+       |  ####  |
+       |  ####  |
+       '--------'
+          |  |
+          '--'
+    `,
+    `
+   .------------------.
+   |  ######   .---.  |
+   |  ######  /     \\ |
+   |  ######  \\     / |
+   |           '---'  |
+   |   .----------.   |
+   |   |          |   |
+   |   '----------'   |
+   '------------------'
+    `,
+    `
+    .----------.
+    | ######   |==.
+    | ######   |  |
+    | ######   |=='
+    | ######   |
+    '----------'
+    `,
+    `
+      __   __
+     /  \\_/  \\
+    |  .---.  |
+    | /     \\ |
+    | |  ## | |
+    | \\     / |
+    |  '---'  |
+     \\__/ \\__/
+    `,
+    `
+     .---.      .---.
+    | ## |     | ## |
+    | ## |=====| ## |
+    | ## |     | ## |
+     '---'      '---'
+         \\     /
+          \\   /
+           \\ /
+            '
+    `,
+    `
+   .------------------.
+   |  .------------.  |
+   |  |   ######   |  |
+   |  |   ######   |  |
+   |  '------------'  |
+   '--.------------.--'
+      |            |
+      '------------'
+    `,
+    `
+   .------------------.
+   | .--------------. |
+   | |     .---.    | |
+   | |    / ## \\    | |
+   | |   |  ##  |   | |
+   | |    \\ ## /    | |
+   | |     '---'    | |
+   | '--------------' |
+   '------------------'
+    `,
+    `
+     .--.     .--.
+    /    \\   /    \\
+   |  ##  '-'  ##  |
+   |  ##       ##  |
+    \\     ___     /
+     '.   \\_/   .'
+       '--. .--'
+          | |
+         _| |_
+        |_____|
+    `,
   ];
 
   /* "CARAS" del enjambre: ahora son caritas de ROBOT (visor) y motivos
@@ -3107,7 +3370,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         y: -200 + Math.random() * (h + 320),
         vx: (Math.random() - 0.5) * 5.5,
         vy: -(0.8 + Math.random() * 3.4),
-        aMax: 0.10 + Math.random() * 0.26,
+        aMax: 0.35 + Math.random() * 0.35,
         t: 0,
         tVida: 6 + Math.random() * 12,
         espera: 0,
@@ -3146,7 +3409,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         y: inicial ? Math.random() * this.h : this.h + 20 + Math.random() * 90,
         vy: -(3 + Math.random() * 9),
         ts: 9 + Math.random() * 4,
-        a: 0.026 + Math.random() * 0.045
+        a: 0.18 + Math.random() * 0.25
       };
     },
 
@@ -3228,7 +3491,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       for (i = 0; i < this.piezas.length; i++) {
         p = this.piezas[i];
         if (!p.ln || p.fase !== 'on') continue;
-        alfa = Math.min(0.7, p.alpha * (1 + intensidad * intensidad * 7) * mul);
+        alfa = Math.min(0.85, p.alpha * (1 + intensidad * intensidad * 7) * mul);
         if (alfa <= 0.012) continue;
         ctx.globalAlpha = alfa;
         ctx.drawImage(p.ln.cv, p.x, p.y, p.ln.w * p.escala, p.ln.h * p.escala);
@@ -3236,7 +3499,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       ctx.globalAlpha = 1;
       for (i = 0; i < this.lineas.length; i++) {
         p = this.lineas[i];
-        alfa = Math.min(0.5, p.a * (1 + intensidad * intensidad * 6) * mul);
+        alfa = Math.min(0.65, p.a * (1 + intensidad * intensidad * 6) * mul);
         if (alfa <= 0.012) continue;
         ctx.font = p.ts.toFixed(1) + 'px ' + fontFam;
         ctx.fillStyle = 'rgba(255,90,90,' + alfa.toFixed(3) + ')';
@@ -3253,7 +3516,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
      el glitch y la captura desde afuera sin adivinar por el screenshot. */
   try { window.__fondoConsola = fondoConsola; window.__logGlitch = logGlitch; } catch (e) {}
 
-  var FONDO_MS = 66;
+  var FONDO_MS = 33;
   var _fondoUltimo = 0;
   function tickFondoConsola(ahora) {
     requestAnimationFrame(tickFondoConsola);
@@ -3274,32 +3537,35 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     ctx.fillStyle = fondoConsolaColor;
     ctx.fillRect(0, 0, w, h);
 
+    // 1) CAPA INFERIOR (FONDO): Grano sutil y Dibujos ASCII (ASCII art / robots / matrix)
     fondoConsola.drawRuido(ctx, intensidad);
+    fondoConsola.drawAscii(ctx, intensidad);
 
-    // 1) LA CONSOLA: la captura del DOM con la opacidad que elige el operador
-    //    (panel P -> OPACIDAD DE LA CONSOLA). Antes era 0.94 fijo y por eso el
-    //    shader ASCII de abajo no se veía nunca.
-    var capa = logGlitch.capturaImg || logGlitch.baseCanvas;
-    if (capa) {
-      ctx.globalAlpha = (ajustes && ajustes.consolaAlpha !== undefined) ? ajustes.consolaAlpha : 0.94;
-      ctx.drawImage(capa, 0, 0, w, h);
-      ctx.globalAlpha = 1;
-    }
-
-    // 2) SHADER ASCII DE FONDO POR ENCIMA con mezcla SCREEN: se ve a través del
-    //    texto sin taparlo. Su opacidad es el slider OPACIDAD DEL FONDO ASCII.
+    // 2) CAPA INTERMEDIA: Shader ASCII animado con su visual (DELANTE del asciiart, DETRÁS de las consolas)
     if (window.__asciiShaderBg && window.__asciiShaderBg.canvas && window.__asciiShaderBg.config && window.__asciiShaderBg.config.enabled) {
+      if (typeof window.__asciiShaderBg.renderFrame === 'function') {
+        window.__asciiShaderBg.renderFrame();
+      }
       var asciiOp = Number(window.__asciiShaderBg.config.opacity !== undefined ? window.__asciiShaderBg.config.opacity : 0.75);
       if (asciiOp > 0.001) {
+        ctx.save();
         ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = asciiOp;
+        ctx.globalAlpha = 1.0;
         ctx.drawImage(window.__asciiShaderBg.canvas, 0, 0, w, h);
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.globalAlpha = 1;
+        ctx.restore();
       }
     }
 
-    fondoConsola.drawAscii(ctx, intensidad);
+    // 3) CAPA SUPERIOR: Las Consolas (captura del DOM con el manifiesto, typewriter y pensamiento en primer plano)
+    var capa = logGlitch.capturaImg || logGlitch.baseCanvas;
+    if (capa) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = (ajustes && ajustes.consolaAlpha !== undefined) ? ajustes.consolaAlpha : 0.94;
+      ctx.drawImage(capa, 0, 0, w, h);
+      ctx.restore();
+    }
+
     logGlitch.textureNeedsUpdate = true;
   }
 
@@ -3308,18 +3574,26 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
      ====================================================================== */
   var asciiCanvas = document.createElement('canvas');
   asciiCanvas.id = 'log-ascii-shader-canvas';
-  asciiCanvas.style.display = 'none';
+  asciiCanvas.style.position = 'fixed';
+  asciiCanvas.style.left = '-99999px';
+  asciiCanvas.style.top = '0';
+  asciiCanvas.style.width = '100px';
+  asciiCanvas.style.height = '100px';
+  asciiCanvas.style.opacity = '0';
+  asciiCanvas.style.pointerEvents = 'none';
+  asciiCanvas.style.zIndex = '-100';
   document.body.appendChild(asciiCanvas);
 
   function syncAsciiShaderSize() {
     if (!asciiCanvas) return;
-    var w = Math.min(window.innerWidth || 800, 1920);
-    var h = Math.min(window.innerHeight || 600, 1080);
-    if (asciiCanvas.width !== w || asciiCanvas.height !== h) {
-      asciiCanvas.width = w;
-      asciiCanvas.height = h;
-      if (window.__asciiShaderBg && typeof window.__asciiShaderBg.resize === 'function') {
-        window.__asciiShaderBg.resize();
+    if (window.__asciiShaderBg && typeof window.__asciiShaderBg.resize === 'function') {
+      window.__asciiShaderBg.resize();
+    } else {
+      var w = Math.min(window.innerWidth || 800, 1920);
+      var h = Math.min(window.innerHeight || 600, 1080);
+      if (asciiCanvas.width !== w || asciiCanvas.height !== h) {
+        asciiCanvas.width = w;
+        asciiCanvas.height = h;
       }
     }
   }
@@ -3429,6 +3703,20 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     }
   }
 
+  function actualizarColoresAsciiShader() {
+    if (!window.__asciiShaderBg) return;
+    var col = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
+    window.__asciiShaderBg.updateConfig({
+      color1: col.acento || '#ff000d',
+      color2: col.acento2 || '#ff4f58',
+      color3: col.borde || '#d46238',
+      color4: col.texto || '#e88f93'
+    });
+  }
+  window.addEventListener('globalstyle:applied', function () {
+    actualizarColoresAsciiShader();
+  });
+
   function initAsciiShaderBg() {
     import('./js/shaders/asciiShaderBackground.js').then(function (mod) {
       var AsciiShaderBackground = mod.AsciiShaderBackground;
@@ -3439,12 +3727,12 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       } catch (e) {}
 
       var col = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
-      var color1 = col.acento || '#00e5ff';
-      var color2 = col.acento2 || '#7c4dff';
-      var color3 = col.borde || '#ff1744';
-      var color4 = col.texto || '#00e676';
+      var color1 = col.acento || '#ff000d';
+      var color2 = col.acento2 || '#ff4f58';
+      var color3 = col.borde || '#d46238';
+      var color4 = col.texto || '#e88f93';
 
-      var asciiBg = new AsciiShaderBackground(asciiCanvas, Object.assign({
+      var finalConfig = Object.assign({
         enabled: true,
         opacity: 0.75,
         speed: 0.35,
@@ -3457,10 +3745,21 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         color2: color2,
         color3: color3,
         color4: color4
-      }, savedConfig));
+      }, savedConfig);
+
+      // Si localStorage tenía una opacidad menor o igual a 0.05, restablecer el default visible
+      if (typeof finalConfig.opacity !== 'number' || finalConfig.opacity <= 0.05) finalConfig.opacity = 0.75;
+      if (finalConfig.enabled === undefined) finalConfig.enabled = true;
+      if (!finalConfig.color1 || finalConfig.color1 === '#00e5ff') finalConfig.color1 = color1;
+      if (!finalConfig.color2 || finalConfig.color2 === '#7c4dff') finalConfig.color2 = color2;
+      if (!finalConfig.color3 || finalConfig.color3 === '#ff1744') finalConfig.color3 = color3;
+      if (!finalConfig.color4 || finalConfig.color4 === '#00e676') finalConfig.color4 = color4;
+
+      var asciiBg = new AsciiShaderBackground(asciiCanvas, finalConfig);
 
       window.__asciiShaderBg = asciiBg;
       initAsciiShaderUI(asciiBg);
+      actualizarColoresAsciiShader();
       console.log('[Log] AsciiShaderBackground iniciado en la consola.');
     }).catch(function (err) {
       console.warn('[Log] No se pudo cargar AsciiShaderBackground:', err);

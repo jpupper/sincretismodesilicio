@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sincretismo de Silicio • Panel de Admin</title>
+<link rel="icon" href="favicon.svg" />
+<script src="js/base-path.js?v=3.44"></script>
+<style>
+  :root {
+    --bg: #05070a;
+    --panel: #0b1017;
+    --panel-2: #0f1620;
+    --line: rgba(126, 249, 255, .18);
+    --line-strong: rgba(126, 249, 255, .45);
+    --cyan: #7ef9ff;
+    --cyan-dim: #3fd0dd;
+    --amber: #ffb000;
+    --red: #ff5c7a;
+    --txt: #cfe9ef;
+    --txt-dim: #7c94a0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background:
+      radial-gradient(1100px 600px at 12% -10%, rgba(0, 240, 255, .09), transparent 60%),
+      radial-gradient(900px 500px at 110% 120%, rgba(255, 176, 0, .07), transparent 60%),
+      var(--bg);
+    color: var(--txt);
+    font: 15px/1.5 'Consolas', 'Menlo', ui-monospace, monospace;
+    padding: 28px 22px 60px;
+    min-height: 100%;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 26px; }
+  .badge {
+    display: inline-block; font-size: 11px; letter-spacing: .28em; text-transform: uppercase;
+    color: var(--cyan); border: 1px solid var(--line-strong); border-radius: 3px;
+    padding: 4px 10px; margin-bottom: 12px;
+  }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .06em; color: #eafcff; font-weight: 700; }
+  header p { margin: 0; color: var(--txt-dim); font-size: 13px; }
+  header a { color: var(--cyan-dim); text-decoration: none; }
+  header a:hover { color: var(--cyan); text-decoration: underline; }
+
+  h2 { font-size: 14px; letter-spacing: .18em; text-transform: uppercase; color: var(--cyan);
+       margin: 30px 0 14px; font-weight: 600; }
+
+  .card { background: linear-gradient(180deg, var(--panel), var(--panel-2));
+          border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; }
+
+  .mon-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px dashed rgba(126,249,255,.12); }
+  .mon-row:last-of-type { border-bottom: none; }
+  .mon-tag { flex: 0 0 130px; font-weight: 700; letter-spacing: .12em; color: #eafcff; }
+  .mon-tag small { display: block; color: var(--txt-dim); letter-spacing: .05em; font-weight: 400; font-size: 11px; }
+  .mon-sel { flex: 1; }
+  select {
+    width: 100%; background: #060a0e; color: var(--txt); border: 1px solid var(--line-strong);
+    border-radius: 5px; padding: 10px 12px; font: inherit; cursor: pointer;
+  }
+  select:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(0,240,255,.15); }
+
+  .actions { margin-top: 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 5px; padding: 10px 18px; letter-spacing: .06em;
+    background: transparent; color: var(--cyan); border: 1px solid var(--line-strong);
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  button:hover { background: rgba(126,249,255,.1); }
+  button.primary { background: rgba(126,249,255,.14); color: #eafcff; }
+  button.primary:hover { background: rgba(126,249,255,.24); }
+  .status { font-size: 12px; color: var(--txt-dim); }
+  .status.ok { color: #52e08a; }
+  .status.err { color: var(--red); }
+
+  .reload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .reload-btn { text-align: left; padding: 14px 16px; }
+  .reload-btn .k { display: inline-block; font-weight: 700; color: var(--amber); font-size: 18px; margin-right: 8px; }
+  .reload-btn .t { font-size: 13px; color: #eafcff; }
+  .reload-btn .d { display: block; font-size: 11px; color: var(--txt-dim); margin-top: 4px; }
+  .reload-btn.all .k { color: var(--red); }
+
+  .hint { margin-top: 16px; font-size: 12px; color: var(--txt-dim); border-left: 2px solid var(--line-strong); padding-left: 12px; }
+  .hint b { color: var(--txt); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="badge">Panel de Admin • Instalación</span>
+    <h1>SINCRETISMO DE SILICIO</h1>
+    <p>Asignación de experiencias por monitor y recarga remota de clientes. &nbsp;·&nbsp; <a href="./">← Volver al portal</a></p>
+  </header>
+
+  <h2>Monitores y experiencias</h2>
+  <div class="card">
+    <div class="mon-row">
+      <div class="mon-tag">MONITOR 1<small>izquierda</small></div>
+      <div class="mon-sel"><select id="sel-monitor1"></select></div>
+    </div>
+    <div class="mon-row">
+      <div class="mon-tag">MONITOR 2<small>centro</small></div>
+      <div class="mon-sel"><select id="sel-monitor2"></select></div>
+    </div>
+    <div class="mon-row">
+      <div class="mon-tag">MONITOR 3<small>derecha</small></div>
+      <div class="mon-sel"><select id="sel-monitor3"></select></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btn-save">GUARDAR ASIGNACIÓN</button>
+      <span class="status" id="status">cargando…</span>
+    </div>
+    <div class="hint">
+      Lo que elijas acá <b>lo lee el arranque automático</b>: al reiniciar la PC, cada monitor abre
+      la experiencia asignada. También define a quién apuntan las <b>teclas 1 / 2 / 3</b> de recarga.
+    </div>
+  </div>
+
+  <h2>Recarga remota de clientes</h2>
+  <div class="card">
+    <div class="reload-grid">
+      <button class="reload-btn" data-send="1"><span class="k">1</span><span class="t">Reiniciar MONITOR 1</span><span class="d">Recarga los clientes de la experiencia del monitor 1</span></button>
+      <button class="reload-btn" data-send="2"><span class="k">2</span><span class="t">Reiniciar MONITOR 2</span><span class="d">Recarga los clientes de la experiencia del monitor 2</span></button>
+      <button class="reload-btn" data-send="3"><span class="k">3</span><span class="t">Reiniciar MONITOR 3</span><span class="d">Recarga los clientes de la experiencia del monitor 3</span></button>
+      <button class="reload-btn all" data-send="4"><span class="k">4</span><span class="t">Reiniciar TODOS</span><span class="d">Hard refresh de todos los clientes conectados</span></button>
+    </div>
+    <div class="hint">
+      Estas mismas teclas <b>1 / 2 / 3 / 4</b> funcionan desde cualquiera de las experiencias
+      (cambiapalabras, cluster, log): mandan la orden por el bus y los demás clientes se recargan
+      solos con un <b>hard refresh sin caché</b>. Estado del bus: <span class="status" id="bus">conectando…</span>
+    </div>
+  </div>
+</div>
+
+<script src="js/control-remoto.js?v=1"></script>
+<script>
+(function () {
+  'use strict';
+  var ETIQ = { cambiapalabras: 'CambiaPalabras', cluster: 'Cluster 3D', log: 'Log de Sucesos' };
+  var seleccion = { monitor1: null, monitor2: null, monitor3: null };
+  var status = document.getElementById('status');
+  var bus = document.getElementById('bus');
+
+  function setStatus(txt, cls) {
+    status.textContent = txt;
+    status.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function llenarSelects(experiencias, urls) {
+    ['monitor1', 'monitor2', 'monitor3'].forEach(function (k) {
+      var sel = document.getElementById('sel-' + k);
+      if (sel.options.length) return;
+      var vacio = document.createElement('option');
+      vacio.value = ''; vacio.textContent = '— (sin experiencia)';
+      sel.appendChild(vacio);
+      (experiencias || Object.keys(ETIQ)).forEach(function (id) {
+        var o = document.createElement('option');
+        o.value = id; o.textContent = ETIQ[id] || id;
+        sel.appendChild(o);
+      });
+    });
+  }
+
+  function pintar(mon) {
+    ['monitor1', 'monitor2', 'monitor3'].forEach(function (k) {
+      if (!mon || typeof mon[k] === 'undefined') return;
+      seleccion[k] = mon[k];
+      var sel = document.getElementById('sel-' + k);
+      if (sel) sel.value = mon[k];
+    });
+  }
+
+  function cargar() {
+    (window.sbFetch ? sbFetch('/api/monitors') : fetch('/api/monitors'))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        llenarSelects(d.experiencias, d.urls);
+        pintar(d);
+        setStatus('asignación cargada');
+      })
+      .catch(function (e) { setStatus('no pude leer /api/monitors: ' + e.message, 'err'); });
+  }
+
+  function guardar() {
+    var body = {};
+    ['monitor1', 'monitor2', 'monitor3'].forEach(function (k) {
+      body[k] = document.getElementById('sel-' + k).value;
+    });
+    setStatus('guardando…');
+    (window.sbFetch ? sbFetch('/api/monitors', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    }) : fetch('/api/monitors', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    }))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error) throw new Error(d.error);
+        pintar(d);
+        setStatus('✓ guardado  ·  ' + ['monitor1', 'monitor2', 'monitor3'].map(function (k) {
+          return (ETIQ[d[k]] || '—');
+        }).join('  ·  '), 'ok');
+      })
+      .catch(function (e) { setStatus('✕ ' + e.message, 'err'); });
+  }
+
+  document.getElementById('btn-save').addEventListener('click', guardar);
+
+  document.querySelectorAll('[data-send]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var v = b.getAttribute('data-send');
+      if (!window.SincretismoControl) { bus.textContent = 'control no cargado'; return; }
+      if (v === '4') window.SincretismoControl.recargarTodo();
+      else window.SincretismoControl.recargarMonitor(v);
+    });
+  });
+
+  // El bus actualiza la asignación en vivo si la cambia otra pestaña.
+  try {
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var url = (typeof window.sbWsUrl === 'function') ? window.sbWsUrl() : (proto + '//' + location.host + '/ws');
+    var ws = new WebSocket(url);
+    ws.addEventListener('open', function () { bus.textContent = 'conectado'; bus.className = 'status ok'; });
+    ws.addEventListener('message', function (ev) {
+      var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m && m.type === 'monitors:update' && m.monitores) pintar(m.monitores);
+    });
+    ws.addEventListener('close', function () { bus.textContent = 'desconectado'; bus.className = 'status err'; });
+  } catch (e) {}
+
+  cargar();
+  setTimeout(function () {
+    if (window.SincretismoControl && window.SincretismoControl.estaConectado()) {
+      bus.textContent = 'conectado'; bus.className = 'status ok';
+    }
+  }, 1200);
+})();
+</script>
+</body>
+</html>

@@ -8,15 +8,8 @@
   <meta name="description" content="Juego semántico en p5.js con física de palabras y fondo procedural de shaders ASCII y ruido.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="css/game.css">
-  <!-- Carga local de p5.js con fallback a CDN -->
+  <!-- p5.js LOCAL (100% offline, vendorizado en js/libs/p5.min.js) -->
   <script src="js/libs/p5.min.js"></script>
-  <script>
-    if (typeof window.p5 === 'undefined') {
-      const cdn = document.createElement('script');
-      cdn.src = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js';
-      document.head.appendChild(cdn);
-    }
-  </script>
 </head>
 <body>
 

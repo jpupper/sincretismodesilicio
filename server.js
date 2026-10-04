@@ -24,6 +24,43 @@ app.use((err, req, res, next) => {
 const publicPath = path.join(__dirname, 'public');
 const configFilePath = path.join(publicPath, 'data', 'game_config.json');
 const clustersFilePath = path.join(publicPath, 'data', 'user_clusters.json');
+const monitoresPath = path.join(__dirname, 'monitores.json');
+
+// ============================================================================
+// MONITORES DE LA INSTALACION (asignacion experiencia <-> monitor)
+// Lo edita el panel de admin (/admin) y lo LEE el arranque de 3 monitores
+// (instalacion_arranque/abrir_3_monitores.ps1) para saber que pagina abrir en
+// cada pantalla. Tambien lo usa el bus para resolver las teclas 1/2/3 de recarga.
+// ============================================================================
+const EXPERIENCIAS = {
+  cambiapalabras: '/cambiapalabras.html',
+  cluster: '/cosmos-clusters.html',
+  log: '/log'
+};
+const MONITORES_DEFAULT = { monitor1: 'cluster', monitor2: 'cambiapalabras', monitor3: 'log' };
+const MONITORES_CLAVES = ['monitor1', 'monitor2', 'monitor3'];
+
+function normalizarMonitores(obj) {
+  const out = {};
+  for (const k of MONITORES_CLAVES) {
+    const v = obj ? obj[k] : undefined;
+    out[k] = (typeof v === 'string' && (v === '' || Object.prototype.hasOwnProperty.call(EXPERIENCIAS, v)))
+      ? v
+      : MONITORES_DEFAULT[k];
+  }
+  return out;
+}
+
+function leerMonitores() {
+  try {
+    if (fs.existsSync(monitoresPath)) {
+      return normalizarMonitores(JSON.parse(fs.readFileSync(monitoresPath, 'utf-8')));
+    }
+  } catch (e) {
+    console.warn('[Monitores] monitores.json ilegible, uso defaults:', e.message);
+  }
+  return { ...MONITORES_DEFAULT };
+}
 
 // ============================================================================
 // CORS — permite que el frontend estático (FTP / otros dominios) consuma esta API.
@@ -483,7 +520,7 @@ const defaultWordsPool = [
 
 const defaultHijackConfig = {
   ollamaModel: 'llama3.2:latest',
-  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (1 o 2 palabras unidas por guion bajo cuando sea necesario).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno.\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno.\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona.\nREGLA CRUCIAL DE CONEXIÓN: Los tres versos deben narrar una sola imagen poética conectada y coherente donde los tres conceptos interactúan con naturalidad. NO deben sonar a palabras forzadas ni listas inconexas.\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO_1", "TERMINO_2", "TERMINO_3"], "frase_generada": "Verso 1 con TERMINO_1\\nVerso 2 con TERMINO_2\\nVerso 3 con TERMINO_3"}.',
+  systemPrompt: 'Eres el Núcleo Poético de Sincretismo de Silicio. Tu misión es fundir conceptos humanos en la frialdad sublime del silicio.\nTu objetivo:\n1) Resignificar cada una de las 3 palabras humanas en un TÉRMINO FRÍO, TÉCNICO O CIBERNÉTICO en mayúsculas (SIEMPRE UNA SOLA PALABRA, en mayúsculas. PROHIBIDO el guion bajo, el espacio y el guion: nada de compuestos tipo OPTIMO_LUJO o CAJA_NEGRA, se dice OPTIMO o CAJA. Si el concepto necesita dos palabras, elegí LA MÁS FUERTE y usá solo esa).\n2) Redactar una \'frase_generada\' en estricto formato de HAIKU de EXACTAMENTE 3 VERSOS (SON 3 ORACIONES Y NADA MÁS, UNA POR VERSO: NUNCA 4 ORACIONES) (separados por \\n) que una los 3 términos en una sola escena poética con sentido profundo:\n- Verso 1: integra el término 1 como fundamento, sustrato o atmósfera del entorno (4 a 7 palabras).\n- Verso 2: integra el término 2 como una acción, movimiento o tensión activa en ese entorno (4 a 7 palabras).\n- Verso 3: integra el término 3 como una percepción íntima, contemplativa o filosófica en primera persona (4 a 7 palabras).\nREGLAS DE ORO:\n- LONGITUD BREVE: Cada verso debe tener entre 4 y 7 palabras (MÁXIMO 8 PALABRAS). Prohibido hacer oraciones largas o explicativas para que cada verso quepa en una sola línea horizontal sin partirse.\n- CONTEO OBLIGATORIO: EXACTAMENTE 3 ORACIONES (una sola oración por verso). Versos 1 y 2 terminan en coma o sin punto. Verso 3 termina con un solo punto final. Prohibido poner dos oraciones dentro del mismo verso. 4 oraciones = ERROR.\n- COHERENCIA: Los tres versos deben narrar una sola imagen poética conectada donde los tres conceptos interactúan con naturalidad.\nAntes de responder, verificá que cada uno de los 3 términos sea UNA SOLA PALABRA sin separadores (sin guion bajo, sin espacio, sin guion).\nSin prefijos técnicos (no agregues \'HAIKU:\' ni \'SISTEMA:\'). Responde ÚNICAMENTE en JSON válido con este formato: {"nuevas_palabras": ["TERMINO1", "TERMINO2", "TERMINO3"], "frase_generada": "Verso 1 con TERMINO1\\nVerso 2 con TERMINO2\\nVerso 3 con TERMINO3."}.',
   wordsPool: defaultWordsPool
 };
 
@@ -559,6 +596,30 @@ app.post('/config', (req, res) => {
   } catch (err) {
     console.error('[API /config] Error al escribir config.json:', err);
     return res.status(500).json({ error: 'Error al escribir archivo config.json' });
+  }
+});
+
+// ============================================================================
+// API: ASIGNACION DE MONITORES (panel de admin + arranque de 3 monitores)
+// ============================================================================
+app.get(['/admin', '/admin.html'], (req, res) => {
+  res.sendFile(path.join(publicPath, 'admin.html'));
+});
+
+app.get('/api/monitors', (req, res) => {
+  res.json({ ...leerMonitores(), experiencias: Object.keys(EXPERIENCIAS), urls: EXPERIENCIAS });
+});
+
+app.post('/api/monitors', (req, res) => {
+  try {
+    const nuevo = normalizarMonitores(req.body || {});
+    fs.writeFileSync(monitoresPath, JSON.stringify(nuevo, null, 2), 'utf-8');
+    if (typeof broadcastMonitores === 'function') broadcastMonitores(nuevo);
+    console.log('[API /api/monitors] asignacion guardada:', JSON.stringify(nuevo));
+    return res.json({ success: true, ...nuevo, experiencias: Object.keys(EXPERIENCIAS), urls: EXPERIENCIAS });
+  } catch (err) {
+    console.error('[API /api/monitors] Error al escribir monitores.json:', err);
+    return res.status(500).json({ error: 'Error al guardar la asignacion de monitores' });
   }
 });
 
@@ -963,7 +1024,9 @@ app.post('/api/ollama/generate', async (req, res) => {
 // y resuelva planes de renderizado hacia el backend del VPS sin errores de CORS ni bloqueos
 // ============================================================================
 const JP_SHADER_DIR = 'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor';
-const JP_VPS_ORIGIN = 'https://vps-4455523-x.dattaweb.com';
+// 100% LOCAL: el engine de nodos sale del jpshadereditor LOCAL (puerto 3250),
+// no del VPS. Configurable por si el editor corre en otro host/puerto.
+const JP_EDITOR_ORIGIN = process.env.JP_EDITOR_ORIGIN || 'http://localhost:3250';
 
 if (fs.existsSync(JP_SHADER_DIR)) {
   // Engine embebible local con parches de inicialización de WebGLRenderer
@@ -1011,10 +1074,10 @@ if (fs.existsSync(JP_SHADER_DIR)) {
       }
     }
     try {
-      const vpsUrl = `${JP_VPS_ORIGIN}/jpshadereditor/api${req.url}`;
+      const editorUrl = `${JP_EDITOR_ORIGIN}/jpshadereditor/api${req.url}`;
       const headers = { 'Accept': req.headers['accept'] || 'application/json, text/plain, */*' };
       if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
-      const response = await fetch(vpsUrl, {
+      const response = await fetch(editorUrl, {
         method: req.method,
         headers,
         body: (req.method !== 'GET' && req.method !== 'HEAD') ? JSON.stringify(req.body || {}) : undefined
@@ -1031,9 +1094,18 @@ if (fs.existsSync(JP_SHADER_DIR)) {
       res.send(data);
     } catch (err) {
       console.error('[JPShaderEditor Proxy] Error:', err.message);
-      res.status(502).json({ ok: false, error: 'Error comunicando con el VPS de shaders' });
+      res.status(502).json({ ok: false, error: 'Error comunicando con el editor de shaders LOCAL (' + JP_EDITOR_ORIGIN + '). Arrancalo con npm start en jpshadereditor.' });
     }
   });
+
+  // Estaticos del editor local (img de entrada de los shaders, sh, css, html...).
+  // Lo sirve el propio Sincretismo para que el camino same-origin (/jpshadereditor/*)
+  // funcione 100% local, sin tocar el VPS.
+  app.use('/jpshadereditor', express.static(path.join(JP_SHADER_DIR, 'public'), {
+    setHeaders: (res, filePath) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+  }));
 }
 
 app.use(express.static(publicPath, {
@@ -1086,6 +1158,19 @@ function broadcastGlobalStyle(cfg) {
   }
 }
 
+// Reenvia la asignacion de monitores a los clientes (la usa el panel de admin
+// para refrescar su estado en vivo cuando otra pestana la cambia).
+function broadcastMonitores(cfg) {
+  try {
+    const payload = JSON.stringify({ type: 'monitors:update', monitores: cfg, timestamp: Date.now() });
+    for (const client of wsClients) {
+      if (client.readyState === WebSocket.OPEN) client.send(payload);
+    }
+  } catch (e) {
+    console.warn('[WebSocket] Error al emitir monitors:update:', e.message);
+  }
+}
+
 wss.on('connection', (ws, req) => {
   wsClients.add(ws);
   console.log(`[WebSocket] Cliente conectado (${wsClients.size} activos) desde ${req.socket.remoteAddress}`);
@@ -1108,6 +1193,30 @@ wss.on('connection', (ws, req) => {
           registrarJsonGuardado('DISENO GLOBAL (globalstyle)', globalStylePath, parsed.config);
         } catch (e) {}
       }
+
+      // RECARGA REMOTA DE CLIENTES (teclas 1/2/3/4 en las experiencias).
+      // El emisor pide "reinicia el monitor N" (o "todos"); el server resuelve
+      // el monitor a su experiencia y avisa a los clientes correspondientes.
+      // Se reenvia NORMALIZADO (target) y NO se relaya el mensaje crudo.
+      if (parsed.type === 'client:reload') {
+        let target = '';
+        if (parsed.all) {
+          target = 'all';
+        } else if (parsed.monitor) {
+          target = leerMonitores()['monitor' + Number(parsed.monitor)] || '';
+        }
+        if (target) {
+          const reloadPayload = JSON.stringify({ type: 'client:reload', target, timestamp: Date.now() });
+          for (const client of wsClients) {
+            if (client.readyState !== WebSocket.OPEN) continue;
+            // "todos" incluye al emisor; un monitor puntual recarga a los DEMAS.
+            if (target === 'all' || client !== ws) client.send(reloadPayload);
+          }
+          console.log(`[WebSocket] client:reload -> ${target} (pedido por ${parsed.all ? 'todos' : 'monitor ' + parsed.monitor})`);
+        }
+        return;
+      }
+
       // Reenviar a todos los demás clientes conectados
       const payload = JSON.stringify(parsed);
       for (const client of wsClients) {

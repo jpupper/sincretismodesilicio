@@ -38,11 +38,20 @@ export class AsciiShaderBackground {
     this.init();
   }
 
-  static hexToRgb(hex) {
-    if (!hex) return [0, 1, 1];
-    let clean = hex.replace('#', '');
+  static hexToRgb(color) {
+    if (!color) return [0, 1, 1];
+    if (Array.isArray(color) && color.length >= 3) return [color[0], color[1], color[2]];
+    const str = String(color).trim();
+    if (str.startsWith('rgb')) {
+      const m = str.match(/\d+(\.\d+)?/g);
+      if (m && m.length >= 3) {
+        return [Number(m[0]) / 255, Number(m[1]) / 255, Number(m[2]) / 255];
+      }
+    }
+    let clean = str.replace('#', '');
     if (clean.length === 3) clean = clean.split('').map(c => c + c).join('');
     const num = parseInt(clean, 16);
+    if (isNaN(num)) return [0, 1, 1];
     return [
       ((num >> 16) & 255) / 255,
       ((num >> 8) & 255) / 255,
@@ -55,6 +64,7 @@ export class AsciiShaderBackground {
     this.gl = this.canvas.getContext('webgl2', {
       alpha: true,
       antialias: false,
+      preserveDrawingBuffer: true,
       powerPreference: 'high-performance'
     });
 
@@ -81,6 +91,14 @@ export class AsciiShaderBackground {
 
     // Build shader programs
     this.buildPrograms();
+
+    // Ensure initial FBO is created immediately
+    const initialW = Math.max(1, Math.min(window.innerWidth || 800, 1920));
+    const initialH = Math.max(1, Math.min(window.innerHeight || 600, 1080));
+    this.canvas.width = initialW;
+    this.canvas.height = initialH;
+    this.initFBO(initialW, initialH);
+
     this.resize();
 
     window.addEventListener('resize', () => this.resize());
@@ -219,7 +237,7 @@ export class AsciiShaderBackground {
       dib = mix(dib, colnegro, v4);
       
       vec3 col = sin(dib);
-      fragColor = vec4(col * u_opacity, u_opacity);
+      fragColor = vec4(col, 1.0);
     }`;
 
     const asciiFsSource = `#version 300 es
@@ -346,7 +364,11 @@ export class AsciiShaderBackground {
         p.y = 4.0 - p.y;
 
         float charMask = character(n, p);
-        fragColor = vec4(noiseColor.rgb * charMask * u_opacity, noiseColor.a * charMask * u_opacity);
+        if (charMask <= 0.001) {
+            fragColor = vec4(0.0);
+            return;
+        }
+        fragColor = vec4(noiseColor.rgb * u_opacity, u_opacity);
     }`;
 
     this.noiseProgramInfo = this.createProgramInfo(vsSource, noiseFsSource, [
@@ -431,15 +453,12 @@ export class AsciiShaderBackground {
 
   resize() {
     if (!this.canvas || !this.gl) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.floor(window.innerWidth * dpr);
-    const height = Math.floor(window.innerHeight * dpr);
+    const width = Math.max(1, Math.min(window.innerWidth || 800, 1920));
+    const height = Math.max(1, Math.min(window.innerHeight || 600, 1080));
 
-    if (this.canvas.width !== width || this.canvas.height !== height) {
+    if (this.canvas.width !== width || this.canvas.height !== height || !this.noiseFbo || this.fboWidth !== width || this.fboHeight !== height) {
       this.canvas.width = width;
       this.canvas.height = height;
-      this.canvas.style.width = `${window.innerWidth}px`;
-      this.canvas.style.height = `${window.innerHeight}px`;
       this.initFBO(width, height);
     }
   }
@@ -448,16 +467,19 @@ export class AsciiShaderBackground {
     Object.assign(this.config, newConfig);
   }
 
-  render() {
-    if (!this.isRunning || !this.gl) return;
+  renderFrame() {
+    if (!this.gl) return;
     const gl = this.gl;
     const cfg = this.config;
 
     if (!cfg.enabled) {
-      gl.clearColor(0.02, 0.03, 0.06, 1.0);
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      this.animFrameId = requestAnimationFrame(() => this.render());
       return;
+    }
+
+    if (!this.noiseFbo || this.fboWidth <= 0 || this.fboHeight <= 0) {
+      this.resize();
     }
 
     const time = (performance.now() - this.startTime) * 0.001;
@@ -465,7 +487,7 @@ export class AsciiShaderBackground {
     // --- PASO 1: Renderizar Noise a FBO ---
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.noiseFbo);
     gl.viewport(0, 0, this.fboWidth, this.fboHeight);
-    gl.clearColor(0, 0, 0, 1);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     if (this.noiseProgramInfo) {
@@ -478,7 +500,7 @@ export class AsciiShaderBackground {
       gl.uniform2f(u.u_resolution, this.fboWidth, this.fboHeight);
       gl.uniform1f(u.u_time, time);
       gl.uniform1f(u.u_tile, Number(cfg.tile) || 2.0);
-      gl.uniform1f(u.u_opacity, Number(cfg.opacity) || 0.75);
+      gl.uniform1f(u.u_opacity, 1.0);
       gl.uniform1f(u.u_speed, Number(cfg.speed) || 0.35);
 
       const c1 = AsciiShaderBackground.hexToRgb(cfg.color1);
@@ -497,8 +519,10 @@ export class AsciiShaderBackground {
     // --- PASO 2: Renderizar a Pantalla (FBO -> Pantalla con ASCII o Blit) ---
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0.02, 0.03, 0.06, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 0.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
+
+    const opacity = Math.max(0.0, Math.min(1.0, Number(cfg.opacity !== undefined ? cfg.opacity : 0.75)));
 
     if (cfg.asciiNoiseOnly) {
       if (this.blitProgramInfo) {
@@ -510,7 +534,7 @@ export class AsciiShaderBackground {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.noiseFboTexture);
         gl.uniform1i(this.blitProgramInfo.uniforms.u_bufferTexture, 0);
-        gl.uniform1f(this.blitProgramInfo.uniforms.u_opacity, Number(cfg.opacity) || 0.75);
+        gl.uniform1f(this.blitProgramInfo.uniforms.u_opacity, opacity);
 
         gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
@@ -522,12 +546,11 @@ export class AsciiShaderBackground {
         gl.vertexAttribPointer(this.asciiProgramInfo.attribLocation, 2, gl.FLOAT, false, 0, 0);
 
         const uA = this.asciiProgramInfo.uniforms;
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         gl.uniform2f(uA.u_resolution, this.canvas.width, this.canvas.height);
-        gl.uniform1f(uA.u_charSize, (Number(cfg.charSize) || 14) * dpr);
+        gl.uniform1f(uA.u_charSize, Math.max(6.0, Number(cfg.charSize) || 14));
         gl.uniform1f(uA.u_glyphScale, Number(cfg.glyphScale) || 0.85);
         gl.uniform1i(uA.u_fontMode, parseInt(cfg.fontMode) || 0);
-        gl.uniform1f(uA.u_opacity, Number(cfg.opacity) || 0.75);
+        gl.uniform1f(uA.u_opacity, opacity);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.noiseFboTexture);
@@ -536,7 +559,11 @@ export class AsciiShaderBackground {
         gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
     }
+  }
 
+  render() {
+    if (!this.isRunning || !this.gl) return;
+    this.renderFrame();
     this.animFrameId = requestAnimationFrame(() => this.render());
   }
 

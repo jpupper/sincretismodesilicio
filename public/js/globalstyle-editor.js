@@ -45,7 +45,9 @@
         ['cambiaFondo', 'FONDO CCTV / CAMBIAPALABRAS'],
         ['cambiaHud', 'PANELES HUD / MODALES'],
         ['cambiaAcento', 'ACENTO / BOTONES / TAGS'],
-        ['cambiaPalabra', 'PALABRAS SECUESTRADAS']
+        ['cambiaPalabra', 'PALABRAS SECUESTRADAS'],
+        ['puntero', 'PUNTERO / RETÍCULO (mouse y tracking)'],
+        ['punteroFijo', 'PUNTERO ENGANCHADO (cargando palabra)']
       ]
     },
     {
@@ -79,7 +81,8 @@
       clusterEsfera: '#c85a32', clusterNucleo: '#8a3318', clusterPelotita: '#ffe2c8',
       clusterCajaFill: '#1b0f0a', clusterCajaBorde: '#c85a32',
       logFondo: '#0c0705', logTexto: '#edd3be', logAcento: '#d46238', logPanel: '#1b0f0a',
-      cambiaFondo: '#0c0705', cambiaHud: '#1b0f0a', cambiaAcento: '#d46238', cambiaPalabra: '#dca876'
+      cambiaFondo: '#0c0705', cambiaHud: '#1b0f0a', cambiaAcento: '#d46238', cambiaPalabra: '#dca876',
+      puntero: '#d46238', punteroFijo: '#dca876'
     }],
     ['ROJO / NEGRO', {
       fondo: '#070303', panel: '#140708', panel2: '#1e0a0c', borde: '#ff000d',
@@ -87,7 +90,8 @@
       clusterEsfera: '#ff000d', clusterNucleo: '#9a000d', clusterPelotita: '#ffd6d6',
       clusterCajaFill: '#140708', clusterCajaBorde: '#ff000d',
       logFondo: '#070303', logTexto: '#e88f93', logAcento: '#ff000d', logPanel: '#140708',
-      cambiaFondo: '#070303', cambiaHud: '#140708', cambiaAcento: '#ff000d', cambiaPalabra: '#e88f93'
+      cambiaFondo: '#070303', cambiaHud: '#140708', cambiaAcento: '#ff000d', cambiaPalabra: '#e88f93',
+      puntero: '#ff000d', punteroFijo: '#e88f93'
     }],
     ['ÁMBAR CRT', {
       fondo: '#0a0702', panel: '#1a1204', panel2: '#261a06', borde: '#ffb000',
@@ -95,7 +99,8 @@
       clusterEsfera: '#ffb000', clusterNucleo: '#b37700', clusterPelotita: '#fff0cc',
       clusterCajaFill: '#1a1204', clusterCajaBorde: '#ffb000',
       logFondo: '#0a0702', logTexto: '#ffcf7a', logAcento: '#ffb000', logPanel: '#1a1204',
-      cambiaFondo: '#0a0702', cambiaHud: '#1a1204', cambiaAcento: '#ffb000', cambiaPalabra: '#ffd98a'
+      cambiaFondo: '#0a0702', cambiaHud: '#1a1204', cambiaAcento: '#ffb000', cambiaPalabra: '#ffd98a',
+      puntero: '#ffb000', punteroFijo: '#ffd98a'
     }],
     ['VERDE FÓSFORO', {
       fondo: '#020604', panel: '#04150c', panel2: '#07200f', borde: '#00ff88',
@@ -103,7 +108,8 @@
       clusterEsfera: '#00ff88', clusterNucleo: '#008a49', clusterPelotita: '#d8ffef',
       clusterCajaFill: '#04150c', clusterCajaBorde: '#00ff88',
       logFondo: '#020604', logTexto: '#8dffc4', logAcento: '#00ff88', logPanel: '#04150c',
-      cambiaFondo: '#020604', cambiaHud: '#04150c', cambiaAcento: '#00ff88', cambiaPalabra: '#8affc9'
+      cambiaFondo: '#020604', cambiaHud: '#04150c', cambiaAcento: '#00ff88', cambiaPalabra: '#8affc9',
+      puntero: '#00ff88', punteroFijo: '#8affc9'
     }],
     ['CIAN FRÍO', {
       fondo: '#020609', panel: '#04141a', panel2: '#07202a', borde: '#4df0ff',
@@ -111,7 +117,8 @@
       clusterEsfera: '#4df0ff', clusterNucleo: '#1a8a99', clusterPelotita: '#e0fbff',
       clusterCajaFill: '#04141a', clusterCajaBorde: '#4df0ff',
       logFondo: '#020609', logTexto: '#a9e9f5', logAcento: '#4df0ff', logPanel: '#04141a',
-      cambiaFondo: '#020609', cambiaHud: '#04141a', cambiaAcento: '#4df0ff', cambiaPalabra: '#b6f7ff'
+      cambiaFondo: '#020609', cambiaHud: '#04141a', cambiaAcento: '#4df0ff', cambiaPalabra: '#b6f7ff',
+      puntero: '#4df0ff', punteroFijo: '#b6f7ff'
     }],
     ['MAGENTA NEÓN', {
       fondo: '#07020a', panel: '#160419', panel2: '#22062a', borde: '#ff3df0',
@@ -119,7 +126,8 @@
       clusterEsfera: '#ff3df0', clusterNucleo: '#99158f', clusterPelotita: '#ffe6fd',
       clusterCajaFill: '#160419', clusterCajaBorde: '#ff3df0',
       logFondo: '#07020a', logTexto: '#f3a9ee', logAcento: '#ff3df0', logPanel: '#160419',
-      cambiaFondo: '#07020a', cambiaHud: '#160419', cambiaAcento: '#ff3df0', cambiaPalabra: '#ffb6f7'
+      cambiaFondo: '#07020a', cambiaHud: '#160419', cambiaAcento: '#ff3df0', cambiaPalabra: '#ffb6f7',
+      puntero: '#ff3df0', punteroFijo: '#ffb6f7'
     }],
     ['BLANCO / NEGRO', {
       fondo: '#050505', panel: '#141414', panel2: '#1f1f1f', borde: '#ffffff',
@@ -127,7 +135,8 @@
       clusterEsfera: '#dddddd', clusterNucleo: '#777777', clusterPelotita: '#ffffff',
       clusterCajaFill: '#141414', clusterCajaBorde: '#ffffff',
       logFondo: '#050505', logTexto: '#dddddd', logAcento: '#ffffff', logPanel: '#141414',
-      cambiaFondo: '#050505', cambiaHud: '#141414', cambiaAcento: '#ffffff', cambiaPalabra: '#ffffff'
+      cambiaFondo: '#050505', cambiaHud: '#141414', cambiaAcento: '#ffffff', cambiaPalabra: '#ffffff',
+      puntero: '#ffffff', punteroFijo: '#ffffff'
     }]
   ];
 
@@ -209,6 +218,9 @@
       if (!base.colores.cambiaHud) base.colores.cambiaHud = base.colores.panel;
       if (!base.colores.cambiaAcento) base.colores.cambiaAcento = base.colores.acento;
       if (!base.colores.cambiaPalabra) base.colores.cambiaPalabra = base.colores.acento2;
+      /* PUNTEROS: si una config vieja no los trae, se derivan del acento de cambiapalabras. */
+      if (!base.colores.puntero) base.colores.puntero = base.colores.cambiaAcento || base.colores.acento;
+      if (!base.colores.punteroFijo) base.colores.punteroFijo = base.colores.cambiaPalabra || base.colores.acento2;
     }
     if (o.contenedores) {
       Object.keys(base.contenedores).forEach(function (k) {

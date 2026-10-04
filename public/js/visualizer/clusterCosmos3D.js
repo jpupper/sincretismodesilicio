@@ -593,7 +593,8 @@ export class ClusterCosmos3D {
     // es un % sobre esto: lo que cambia es la ESCALA del cartel respecto del planeta. La
     // tipografia del lienzo va aparte y siempre con la misma densidad (LIENZO_PX_POR_UNIDAD)
     // con un piso, asi que achicar el cartel NO pixela el texto.
-    this.TEXTO_BASE_WORLD = { word: 6.5, title: 30, badge: 16 };
+    // Requerimiento: el tamaño de las categorías tiene el mismo tamaño que las palabras comunes (6.5).
+    this.TEXTO_BASE_WORLD = { word: 6.5, title: 6.5, badge: 16 };
     this.LIENZO_PX_POR_UNIDAD = 12;
     this.LIENZO_ALTO_MIN = 48;
     this.LIENZO_ALTO_MAX = 512;
@@ -817,6 +818,18 @@ export class ClusterCosmos3D {
         this.aplicarColoresEsferas();
       } catch (e) {}
     });
+
+    // Iniciar por defecto el recorrido cinemático continuo en la categoría HUMANA si nadie interactúa
+    setTimeout(() => {
+      if (!this.followingNode && !this.isWarping) {
+        const catNodes = (this.wordNodes || []).filter(n => n.isClusterCenter && n.mesh);
+        if (catNodes.length > 0) {
+          const humIdx = catNodes.findIndex(cn => String(cn.clusterId).toLowerCase() === 'humana' || String(cn.name).toUpperCase() === 'HUMANA');
+          this.idleCategoryIndex = humIdx >= 0 ? humIdx : 0;
+          this.warpToNode(catNodes[this.idleCategoryIndex], true);
+        }
+      }
+    }, 350);
   }
 
   /**
@@ -1180,8 +1193,8 @@ export class ClusterCosmos3D {
       const systemGroup = new THREE.Group();
       systemGroup.position.copy(clusterCenter);
 
-      // 1. Núcleo macro-ganglionar central (Soma maestro)
-      const coreGeo = new THREE.SphereGeometry(15, 32, 32);
+      // 1. Núcleo macro-ganglionar central (Soma maestro) - Mismo tamaño base que palabras comunes (4.4)
+      const coreGeo = new THREE.SphereGeometry(4.4, 24, 24);
       const coreMat = new THREE.ShaderMaterial({
         vertexShader: neuronVertexShader,
         fragmentShader: macroGanglionFragmentShader,
@@ -1205,7 +1218,7 @@ export class ClusterCosmos3D {
 
       // Título de Categoría 3D
       const titleSprite = this.createClusterTitleSprite(cluster.name, colorHex);
-      titleSprite.position.set(0, 32, 0);
+      titleSprite.position.set(0, 8, 0);
       systemGroup.add(titleSprite);
 
       // Registrar nodo central
@@ -1217,7 +1230,7 @@ export class ClusterCosmos3D {
         position: clusterCenter.clone(),
         mesh: coreMesh,
         titleSprite: titleSprite,
-        radius: 15,
+        radius: 4.4,
         breathePhase: Math.random() * Math.PI * 2
       };
       this.wordNodes.push(clusterNode);
@@ -1226,17 +1239,31 @@ export class ClusterCosmos3D {
       // 2. Neuronas de palabras individuales: somas bio-eléctricos
       const words = cluster.words || [];
       const wordCount = words.length;
-      const orbitRadiusStep = Math.max(34, Math.min(75, wordCount * 4.5));
+      const isLargeCluster = wordCount > 40;
+      const numShells = isLargeCluster ? Math.min(4, Math.ceil(wordCount / 35)) : 1;
       const clusterWordLocalNodes = [];
 
       words.forEach((w, wIdx) => {
-        const wAngle = (wIdx / Math.max(1, wordCount)) * Math.PI * 2 + (idx * 0.4);
-        const elevation = (Math.sin(wIdx * 2.2) * 22);
-        const radius = orbitRadiusStep + (Math.cos(wIdx * 1.8) * 14);
-
-        const wx = Math.cos(wAngle) * radius;
-        const wy = elevation;
-        const wz = Math.sin(wAngle) * radius;
+        let wx, wy, wz;
+        if (isLargeCluster) {
+          const shellIdx = wIdx % numShells;
+          const wordsInShell = Math.ceil(wordCount / numShells);
+          const posInShell = Math.floor(wIdx / numShells);
+          const baseShellRadius = 42 + shellIdx * 24 + (Math.cos(wIdx * 1.7) * 9);
+          const wAngle = (posInShell / Math.max(1, wordsInShell)) * Math.PI * 2 + (shellIdx * 0.7) + (idx * 0.4);
+          const elevation = Math.sin(wIdx * 2.3 + shellIdx * 1.3) * (20 + shellIdx * 9);
+          wx = Math.cos(wAngle) * baseShellRadius;
+          wy = elevation;
+          wz = Math.sin(wAngle) * baseShellRadius;
+        } else {
+          const orbitRadiusStep = Math.max(34, Math.min(75, wordCount * 4.5));
+          const wAngle = (wIdx / Math.max(1, wordCount)) * Math.PI * 2 + (idx * 0.4);
+          const elevation = (Math.sin(wIdx * 2.2) * 22);
+          const radius = orbitRadiusStep + (Math.cos(wIdx * 1.8) * 14);
+          wx = Math.cos(wAngle) * radius;
+          wy = elevation;
+          wz = Math.sin(wAngle) * radius;
+        }
         const localPos = new THREE.Vector3(wx, wy, wz);
 
         // Geometría y Shader vivo de neurona: DORMIDA POR DEFECTO (uActivity = 0.04)
@@ -1541,7 +1568,7 @@ export class ClusterCosmos3D {
     (this.clusterCoreMeshes || []).forEach((item) => {
       const k = this.planetaK.categoria;
       if (item.core) item.core.scale.setScalar(k > 0 ? k : 0.0001);
-      if (item.titleSprite) item.titleSprite.position.y = 32 * (k > 0 ? k : 1);
+      if (item.titleSprite) item.titleSprite.position.y = 8 * (k > 0 ? k : 1);
     });
 
     return { palabra: a.planetaPalabraPct, categoria: a.planetaCategoriaPct, pelotita: a.pelotitaPct };
@@ -1844,40 +1871,45 @@ export class ClusterCosmos3D {
   dibujarCartelCanvas(titleText, colorHex, worldH) {
     const text = String(titleText || '').toUpperCase();
     const canvasHeight = this.lienzoAltoParaMundo(worldH);
-    const f = canvasHeight / 4.2667;                 // 128px de lienzo -> tipografia 30px
+    const f = canvasHeight / 2;                      // Mismo ratio y tamaño de tipografía que las palabras comunes
+    const padX = Math.round(f * 0.7);
     const c = this.coloresCarteles(colorHex);
 
     const measureCanvas = document.createElement('canvas');
     const measureCtx = measureCanvas.getContext('2d');
     measureCtx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
-    const textWidth = Math.ceil(measureCtx.measureText(text).width);
+    const textWidth = Math.max(Math.round(f), Math.ceil(measureCtx.measureText(text).width));
 
-    // ANCHO AJUSTADO AL TEXTO: envuelve exactamente la palabra con padding horizontal equilibrado
-    const padX = Math.round(f * 0.95);
-    const canvasWidth = Math.max(Math.round(f * 2.4), textWidth + padX * 2);
+    // ANCHO AJUSTADO AL TEXTO
+    const canvasWidth = Math.max(Math.round(f * 3), textWidth + padX * 2);
 
     const canvas = document.createElement('canvas');
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d');
 
-    const insetY = Math.round(canvasHeight * 0.12);
-    const insetX = 2;
+    const insetY = 1;
+    const insetX = 1;
     const boxW = canvasWidth - insetX * 2;
     const boxH = canvasHeight - insetY * 2;
 
-    // Requerimiento 1: Las palabras que están arriba de las categorías tienen fondo negro puro
+    // Fondo negro puro para categorías
     ctx.fillStyle = '#000000';
     ctx.fillRect(insetX, insetY, boxW, boxH);
 
     ctx.strokeStyle = c.borde;
-    ctx.lineWidth = Math.max(1.5, f * 0.1);
+    ctx.lineWidth = Math.max(1, f * 0.08);
     ctx.strokeRect(insetX, insetY, boxW, boxH);
 
     // Sin glow en las letras
     ctx.font = 'bold ' + f + 'px ' + this.fuenteCarteles();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
+    ctx.lineWidth = Math.max(2, f * 0.12);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.strokeText(text, canvasWidth / 2, canvasHeight / 2);
+
     ctx.fillStyle = c.texto;
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
@@ -2527,7 +2559,7 @@ export class ClusterCosmos3D {
     }
 
     const idleElapsed = now - (this.lastUserInteraction || 0);
-    const isIdle = idleElapsed > 4500 && !isManualInput;
+    const isIdle = idleElapsed > 3500 && !isManualInput;
 
     if (isIdle) {
       const categoryNodes = (this.wordNodes || []).filter(n => n.isClusterCenter && n.mesh);
@@ -2536,7 +2568,7 @@ export class ClusterCosmos3D {
           // El viaje suave lento hacia la categoría está en curso
         } else if (this.followingNode) {
           // Órbita lenta continua alrededor de la categoría para revelar todas sus palabras
-          this.followYaw += dt * 0.00020;
+          this.followYaw += dt * 0.00026;
           this.idleDwellTimer = (this.idleDwellTimer || 0) + (dt / 1000);
 
           // Tras 8.5 segundos de exhibición orbital pausada, transita lentamente a la siguiente categoría
@@ -2548,11 +2580,16 @@ export class ClusterCosmos3D {
             this.warpToNode(nextCategory, true); // true = viaje lento cinemático (6.5s)
           }
         } else {
-          // Sin objetivo actual: arranca el tour cinemático lento tras 1.8 segundos
+          // Sin objetivo actual: arranca el tour cinemático lento tras 1.2 segundos
           this.idleDwellTimer = (this.idleDwellTimer || 0) + (dt / 1000);
-          if (this.idleDwellTimer >= 1.8) {
+          if (this.idleDwellTimer >= 1.2) {
             this.idleDwellTimer = 0;
-            this.idleCategoryIndex = (this.idleCategoryIndex || 0) % categoryNodes.length;
+            if (this.idleCategoryIndex === undefined || this.idleCategoryIndex === null) {
+              const humIdx = categoryNodes.findIndex(cn => String(cn.clusterId).toLowerCase() === 'humana' || String(cn.name).toUpperCase() === 'HUMANA');
+              this.idleCategoryIndex = humIdx >= 0 ? humIdx : 0;
+            } else {
+              this.idleCategoryIndex = (this.idleCategoryIndex || 0) % categoryNodes.length;
+            }
             this.warpToNode(categoryNodes[this.idleCategoryIndex], true);
           }
         }
@@ -2801,7 +2838,8 @@ export class ClusterCosmos3D {
     if (diff.length() < 0.1) diff.set(0, 10, 30);
 
     const distK = ((this.cam && this.cam.seguirDist) ? this.cam.seguirDist : 58) / 58;
-    const standoff = (node.isClusterCenter ? 115 : 58) * distK;   // panel P -> distancia de seguimiento
+    const isBig = node.isClusterCenter && (node.clusterId === 'humana' || String(node.name).toUpperCase() === 'HUMANA');
+    const standoff = (node.isClusterCenter ? (isBig ? 140 : 115) : 58) * distK;   // panel P -> distancia de seguimiento
     this.followDistance = standoff;
     this.followYaw = Math.atan2(diff.x, diff.z);
     this.followPitch = Math.atan2(diff.y, Math.sqrt(diff.x * diff.x + diff.z * diff.z));
@@ -3754,11 +3792,11 @@ export class ClusterCosmos3D {
     ctx.stroke();
 
     // Etiqueta de tipo en esquina superior izquierda
-    ctx.fillStyle = 'rgba(220, 168, 118, 0.70)';
-    ctx.font = 'bold 7px monospace';
+    ctx.fillStyle = type === 'rot' ? 'rgba(240, 185, 130, 0.95)' : 'rgba(220, 168, 118, 0.75)';
+    ctx.font = 'bold 9.5px "Share Tech Mono", monospace';
     ctx.textAlign = 'left';
     const tagText = type === 'rot' ? 'VEC·ROT 3D' : (type === 'vel' ? 'VEC·VEL 3D' : 'VEC·POS 3D');
-    ctx.fillText(tagText, 7, 13);
+    ctx.fillText(tagText, 6, 14);
 
     // Manejo de valores y magnitudes
     const vec = (rawVec && typeof rawVec.length === 'function') ? rawVec.clone() : new THREE.Vector3();
@@ -3770,12 +3808,18 @@ export class ClusterCosmos3D {
         const yDeg = Math.round((this.camera ? this.camera.rotation.y : 0) * 180 / Math.PI);
         valEl.textContent = `P:${pDeg}° Y:${yDeg}°`;
         valEl.style.color = accentColor;
+        valEl.style.fontSize = '15.5px';
+        valEl.style.fontWeight = '900';
       } else if (type === 'vel') {
         valEl.textContent = `${mag.toFixed(1)} u/s`;
         valEl.style.color = mag > 0.05 ? accentColor : '#888';
+        valEl.style.fontSize = '14.5px';
+        valEl.style.fontWeight = '700';
       } else if (type === 'pos') {
         valEl.textContent = `${Math.round(mag)} u`;
         valEl.style.color = accentColor;
+        valEl.style.fontSize = '14.5px';
+        valEl.style.fontWeight = '700';
       }
     }
 
@@ -3814,8 +3858,8 @@ export class ClusterCosmos3D {
     const yAx = project3D(0, 1, 0, R * 0.40);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(yAx.px, yAx.py); ctx.stroke();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.font = '6px monospace';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+    ctx.font = '8px monospace';
     ctx.fillText('+Y', yAx.px + 2, yAx.py);
 
     // Eje X (lateral)

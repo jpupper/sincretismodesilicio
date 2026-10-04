@@ -1,10 +1,20 @@
-import { pipeline } from '@xenova/transformers';
+import { pipeline, env } from '@xenova/transformers';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// ============================================================================
+// 100% LOCAL: el modelo ONNX vive VENDORIZADO en public/models/Xenova/...
+// (paraphrase-multilingual-MiniLM-L12-v2, 384D). Con esto NUNCA se descarga
+// nada de huggingface.co: la instalacion corre offline de punta a punta.
+// ============================================================================
+env.allowRemoteModels = false;   // prohibido pedir modelos por internet
+env.allowLocalModels = true;
+env.useBrowserCache = false;
+env.localModelPath = path.join(__dirname, '..', 'public', 'models') + path.sep;
 
 class LayaSemanticService {
   constructor() {
@@ -27,8 +37,15 @@ class LayaSemanticService {
 
     this.loadingPromise = (async () => {
       console.log('[Laya Engine] Inicializando modelo Transformer ONNX Laya Multilingüe (Español NATIVO)...');
-      // paraphrase-multilingual-MiniLM-L12-v2 has native Spanish tokenizer and embeddings (384D)
-      this.extractor = await pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-MiniLM-L12-v2');
+      // paraphrase-multilingual-MiniLM-L12-v2 has native Spanish tokenizer and embeddings (384D).
+      // Se carga del disco (public/models). Si faltara, el motor sigue con la matriz
+      // precomputada en vez de tirar abajo los endpoints semanticos.
+      try {
+        this.extractor = await pipeline('feature-extraction', 'Xenova/paraphrase-multilingual-MiniLM-L12-v2');
+      } catch (e) {
+        this.extractor = null;
+        console.warn('[Laya Engine] Modelo ONNX local no disponible (' + e.message + '). Uso SOLO la matriz precomputada.');
+      }
 
       // Cargar matriz base precomputada si existe en public/data
       const publicDataDir = path.join(__dirname, '..', 'public', 'data');
@@ -72,6 +89,9 @@ class LayaSemanticService {
     }
 
     // Extracción en tiempo real vía Transformer ONNX para palabras fuera del vocabulario
+    if (!this.extractor) {
+      throw new Error('palabra fuera del vocabulario y modelo ONNX local no disponible: ' + clean);
+    }
     const output = await this.extractor(clean, { pooling: 'mean', normalize: true });
     const vec = Array.from(output.data);
     this.vectorCache.set(clean, vec);
@@ -93,6 +113,10 @@ class LayaSemanticService {
     }
 
     if (missing.length > 0) {
+      if (!this.extractor) {
+        for (const w of missing) results[w] = null;
+        return results;
+      }
       const output = await this.extractor(missing, { pooling: 'mean', normalize: true });
       for (let i = 0; i < missing.length; i++) {
         const vec = Array.from(output[i].data);

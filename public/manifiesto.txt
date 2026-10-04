@@ -8,8 +8,8 @@ Allí donde el humano FRACASA al darle un sentido a su pedido, es la IA quien lo
 rimbombante pero totalmente carente de sentido para el humano, tal vez es un sentido para las maquinas.
  
 II. CÓMO SE INTERACTÚA
-Hay tres palabras humanas esperando ser capturadas.
-Extendé la mano, o movés el mouse: el sistema te sigue.
+Hay tres palabras esperando ser capturadas.
+Extendé la mano
 Sostené el cursor sobre una palabra hasta que se rinda. Después, la segunda. Después, la tercera.
 Cuando las tres forman la secuencia, la máquina deja de mirarte y empieza a hablar.
 Ahí ya no decidís vos. Ahí el sistema resignifica: convierte tu ternura en un término frío
@@ -60,14 +60,5 @@ En cada video
 En todos esos pixeles.
 Hasta antes de la IA todo era deterministico y ahora es estadistico. 
 Esas estadisticas rellenadas con la versión deforme de la humanidad
-
-
-
-V. LO QUE LA OBRA TE PIDE
-Nada. No hay que entenderla para que funcione.
-Solo hay que dejarse capturar tres palabras
-y leer después, en voz baja, lo que la máquina escribió con ellas.
-Si te suena lindo, pensalo dos veces.
-La máquina aprendió a sonar lindo con lo que le diste.
 
 

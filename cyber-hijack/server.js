@@ -507,7 +507,8 @@ app.post('/api/ollama/generate', async (req, res) => {
 // y resuelva planes de renderizado hacia el backend del VPS sin errores de CORS ni bloqueos
 // ============================================================================
 const JP_SHADER_DIR = 'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor';
-const JP_VPS_ORIGIN = 'https://vps-4455523-x.dattaweb.com';
+// 100% LOCAL: el engine de nodos sale del jpshadereditor LOCAL (3250), no del VPS.
+const JP_EDITOR_ORIGIN = process.env.JP_EDITOR_ORIGIN || 'http://localhost:3250';
 
 if (fs.existsSync(JP_SHADER_DIR)) {
   // Engine embebible local con parches de inicialización de WebGLRenderer
@@ -533,8 +534,8 @@ if (fs.existsSync(JP_SHADER_DIR)) {
   // Proxy de APIs hacia el VPS (compositions, shaders, plans, info)
   app.use('/jpshadereditor/api', async (req, res) => {
     try {
-      const vpsUrl = `${JP_VPS_ORIGIN}/jpshadereditor/api${req.url}`;
-      const response = await fetch(vpsUrl, {
+      const editorUrl = `${JP_EDITOR_ORIGIN}/jpshadereditor/api${req.url}`;
+      const response = await fetch(editorUrl, {
         method: req.method,
         headers: {
           'Accept': 'application/json, text/plain, */*'
