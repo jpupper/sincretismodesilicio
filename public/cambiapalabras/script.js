@@ -1385,6 +1385,8 @@ const DOM = {
   cfgTrackSmoothing: document.getElementById('cfg-track-smoothing'),
   valTrackSmoothing: document.getElementById('val-track-smoothing'),
   calibCamStatus: document.getElementById('calib-cam-status'),
+  cfgCameraSelect: document.getElementById('cfg-camera-select'),
+  btnReconnectCam: document.getElementById('btn-reconnect-cam'),
   calibPointsCount: document.getElementById('calib-points-count'),
   calibFps: document.getElementById('calib-fps'),
   calibDepthStatus: document.getElementById('calib-depth-status'),
@@ -5323,26 +5325,223 @@ function renderHandCameras(landmarks) {
 }
 
 // ============================================================================
-// WEBCAM Y MEDIAPIPE POSE (MOTOR DE TRACKING & CALIBRACIÓN)
+// WEBCAM Y MEDIAPIPE POSE (MOTOR DE TRACKING & CALIBRACIÓN AUTORRECUPERABLE)
 // ============================================================================
-async function initWebcamAndPose() {
+let cameraInitInProgress = false;
+let cameraRetryTimer = null;
+let cameraRetryCount = 0;
+const MAX_FAST_CAMERA_RETRIES = 6;
+
+async function populateCameraDevicesSelect(selectedId = null) {
+  if (!DOM.cfgCameraSelect || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-      audio: false
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevs = devices.filter(d => d.kind === 'videoinput');
+    const currentVal = selectedId || localStorage.getItem('cambiapalabras_camera_device_id') || '';
+
+    DOM.cfgCameraSelect.innerHTML = '<option value="">(Autoselección Inteligente / Predeterminada)</option>';
+    videoDevs.forEach((dev, idx) => {
+      const opt = document.createElement('option');
+      opt.value = dev.deviceId;
+      opt.textContent = dev.label || `Cámara ${idx + 1} (${dev.deviceId.substring(0, 8)}...)`;
+      if (dev.deviceId === currentVal) opt.selected = true;
+      DOM.cfgCameraSelect.appendChild(opt);
     });
+  } catch (e) {
+    console.warn('[WEBCAM] No se pudieron enumerar dispositivos para el selector:', e);
+  }
+}
+
+async function initWebcamAndPose(preferredDeviceId = null, isUserManual = false) {
+  if (cameraInitInProgress) return;
+  cameraInitInProgress = true;
+  if (cameraRetryTimer) { clearTimeout(cameraRetryTimer); cameraRetryTimer = null; }
+
+  if (DOM.calibCamStatus && !appState.cameraReady) {
+    DOM.calibCamStatus.textContent = 'CONECTANDO...';
+  }
+
+  try {
+    let stream = null;
+    const targetDeviceId = preferredDeviceId !== null ? preferredDeviceId : localStorage.getItem('cambiapalabras_camera_device_id');
+
+    // 1) Si hay dispositivo guardado o especificado por el usuario, intentar primero con ese
+    if (targetDeviceId) {
+      try {
+        console.log('[WEBCAM] Intentando cámara configurada:', targetDeviceId);
+        stream = await Promise.race([
+          navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { ideal: targetDeviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout de inicio con cámara guardada')), 4000))
+        ]);
+      } catch (errSaved) {
+        console.warn('[WEBCAM] Cámara guardada no respondió o cambió, probando autodetección:', errSaved.message);
+        stream = null;
+      }
+    }
+
+    // 2) Si no hay stream, enumerar dispositivos y clasificar por prioridad
+    if (!stream) {
+      let videoDevices = [];
+      try {
+        const allDevs = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = allDevs.filter(d => d.kind === 'videoinput');
+      } catch (eEnum) {
+        console.warn('[WEBCAM] Error enumerando dispositivos:', eEnum);
+      }
+
+      // Priorizar cámaras físicas reales (Brio, Logitech, C920, USB, etc.) sobre drivers virtuales dummy (NDI) que timeoutan
+      const isPhysical = (lbl) => {
+        const s = (lbl || '').toLowerCase();
+        return s.includes('brio') || s.includes('c920') || s.includes('logi') ||
+               s.includes('webcam') || s.includes('camera') || s.includes('usb') ||
+               s.includes('cam') || s.includes('obs');
+      };
+      const isVirtualDummy = (lbl) => {
+        const s = (lbl || '').toLowerCase();
+        return s.includes('ndi');
+      };
+
+      const sortedDevs = [...videoDevices].sort((a, b) => {
+        const aPhys = isPhysical(a.label);
+        const bPhys = isPhysical(b.label);
+        const aDum = isVirtualDummy(a.label);
+        const bDum = isVirtualDummy(b.label);
+        if (aPhys && !bPhys) return -1;
+        if (!aPhys && bPhys) return 1;
+        if (!aDum && bDum) return -1;
+        if (aDum && !bDum) return 1;
+        return 0;
+      });
+
+      // Probar en orden de prioridad
+      for (const dev of sortedDevs) {
+        try {
+          console.log('[WEBCAM] Probando cámara:', dev.label || dev.deviceId);
+          stream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({
+              video: {
+                deviceId: dev.deviceId ? { exact: dev.deviceId } : undefined,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout de cámara individual')), 3500))
+          ]);
+          if (stream) {
+            console.log('[WEBCAM] Cámara conectada con éxito:', dev.label || dev.deviceId);
+            if (dev.deviceId) {
+              localStorage.setItem('cambiapalabras_camera_device_id', dev.deviceId);
+            }
+            break;
+          }
+        } catch (devErr) {
+          console.warn('[WEBCAM] No se pudo conectar a ' + (dev.label || dev.deviceId) + ':', devErr.message);
+        }
+      }
+
+      // Fallback final: getUserMedia estándar sin deviceId específico
+      if (!stream) {
+        try {
+          stream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({
+              video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+              audio: false
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout getUserMedia estándar')), 4000))
+          ]);
+        } catch (errGen) {
+          // Último recurso: { video: true } básico
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+      }
+    }
+
+    if (!stream) {
+      throw new Error('No se pudo obtener señal de ninguna cámara disponible.');
+    }
+
     DOM.video.srcObject = stream;
     await DOM.video.play();
     appState.cameraReady = true;
-    console.log('[WEBCAM] Cámara iniciada correctamente');
-    if (DOM.calibCamStatus) DOM.calibCamStatus.textContent = 'EN LÍNEA';
-    initMediaPipePose();
+    cameraRetryCount = 0;
+    console.log('[WEBCAM] Cámara iniciada y transmitiendo correctamente.');
+    if (DOM.calibCamStatus) {
+      DOM.calibCamStatus.textContent = 'EN LÍNEA';
+      DOM.calibCamStatus.style.color = '#00ffaa';
+    }
+
+    const track = stream.getVideoTracks()[0];
+    if (track) {
+      console.log('[WEBCAM] Dispositivo activo:', track.label);
+      if (DOM.calibCamStatus) DOM.calibCamStatus.title = `Cámara: ${track.label} (Clic para reconectar)`;
+      track.onended = () => {
+        console.warn('[WEBCAM] Stream de cámara detenido o desconectado.');
+        appState.cameraReady = false;
+        if (DOM.calibCamStatus) {
+          DOM.calibCamStatus.textContent = 'OFFLINE';
+          DOM.calibCamStatus.style.color = '';
+        }
+        setInputMode('mouse');
+        scheduleCameraRetry(3000);
+      };
+    }
+
+    populateCameraDevicesSelect();
+
+    if (!appState.poseInstance) {
+      initMediaPipePose();
+    }
+
+    if (isUserManual) {
+      showToast('Cámara conectada: ' + (track?.label || 'En línea'), 'success');
+    }
   } catch (err) {
     console.warn('[WEBCAM] Cámara no activa o permisos no concedidos. Modo Mouse activo:', err.message);
     appState.cameraReady = false;
-    if (DOM.calibCamStatus) DOM.calibCamStatus.textContent = 'OFFLINE';
+    if (DOM.calibCamStatus) {
+      DOM.calibCamStatus.textContent = 'OFFLINE';
+      DOM.calibCamStatus.style.color = '';
+      DOM.calibCamStatus.title = `Error: ${err.message}. Clic para reintentar.`;
+    }
     setInputMode('mouse');
+
+    // Auto-reintento con backoff
+    const delay = cameraRetryCount < MAX_FAST_CAMERA_RETRIES ? 3000 : 12000;
+    cameraRetryCount++;
+    console.log(`[WEBCAM] Reintento automático en ${delay / 1000}s (intento #${cameraRetryCount})...`);
+    scheduleCameraRetry(delay);
+
+    if (isUserManual) {
+      showToast('No se pudo conectar la cámara: ' + err.message, 'warning');
+    }
+  } finally {
+    cameraInitInProgress = false;
   }
+}
+
+function scheduleCameraRetry(delayMs) {
+  if (cameraRetryTimer) clearTimeout(cameraRetryTimer);
+  cameraRetryTimer = setTimeout(() => {
+    if (!appState.cameraReady) {
+      initWebcamAndPose();
+    }
+  }, delayMs);
+}
+
+function reconnectWebcamManual() {
+  console.log('[WEBCAM] Reconexión manual solicitada...');
+  cameraRetryCount = 0;
+  if (cameraRetryTimer) clearTimeout(cameraRetryTimer);
+  showToast('Buscando y reconectando cámara...', 'info');
+  return initWebcamAndPose(null, true);
 }
 
 // ============================================================================
@@ -10410,6 +10609,25 @@ function setupEventListeners() {
     });
   }
 
+  // Control de Cámara: Reconexión manual, selector de dispositivo y click en estado
+  if (DOM.btnReconnectCam) {
+    DOM.btnReconnectCam.addEventListener('click', reconnectWebcamManual);
+  }
+  if (DOM.calibCamStatus) {
+    DOM.calibCamStatus.addEventListener('click', reconnectWebcamManual);
+  }
+  if (DOM.cfgCameraSelect) {
+    DOM.cfgCameraSelect.addEventListener('change', (e) => {
+      const devId = e.target.value;
+      if (devId) {
+        localStorage.setItem('cambiapalabras_camera_device_id', devId);
+      } else {
+        localStorage.removeItem('cambiapalabras_camera_device_id');
+      }
+      initWebcamAndPose(devId || null, true);
+    });
+  }
+
   if (DOM.cfgTrackBodyCollision) {
     DOM.cfgTrackBodyCollision.addEventListener('change', (e) => {
       appState.trackingConfig.bodyCollision = e.target.checked;
@@ -11297,6 +11515,7 @@ function toggleConfigModal() {
 function openConfigModal() {
   syncConfigToModalInputs();
   applyGlitchConfigToUI();
+  populateCameraDevicesSelect();
   DOM.configStatusMsg.textContent = '';
   DOM.configModal.classList.remove('hidden');
   fetchAndPopulateOllamaModels();
