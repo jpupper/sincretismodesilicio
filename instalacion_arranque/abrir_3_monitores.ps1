@@ -118,12 +118,68 @@ foreach ($k in @('monitor1', 'monitor2', 'monitor3')) {
 
 $PROFILE_ROOT = Join-Path $env:LOCALAPPDATA 'sincretismo-kiosco'
 
+function Initialize-KioskProfile([string]$profileDir) {
+    $script = @"
+const fs = require('fs');
+const path = require('path');
+const profDir = process.argv[1];
+const defDir = path.join(profDir, 'Default');
+if (!fs.existsSync(defDir)) fs.mkdirSync(defDir, { recursive: true });
+
+const prefFile = path.join(defDir, 'Preferences');
+let pref = {};
+try { pref = JSON.parse(fs.readFileSync(prefFile, 'utf8')); } catch (e) { pref = {}; }
+
+pref.profile = pref.profile || {};
+pref.profile.content_settings = pref.profile.content_settings || {};
+pref.profile.content_settings.exceptions = pref.profile.content_settings.exceptions || {};
+
+const exc = pref.profile.content_settings.exceptions;
+exc.media_stream_camera = exc.media_stream_camera || {};
+exc.media_stream_mic = exc.media_stream_mic || {};
+
+const origins = [
+  'http://localhost:6932,*',
+  'http://127.0.0.1:6932,*',
+  'http://localhost:3250,*',
+  'http://127.0.0.1:3250,*'
+];
+for (const o of origins) {
+  exc.media_stream_camera[o] = { setting: 1 };
+  exc.media_stream_mic[o] = { setting: 1 };
+}
+
+pref.profile.exit_type = 'Normal';
+pref.profile.exited_cleanly = true;
+
+const mainPref = path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'User Data', 'Default', 'Preferences');
+if (fs.existsSync(mainPref)) {
+  try {
+    const mainObj = JSON.parse(fs.readFileSync(mainPref, 'utf8'));
+    if (mainObj.media && mainObj.media.video_input) {
+      pref.media = pref.media || {};
+      pref.media.video_input = mainObj.media.video_input;
+    }
+  } catch (e) {}
+}
+
+fs.writeFileSync(prefFile, JSON.stringify(pref, null, 2), 'utf8');
+"@
+    node -e $script $profileDir 2>$null
+}
+
 # --- 5) lanzar una ventana de Chrome por monitor ---------------------
 # cierro instancias previas de ESTE kiosco (perfiles sincretismo-kiosco) para
 # que re-ejecutar el .bat no abra ventanas de mas
 Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -like '*sincretismo-kiosco*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+# Liberar servicios de captura de video huerfanos si estuvieran bloqueando la camara
+Get-CimInstance Win32_Process -Filter "Name='chrome.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*video_capture.mojom.VideoCaptureService*' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
 Start-Sleep -Seconds 2
 
 Write-Step "Abriendo ventanas (fullscreen = $(-not $Windowed))"
@@ -136,6 +192,9 @@ foreach ($item in $PLAN) {
     $prof = Join-Path $PROFILE_ROOT $item.prof
     New-Item -ItemType Directory -Force -Path $prof | Out-Null
 
+    # Inyectar permisos explicitos de camara en el perfil antes del arranque
+    Initialize-KioskProfile -profileDir $prof
+
     $cargs = @(
         "--user-data-dir=$prof",
         '--no-first-run',
@@ -144,6 +203,10 @@ foreach ($item in $PLAN) {
         '--disable-infobars',
         '--use-fake-ui-for-media-stream',                              # concede camara sin dialogos
         '--autoplay-policy=no-user-gesture-required',
+        '--unsafely-treat-insecure-origin-as-secure=http://localhost:6932,http://127.0.0.1:6932,http://localhost:3250,http://127.0.0.1:3250',
+        '--allow-running-insecure-content',
+        '--enable-features=PreloadMediaEngagementData,AutoplayIgnoreWebAudio',
+        '--disable-features=Translate,OptimizationHints,MediaRouter',
         "--app=$($item.url)",
         "--window-position=$($b.X),$($b.Y)",
         "--window-size=$($b.Width),$($b.Height)"
