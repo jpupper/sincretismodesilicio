@@ -982,42 +982,6 @@ const appState = {
     smoothingFactor: 0.55
   },
 
-  // Estado dinámico del gesto de manos (apertura / cierre y agarre instantáneo)
-  handGestures: {
-    left: {
-      closure: 0,
-      targetClosure: 0,
-      minM: 0.07,
-      maxM: 0.22,
-      isOpen: true,
-      isClosed: false,
-      justGrabbed: false,
-      lastGrabTime: 0,
-      lastOpenTime: 0,
-      confidence: 0,
-      pos: { x: 0, y: 0 }
-    },
-    right: {
-      closure: 0,
-      targetClosure: 0,
-      minM: 0.07,
-      maxM: 0.22,
-      isOpen: true,
-      isClosed: false,
-      justGrabbed: false,
-      lastGrabTime: 0,
-      lastOpenTime: 0,
-      confidence: 0,
-      pos: { x: 0, y: 0 }
-    },
-    mouse: {
-      closure: 0,
-      targetClosure: 0,
-      isClosed: false,
-      justGrabbed: false,
-      lastGrabTime: 0
-    }
-  },
   openposeSpeeds: null,
   openposePrev: null,
 
@@ -2159,7 +2123,7 @@ float getDepthMask(vec2 p) {
     vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
     if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
     vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
-    return (d.a > 0.001) ? d.a : max(d.r, max(d.g, d.b));
+    return (d.a > 0.005) ? clamp(d.a, 0.0, 1.0) : 0.0;
 }
 
 void main() {
@@ -2187,13 +2151,13 @@ void main() {
     vec2 camUvG = vec2(1.0 - uvG.x, 1.0 - uvG.y);
     vec2 camUvB = vec2(1.0 - uvB.x, 1.0 - uvB.y);
 
-    // 1) Render Cámara con aberración cromática glitcheada
-    vec3 camCol = texture2D(u_cameraTexture, camUvR).rgb;
-  /*  if (u_hasCamera == 1) {
+    // 1) Render Cámara con aberración cromática glitcheada suave
+    vec3 camCol = vec3(0.0);
+    if (u_hasCamera == 1) {
         camCol.r = texture2D(u_cameraTexture, camUvR).r;
         camCol.g = texture2D(u_cameraTexture, camUvG).g;
         camCol.b = texture2D(u_cameraTexture, camUvB).b;
-    }*/
+    }
     // TINTE DE LA CÁMARA con la paleta unificada (u_camPal = 0 → imagen original).
     if (u_hasCamera == 1 && u_camPal > 0.001) {
         float camLum = dot(camCol, vec3(0.299, 0.587, 0.114));
@@ -2810,15 +2774,16 @@ void main() {
     const finalMaskOn = !appState.hasHuman
       ? 0.0
       : (FORZAR_CAMARA_SILUETA_OPENPOSE ? 1.0 : (auto * appState._maskLerp + (1 - auto) * manualOn));
-    /* ALTERNANCIA SILUETA <-> CAMARA (pedido del usuario): cada CICLO_CUERPO_MS el
-       relleno del cuerpo cambia entre la SILUETA (patron RDM + borde blanco) y la CAMARA.
-       El OpenPose va SIEMPRE encima (compuesto ultimo en el shader). */
-    const faseSilueta = ((Math.floor(performance.now() / CICLO_CUERPO_MS) % 2) === 0);
+    /* ALTERNANCIA SILUETA <-> CAMARA CON CROSSFADE SUAVE:
+       En vez de saltar bruscamente en 1 frame cada CICLO_CUERPO_MS (lo cual producía parpadeo/strobo),
+       se realiza un crossfade continuo y suave entre la silueta RDM y la cámara RGB. */
+    const cicloProg = (performance.now() % (CICLO_CUERPO_MS * 2)) / (CICLO_CUERPO_MS * 2);
+    const mezclaSuave = 0.5 - 0.5 * Math.cos(cicloProg * Math.PI * 2);
     const camVisFinal = (FORZAR_CAMARA_SILUETA_OPENPOSE && appState.hasHuman)
-      ? (faseSilueta ? 0.0 : 1.0)
+      ? mezclaSuave
       : (auto * mezclaAuto + (1 - auto) * baseCam);
     const silRdmFinal = (FORZAR_CAMARA_SILUETA_OPENPOSE && appState.hasHuman)
-      ? (faseSilueta ? 1.0 : 0.0)
+      ? (1.0 - mezclaSuave)
       : Math.max(0, Math.min(1, (Number(rdmParams.silRdm === undefined ? 100 : rdmParams.silRdm) || 0) / 100));
     if (this.uniforms.silRdm) gl.uniform1f(this.uniforms.silRdm, silRdmFinal);
     if (this.uniforms.maskOn) gl.uniform1f(this.uniforms.maskOn, finalMaskOn);
@@ -3620,8 +3585,8 @@ class DepthMapShader {
 
   initWebGL() {
     if (!this.canvas) return;
-    const gl = this.canvas.getContext('webgl2', { alpha: true, antialias: true, preserveDrawingBuffer: false }) ||
-      this.canvas.getContext('webgl', { alpha: true, antialias: true, preserveDrawingBuffer: false });
+    const gl = this.canvas.getContext('webgl2', { alpha: true, antialias: true, preserveDrawingBuffer: true }) ||
+      this.canvas.getContext('webgl', { alpha: true, antialias: true, preserveDrawingBuffer: true });
     if (!gl) {
       console.warn('[DepthMapShader] WebGL no disponible para Depth Map.');
       return;
@@ -4504,175 +4469,6 @@ function renderFlowFieldOverlay(landmarks) {
   appState.flowfieldFrameId = (appState.flowfieldFrameId || 0) + 1;
 }
 
-// ============================================================================
-// SISTEMA DE GESTOS DE MANO: DETECCIÓN DE APERTURA / CIERRE Y AGARRE RÁPIDO
-// ============================================================================
-function interpolateRGB(colorA, colorB, t) {
-  const clampT = Math.max(0, Math.min(1, t));
-  const r = Math.round(colorA[0] + (colorB[0] - colorA[0]) * clampT);
-  const g = Math.round(colorA[1] + (colorB[1] - colorA[1]) * clampT);
-  const b = Math.round(colorA[2] + (colorB[2] - colorA[2]) * clampT);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-function getHandMorphColor(closure, isLocking) {
-  if (isLocking) return '#f39c12';
-  // closure 0.0 = Mano abierta (Cian luminoso #00f0ff, SIN ROJO)
-  // closure 0.5 = Transición intermedia (Ámbar cálido #ffaa00)
-  // closure 1.0 = Mano cerrada / Puño (Carmesí intenso #ff0055)
-  const cyan = [0, 240, 255];
-  const amber = [255, 170, 0];
-  const crimson = [255, 0, 85];
-  if (closure <= 0.5) {
-    return interpolateRGB(cyan, amber, closure * 2.0);
-  } else {
-    return interpolateRGB(amber, crimson, (closure - 0.5) * 2.0);
-  }
-}
-
-function computeHandOpenness(wrist, elbow, index, pinky, thumb, shoulder, hState) {
-  if (!wrist || !index) return { closure: 0, confidence: 0 };
-
-  const aspect = (window.innerWidth && window.innerHeight) ? (window.innerWidth / window.innerHeight) : 1.333;
-
-  // Distancia euclidiana con corrección de relación de aspecto de pantalla/cámara
-  const distAspect = (p1, p2) => {
-    if (!p1 || !p2) return 0;
-    const dx = (p1.x - p2.x) * aspect;
-    const dy = p1.y - p2.y;
-    return Math.hypot(dx, dy);
-  };
-
-  // 1. Distancias desde la muñeca a los extremos de la mano
-  const dIndex = distAspect(index, wrist);
-  const dPinky = pinky ? distAspect(pinky, wrist) : dIndex;
-  const dThumb = thumb ? distAspect(thumb, wrist) : (dIndex * 0.75);
-
-  // 2. Extensión y apertura entre dedos (envergadura de la palma)
-  const dSpanThumb = (thumb && index) ? distAspect(index, thumb) : (dIndex * 0.5);
-  const dSpanPinky = (pinky && index) ? distAspect(index, pinky) : (dIndex * 0.5);
-
-  const handReach = Math.max(dIndex, dPinky, dThumb);
-  const handSpread = (dSpanThumb + dSpanPinky) * 0.5;
-
-  // Escala de referencia anatómica: antebrazo si está disponible, hombro o base normalizada
-  let refScale = 0;
-  if (elbow && (elbow.visibility === undefined || elbow.visibility > 0.35)) {
-    refScale = distAspect(wrist, elbow);
-  }
-  if (refScale < 0.06 && shoulder && (shoulder.visibility === undefined || shoulder.visibility > 0.35)) {
-    refScale = distAspect(wrist, shoulder) * 0.45;
-  }
-  if (refScale < 0.05) {
-    refScale = 0.20;
-  }
-
-  // Métrica normalizada de extensión de mano
-  const metric = (handReach * 0.65 + handSpread * 0.35) / refScale;
-
-  // CALIBRACIÓN ADAPTATIVA AUTOMÁTICA (se ajusta suavemente a la cámara y distancia del usuario):
-  if (!hState.minM || !hState.maxM) {
-    hState.minM = 0.07;
-    hState.maxM = 0.22;
-  }
-
-  if (metric > hState.maxM) {
-    hState.maxM = hState.maxM * 0.94 + metric * 0.06;
-  } else {
-    hState.maxM = Math.max(0.18, hState.maxM * 0.999);
-  }
-
-  if (metric < hState.minM && metric > 0.015) {
-    hState.minM = hState.minM * 0.94 + metric * 0.06;
-  } else {
-    hState.minM = Math.min(0.11, hState.minM * 1.001);
-  }
-
-  const range = Math.max(0.06, hState.maxM - hState.minM);
-  let rawClosure = (hState.maxM - metric) / range;
-  rawClosure = Math.max(0, Math.min(1, rawClosure));
-
-  const conf = Math.min(
-    wrist.visibility !== undefined ? wrist.visibility : 1,
-    index.visibility !== undefined ? index.visibility : 1
-  );
-
-  return { closure: rawClosure, confidence: conf };
-}
-
-function updateHandGestures(landmarks) {
-  if (!appState.handGestures) return;
-
-  const now = performance.now();
-
-  if (!landmarks || landmarks.length < 23) {
-    ['left', 'right'].forEach(side => {
-      const h = appState.handGestures[side];
-      if (h) {
-        h.targetClosure = 0;
-        h.closure += (0 - h.closure) * 0.15;
-        h.justGrabbed = false;
-      }
-    });
-    return;
-  }
-
-  const hands = [
-    { side: 'left', wrist: 15, elbow: 13, index: 19, pinky: 17, thumb: 21, shoulder: 11 },
-    { side: 'right', wrist: 16, elbow: 14, index: 20, pinky: 18, thumb: 22, shoulder: 12 }
-  ];
-
-  for (const hInfo of hands) {
-    const hState = appState.handGestures[hInfo.side];
-    if (!hState) continue;
-
-    const wLm = landmarks[hInfo.wrist];
-    const eLm = landmarks[hInfo.elbow];
-    const iLm = landmarks[hInfo.index];
-    const pLm = landmarks[hInfo.pinky];
-    const tLm = landmarks[hInfo.thumb];
-    const sLm = landmarks[hInfo.shoulder];
-
-    const { closure: targetClosure, confidence } = computeHandOpenness(wLm, eLm, iLm, pLm, tLm, sLm, hState);
-    hState.confidence = confidence;
-    hState.targetClosure = targetClosure;
-
-    // Suavizado continuo de interpolación (~0.20 para transición fluida y visible)
-    hState.closure += (targetClosure - hState.closure) * 0.20;
-
-    // Coordenadas espejadas en pantalla para alinear con la cámara CCTV
-    if (wLm) {
-      hState.pos.x = (1.0 - wLm.x) * window.innerWidth;
-      hState.pos.y = wLm.y * window.innerHeight;
-    }
-
-    // Histéresis de estados ABIERTA <-> CERRADA (Gesto de agarrar)
-    const CLOSED_CUTOFF = 0.62;
-    const OPEN_CUTOFF = 0.32;
-
-    if (hState.closure <= OPEN_CUTOFF) {
-      if (!hState.isOpen) {
-        hState.isOpen = true;
-        hState.isClosed = false;
-        hState.lastOpenTime = now;
-      }
-    } else if (hState.closure >= CLOSED_CUTOFF) {
-      // Transición de abierta a cerrada: ¡DISPARO DE AGARRE!
-      if (hState.isOpen) {
-        hState.isOpen = false;
-        hState.isClosed = true;
-        hState.justGrabbed = true;
-        hState.lastGrabTime = now;
-      }
-    }
-  }
-
-  // Suavizado de mouse si está disponible
-  const m = appState.handGestures.mouse;
-  if (m) {
-    m.closure += ((m.targetClosure || 0) - m.closure) * 0.22;
-  }
-}
 
 // ============================================================================
 // SISTEMA 1: RENDER DE SUPERPOSICIÓN OPENPOSE (CANVAS OVERLAY FULLSCREEN)
@@ -4850,11 +4646,7 @@ function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, b
       ctx.shadowBlur = 0;
 
       let ptFill = isP2 ? '#ff007f' : '#ffffff';
-      if (isHandWrist && appState.handGestures) {
-        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
-        const closure = hand ? hand.closure : 0;
-        ptFill = isP2 ? '#ff007f' : getHandMorphColor(closure, false);
-      } else if (i === 0) {
+      if (i === 0) {
         ptFill = isP2 ? '#ffb700' : '#ff0055';
       } else if (theme === 'phosphor' && !isP2) {
         ptFill = '#00ff41';
@@ -4881,40 +4673,13 @@ function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, b
         ctx.stroke();
       }
 
-      if (isHandWrist && appState.handGestures) {
-        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
-        const closure = hand ? hand.closure : 0;
-        const grabPulse = hand ? Math.max(0, 1.0 - (now - (hand.lastGrabTime || 0)) / 420) : 0;
-        const morphCol = isP2 ? '#ff007f' : getHandMorphColor(closure, false);
-
-        const beaconRadius = (ptRadius + 4.5) * (1.0 - 0.28 * closure);
+      if (isHandWrist) {
+        const beaconRadius = ptRadius + 4.5;
         ctx.beginPath();
         ctx.arc(x, y, beaconRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = morphCol;
-        ctx.lineWidth = 1.2 + closure * 1.0;
+        ctx.strokeStyle = isP2 ? '#ff007f' : '#00f0ff';
+        ctx.lineWidth = 1.2;
         ctx.stroke();
-
-        const arcPulse = (now * 0.005) % (Math.PI * 2);
-        const arcSpread = (1.0 - closure) * 0.65;
-        if (arcSpread > 0.08) {
-          for (let a = 0; a < 3; a++) {
-            const ang = arcPulse + (a * Math.PI * 2 / 3);
-            ctx.beginPath();
-            ctx.arc(x, y, beaconRadius + 3.5, ang, ang + arcSpread);
-            ctx.strokeStyle = rgbaDesdeHex(morphCol, 0.75 * (1.0 - closure));
-            ctx.lineWidth = 1.0;
-            ctx.stroke();
-          }
-        }
-
-        if (grabPulse > 0.02) {
-          const shockR = beaconRadius + (1.0 - grabPulse) * 35;
-          ctx.beginPath();
-          ctx.arc(x, y, shockR, 0, Math.PI * 2);
-          ctx.strokeStyle = rgbaDesdeHex('#ff0055', grabPulse * 0.9);
-          ctx.lineWidth = 2.2 * grabPulse;
-          ctx.stroke();
-        }
       }
     }
   }
@@ -5044,9 +4809,10 @@ function renderDepthMap(results, landmarks) {
 
   appState.depthFrameId = (appState.depthFrameId || 0) + 1;
 
-  let mask = (results && results.segmentationMask) ? results.segmentationMask : null;
+  const { masterMaskCanvas } = getCropCanvases();
+  let mask = (results && results.segmentationMask) ? results.segmentationMask : (masterMaskCanvas || null);
   let isVideo = false;
-  // Solo usar fallback de video si realmente hay humano presente
+  // Solo usar fallback de video si realmente hay humano y no hay máscara de segmentación disponible
   if (!mask && appState.hasHuman && DOM.video && DOM.video.readyState >= 2) {
     mask = DOM.video;
     isVideo = true;
@@ -5583,6 +5349,8 @@ let poseSegmentationEnabled = false;
 function needsSegmentation() {
   const asciiNeedsDepth = Boolean(appState.asciiConfig && appState.asciiConfig.enabled && appState.trackingConfig.depthInShader !== false);
   return Boolean(
+    FORZAR_CAMARA_SILUETA_OPENPOSE ||
+    (appState.masterOutputShader && appState.masterOutputShader.active) ||
     appState.renderConfig.cutoutEnabled ||
     asciiNeedsDepth ||
     appState.renderConfig.depthEnabled ||
@@ -5626,6 +5394,8 @@ let poseInferenceCropIndex = 0;
 let cropCanvasP1 = null, cropCtxP1 = null;
 let cropCanvasP2 = null, cropCtxP2 = null;
 let masterMaskCanvas = null, masterMaskCtx = null;
+let slotMaskCanvas0 = null, slotMaskCtx0 = null;
+let slotMaskCanvas1 = null, slotMaskCtx1 = null;
 
 function getCropCanvases() {
   if (!cropCanvasP1) {
@@ -5640,13 +5410,31 @@ function getCropCanvases() {
     cropCanvasP2.height = 480;
     cropCtxP2 = cropCanvasP2.getContext('2d');
   }
+  if (!slotMaskCanvas0) {
+    slotMaskCanvas0 = document.createElement('canvas');
+    slotMaskCanvas0.width = 480;
+    slotMaskCanvas0.height = 480;
+    slotMaskCtx0 = slotMaskCanvas0.getContext('2d');
+  }
+  if (!slotMaskCanvas1) {
+    slotMaskCanvas1 = document.createElement('canvas');
+    slotMaskCanvas1.width = 480;
+    slotMaskCanvas1.height = 480;
+    slotMaskCtx1 = slotMaskCanvas1.getContext('2d');
+  }
   if (!masterMaskCanvas) {
     masterMaskCanvas = document.createElement('canvas');
     masterMaskCanvas.width = 640;
     masterMaskCanvas.height = 360;
     masterMaskCtx = masterMaskCanvas.getContext('2d');
   }
-  return { cropCanvasP1, cropCtxP1, cropCanvasP2, cropCtxP2, masterMaskCanvas, masterMaskCtx };
+  return {
+    cropCanvasP1, cropCtxP1,
+    cropCanvasP2, cropCtxP2,
+    slotMaskCanvas0, slotMaskCtx0,
+    slotMaskCanvas1, slotMaskCtx1,
+    masterMaskCanvas, masterMaskCtx
+  };
 }
 
 async function stepPoseInference() {
@@ -5827,19 +5615,32 @@ function onPoseResults(results) {
   const landmarks = activePlayers[0] ? activePlayers[0].landmarks : [];
   appState.lastLandmarks = landmarks;
 
-  // Actualizar cálculo de apertura/cierre de manos para agarre "al toque"
-  updateHandGestures(landmarks);
-
-  // Composición de dos máscaras simultáneas en masterMaskCanvas
+  // Composición sin parpadeo (flicker-free) de ambas máscaras en masterMaskCanvas
   if (results.segmentationMask) {
-    const { masterMaskCanvas, masterMaskCtx } = getCropCanvases();
+    const { slotMaskCanvas0, slotMaskCtx0, slotMaskCanvas1, slotMaskCtx1, masterMaskCanvas, masterMaskCtx } = getCropCanvases();
     if (slot === 0) {
-      masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width * 0.55, masterMaskCanvas.height);
-      masterMaskCtx.drawImage(results.segmentationMask, 0, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+      slotMaskCtx0.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
     } else {
-      masterMaskCtx.clearRect(masterMaskCanvas.width * 0.45, 0, masterMaskCanvas.width * 0.55, masterMaskCanvas.height);
-      masterMaskCtx.drawImage(results.segmentationMask, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+      slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+      slotMaskCtx1.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
     }
+
+    const s0Active = Boolean(appState.playerSlots && appState.playerSlots[0] && (now - appState.playerSlots[0].timestamp < 600));
+    const s1Active = Boolean(appState.playerSlots && appState.playerSlots[1] && (now - appState.playerSlots[1].timestamp < 600));
+    if (!s0Active && !s1Active && (now - (appState.lastHumanSeenTimestamp || 0) > 600)) {
+      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+      slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+    }
+
+    // Fusión aditiva en la zona central: ni se cortan los cuerpos ni se apagan en alternancia
+    masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
+    masterMaskCtx.globalCompositeOperation = 'source-over';
+    masterMaskCtx.drawImage(slotMaskCanvas0, 0, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+    masterMaskCtx.globalCompositeOperation = 'lighten';
+    masterMaskCtx.drawImage(slotMaskCanvas1, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+    masterMaskCtx.globalCompositeOperation = 'source-over';
+
     results.segmentationMask = masterMaskCanvas;
   }
 
@@ -7094,7 +6895,7 @@ function rgbaDesdeHex(hex, alfa) {
   return 'rgba(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ', ' + alfa + ')';
 }
 
-function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = '', handGesture = null) {
+function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = '') {
   if (!appState.renderConfig.pointersEnabled) return;
 
   const masterOpacity = appState.renderConfig.pointersOpacity;
@@ -7107,49 +6908,26 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
   const colPun = coloresPunteros();
   const now = performance.now();
 
-  // Detección del estado de mano para animación reactiva
-  let hand = handGesture;
-  if (!hand && appState.handGestures) {
-    if (label.includes('IZQ') || label === 'MANO_IZQ') hand = appState.handGestures.left;
-    else if (label.includes('DER') || label === 'MANO_DER') hand = appState.handGestures.right;
-    else if (label.includes('MOUSE') || label === 'PUNTERO_MOUSE') hand = appState.handGestures.mouse;
-  }
-
-  const closure = hand ? (hand.closure || 0) : 0;
-  const grabPulse = hand ? Math.max(0, 1.0 - (now - (hand.lastGrabTime || 0)) / 420) : 0;
-  const isClosed = (closure >= 0.60);
-
-  // INTERPOLACIÓN VISUAL CONTINUA DE COLOR Y FORMA ENTRE ABIERTA Y CERRADA:
-  const morphColor = getHandMorphColor(closure, isLocking);
-  const primaryCol = isLocking ? colPun.fijo : morphColor;
+  const primaryCol = isLocking ? colPun.fijo : colPun.base;
   const pulse = Math.sin(now * 0.008) * 2;
   const baseR = isLocking ? (26 + pulse) : 22;
-
-  // ANIMACIÓN DE PUNTO DE MANO:
-  // Mano abierta -> radio relajado, apertura amplia
-  // Mano cerrándose -> contracción concéntrica suave continua (hasta 25%)
-  const openBreath = (hand && closure < 0.4) ? Math.sin(now * 0.005) * 1.5 : 0;
-  const contraction = 0.25 * closure;
-  const outerRadius = ((baseR + 14 + openBreath) * (1.0 - contraction)) + (grabPulse * 3.5);
-  const radius = baseR * (1.0 - contraction * 0.8);
+  const outerRadius = baseR + 14;
+  const radius = baseR;
 
   ctx.shadowBlur = 0;
 
-  // 1. Fondo negro óptico con tinte continuo según interpolación de apertura/cierre
+  // 1. Fondo negro óptico
   const lensGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, outerRadius);
-  const rBg = Math.round(8 + closure * 32);
-  const gBg = Math.round(18 - closure * 10);
-  const bBg = Math.round(26 - closure * 20);
-  lensGrad.addColorStop(0, `rgba(${rBg}, ${gBg}, ${bBg}, 0.95)`);
-  lensGrad.addColorStop(0.65, `rgba(${Math.round(rBg * 0.6)}, ${Math.round(gBg * 0.6)}, ${Math.round(bBg * 0.6)}, 0.98)`);
+  lensGrad.addColorStop(0, 'rgba(8, 18, 26, 0.95)');
+  lensGrad.addColorStop(0.65, 'rgba(5, 11, 16, 0.98)');
   lensGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');
   ctx.fillStyle = lensGrad;
   ctx.beginPath();
   ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Bisel exterior con muescas mecánicas y color interpolado dinámico
-  ctx.strokeStyle = morphColor;
+  // 2. Bisel exterior con muescas mecánicas
+  ctx.strokeStyle = primaryCol;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
@@ -7157,7 +6935,7 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
 
   // Muescas radiales del bisel mecánico (12 muescas a 30°)
   ctx.lineWidth = 1.4;
-  ctx.strokeStyle = morphColor;
+  ctx.strokeStyle = primaryCol;
   for (let a = 0; a < 12; a++) {
     const ang = a * (Math.PI / 6);
     const cosA = Math.cos(ang);
@@ -7168,45 +6946,8 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
     ctx.stroke();
   }
 
-  // ANIMACIÓN DE PINZAS / GARRAS MECÁNICAS (Gripper Aperture Claws):
-  // Abiertas: giran hacia afuera (+26°) y se repliegan en el borde.
-  // Cerrándose: giran hacia adentro (-40°) y se extienden al centro, pinzando suavemente.
-  const clawCount = 4;
-  for (let c = 0; c < clawCount; c++) {
-    const baseAng = (c * Math.PI / 2) + (Math.PI / 4);
-    const clawAngleOffset = (1.0 - closure) * 0.45 - closure * 0.60;
-    const curAng = baseAng + clawAngleOffset;
-
-    const mountR = outerRadius - 2.5;
-    const mx = Math.cos(baseAng) * mountR;
-    const my = Math.sin(baseAng) * mountR;
-
-    const clawLen = 7.0 + closure * 10.5;
-    const tipX = mx + Math.cos(curAng + Math.PI) * clawLen;
-    const tipY = my + Math.sin(curAng + Math.PI) * clawLen;
-
-    ctx.strokeStyle = morphColor;
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(mx, my);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-
-    // Remache en la articulación de la garra
-    ctx.fillStyle = morphColor;
-    ctx.beginPath();
-    ctx.arc(mx, my, 1.6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Yema de contacto / electrodo
-    ctx.fillStyle = morphColor;
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 1.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
   // 3. Anillos concéntricos de retícula de mira (óptica de precisión)
-  ctx.strokeStyle = isClosed ? 'rgba(255, 59, 48, 0.7)' : (isLocking ? 'rgba(243, 156, 18, 0.65)' : 'rgba(0, 240, 255, 0.55)');
+  ctx.strokeStyle = isLocking ? 'rgba(243, 156, 18, 0.65)' : 'rgba(0, 240, 255, 0.55)';
   ctx.lineWidth = 1.0;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -7216,15 +6957,13 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
   ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 4. Cruz Táctica Steampunk con Mil-Dots / Marcas de Telémetro
+  // 4. Cruz Táctica con Mil-Dots / Marcas de Telémetro
   ctx.lineWidth = 1.1;
   ctx.strokeStyle = primaryCol;
 
-  // Eje X
   ctx.beginPath();
   ctx.moveTo(-outerRadius + 4, 0); ctx.lineTo(-radius * 0.45, 0);
   ctx.moveTo(radius * 0.45, 0); ctx.lineTo(outerRadius - 4, 0);
-  // Eje Y
   ctx.moveTo(0, -outerRadius + 4); ctx.lineTo(0, -radius * 0.45);
   ctx.moveTo(0, radius * 0.45); ctx.lineTo(0, outerRadius - 4);
   ctx.stroke();
@@ -7232,7 +6971,7 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
   // Mil-dots / graduaciones en la cruz
   const dots = [8, 14, 20];
   ctx.lineWidth = 0.9;
-  ctx.strokeStyle = morphColor;
+  ctx.strokeStyle = primaryCol;
   dots.forEach(d => {
     if (d < outerRadius - 6) {
       ctx.beginPath();
@@ -7244,14 +6983,14 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
     }
   });
 
-  // 5. Punto Central / Bead (Morphing continuo de color y tamaño según apertura)
-  const beadR = 2.0 + closure * 1.6 + (grabPulse * 1.5);
-  ctx.fillStyle = morphColor;
+  // 5. Punto Central / Bead
+  ctx.fillStyle = primaryCol;
   ctx.beginPath();
-  ctx.arc(0, 0, beadR, 0, Math.PI * 2);
+  ctx.arc(0, 0, 2.0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 6. Arco de Carga de Dwell (Manómetro / Muelle de Carga Steampunk)
+  // 6. Arco de Carga de Dwell (Manómetro / Muelle de Carga Steampunk):
+  // los 3 segundos de contacto con la palabra.
   if (isLocking && chargeProgress > 0) {
     ctx.strokeStyle = '#ff5722';
     ctx.lineWidth = 3.6;
@@ -7268,51 +7007,13 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
     ctx.fill();
   }
 
-  // 7. ANIMACIÓN DE IMPACTO / AGARRE INSTANTÁNEO ("AL TOQUE")
-  if (grabPulse > 0.01) {
-    // Onda de choque expansiva
-    const shockR = outerRadius + (1.0 - grabPulse) * 46;
-    ctx.strokeStyle = rgbaDesdeHex('#ff0055', grabPulse * 0.95);
-    ctx.lineWidth = 3.2 * grabPulse;
-    ctx.beginPath();
-    ctx.arc(0, 0, shockR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 4 Descargas radiales en cruz
-    ctx.strokeStyle = rgbaDesdeHex('#ffffff', grabPulse);
-    ctx.lineWidth = 1.6 * grabPulse;
-    for (let s = 0; s < 4; s++) {
-      const sAng = s * Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(sAng) * outerRadius, Math.sin(sAng) * outerRadius);
-      ctx.lineTo(Math.cos(sAng) * (outerRadius + 22 * grabPulse), Math.sin(sAng) * (outerRadius + 22 * grabPulse));
-      ctx.stroke();
-    }
-  }
-
-  // 8. Etiqueta Telemetría Steampunk y Estado de Mano
+  // 7. Etiqueta de telemetría del punto de interacción
   if (label) {
     ctx.shadowBlur = 0;
     ctx.font = '8px "Share Tech Mono", monospace';
     ctx.fillStyle = isLocking ? '#f39c12' : '#dfa857';
     ctx.textAlign = 'center';
     ctx.fillText(label, 0, outerRadius + 14);
-
-    if (hand) {
-      if (grabPulse > 0.05) {
-        ctx.fillStyle = '#ff0055';
-        ctx.fillText('⚡ ¡AGARRE AL TOQUE! ⚡', 0, outerRadius + 24);
-      } else if (closure >= 0.62) {
-        ctx.fillStyle = '#ff0055';
-        ctx.fillText('[ MANO CERRADA ✊ ]', 0, outerRadius + 24);
-      } else if (closure > 0.35) {
-        ctx.fillStyle = '#ffaa00';
-        ctx.fillText(`[ CERRANDO ${Math.round(closure * 100)}% ✊ ]`, 0, outerRadius + 24);
-      } else {
-        ctx.fillStyle = '#00f0ff';
-        ctx.fillText('[ MANO ABIERTA 🖐 ]', 0, outerRadius + 24);
-      }
-    }
   }
 
   ctx.restore();
@@ -8067,65 +7768,6 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
 
   appState.lockingPointName = lockingPoint ? lockingPoint.name : null;
 
-  // EVALUAR GESTO DE AGARRE INSTANTÁNEO ("Al toque" al abrir y cerrar la mano)
-  const gestures = appState.handGestures;
-  if (gestures) {
-    const handsToTest = [
-      { key: 'left', state: gestures.left, name: 'MANO_IZQ' },
-      { key: 'right', state: gestures.right, name: 'MANO_DER' },
-      { key: 'mouse', state: gestures.mouse, name: 'PUNTERO_MOUSE', pos: { x: appState.cursorX, y: appState.cursorY } }
-    ];
-
-    for (const h of handsToTest) {
-      const hs = h.state;
-      if (!hs) continue;
-
-      const isGrabbingNow = hs.justGrabbed || (hs.isClosed && (performance.now() - (hs.lastGrabTime || 0) < 260));
-
-      if (isGrabbingNow) {
-        let wordToGrab = null;
-        let wordToGrabIdx = -1;
-
-        // 1. Si ya hay una palabra fijada por proximidad (targetIndex)
-        if (foundTarget && targetIndex !== -1 && appState.floatingWords[targetIndex]) {
-          wordToGrab = appState.floatingWords[targetIndex];
-          wordToGrabIdx = targetIndex;
-        } else if (appState.targetedWordIndex !== -1 && appState.floatingWords[appState.targetedWordIndex]) {
-          wordToGrab = appState.floatingWords[appState.targetedWordIndex];
-          wordToGrabIdx = appState.targetedWordIndex;
-        } else {
-          // 2. Si la mano que cerró está al alcance físico de cualquier palabra flotante
-          const handPos = h.pos || hs.pos;
-          if (handPos && handPos.x > 0 && handPos.y > 0) {
-            for (let wi = 0; wi < appState.floatingWords.length; wi++) {
-              const fw = appState.floatingWords[wi];
-              if (fw.isCaught) continue;
-              const distToHand = Math.hypot(fw.x - handPos.x, fw.y - handPos.y);
-              if (distToHand <= (fw.radius + 65) * RADIO_COLISION_MULT) {
-                wordToGrab = fw;
-                wordToGrabIdx = wi;
-                break;
-              }
-            }
-          }
-        }
-
-        if (wordToGrab && wordToGrabIdx !== -1 && !wordToGrab.isCaught) {
-          console.log(`[GESTURE] ¡AGARRE AL TOQUE! Gesto de mano cerrada detectado (${h.name}) sobre: "${wordToGrab.text}"`);
-          emitAgentEvent('gesture', `Agarre instantáneo ("al toque"): mano cerrada capturó "${wordToGrab.text}"`, 'action', {
-            hand: h.name,
-            word: wordToGrab.text
-          });
-          hs.justGrabbed = false;
-          catchWord(wordToGrab, wordToGrabIdx);
-          return;
-        }
-
-        hs.justGrabbed = false;
-      }
-    }
-  }
-
   if (foundTarget) {
     if (appState.targetedWordIndex !== targetIndex) {
       if (appState.targetedWordIndex !== -1 && appState.floatingWords[appState.targetedWordIndex]) {
@@ -8679,7 +8321,10 @@ async function startResignificationSequence() {
 
   // Mostrar el discurso final: reacomodar las 3 palabras unificadas y hacer aparecer las auxiliares
   DOM.finalSpeechBox.classList.remove('hidden');
-  document.querySelectorAll('.organic-word-item.word-charged').forEach(function (el) { el.classList.remove('word-charged'); });
+  // ENERGIA HASTA ACA: entra el contenedor del haiku -> se descargan las palabras.
+  document.querySelectorAll('.organic-word-item.word-charged').forEach(function (el) {
+    el.classList.remove('word-charged');
+  });
   // Partículas corporativas desactivadas totalmente según requerimiento de diseño
   if (appState.corporateParticles) {
     appState.corporateParticles.stop();
@@ -9792,16 +9437,6 @@ function mainLoop(currentTimestamp) {
   const showReticle = isIdleForPointers && (!appState.isUsingMouse || appState.isMouseDown);
   DOM.reticle.classList.toggle('hidden', !showReticle);
 
-  // Suavizado continuo de gestos de manos a 60 FPS
-  if (appState.handGestures) {
-    ['left', 'right', 'mouse'].forEach(k => {
-      const h = appState.handGestures[k];
-      if (h && h.targetClosure !== undefined) {
-        h.closure += (h.targetClosure - h.closure) * 0.20;
-      }
-    });
-  }
-
   // 2. Actualizar palabras flotantes y calcular físicas de colisión
   if (appState.currentState !== STATES.PROCESSING && appState.currentState !== STATES.HIJACK) {
     updateFloatingWordsPhysics(dt);
@@ -9985,46 +9620,21 @@ function setupEventListeners() {
   // Clic en pantalla para atrapar palabra cercana inmediatamente
   window.addEventListener('mousedown', (e) => {
     appState.isMouseDown = true;
-    if (e.target.closest('#hud-container') || e.target.closest('#debug-hud-panel') || e.target.closest('.words-modal-backdrop') || e.target.closest('button') || e.target.closest('input')) return;
-    if (appState.handGestures && appState.handGestures.mouse) {
-      const m = appState.handGestures.mouse;
-      m.targetClosure = 1.0;
-      m.closure = 1.0;
-      m.isClosed = true;
-      m.justGrabbed = true;
-      m.lastGrabTime = performance.now();
-    }
   });
 
   window.addEventListener('mouseup', () => {
     appState.isMouseDown = false;
-    if (appState.handGestures && appState.handGestures.mouse) {
-      const m = appState.handGestures.mouse;
-      m.targetClosure = 0.0;
-      m.isClosed = false;
-    }
   });
 
   window.addEventListener('mouseleave', () => {
     appState.isMouseDown = false;
   });
 
-  window.addEventListener('click', (e) => {
+  // El clic ya NO captura palabras: la ÚNICA forma de capturar es mantener un
+  // punto de interacción en contacto con la palabra hasta completar el dwell (3 s).
+  window.addEventListener('click', () => {
     markUserActivity();
     appState.isUsingMouse = true;
-    if (appState.currentState === STATES.IDLE || appState.currentState === STATES.INTERACT) {
-      // Buscar palabra bajo el clic
-      for (let i = 0; i < appState.floatingWords.length; i++) {
-        const word = appState.floatingWords[i];
-        if (word.isCaught) continue;
-        const dx = word.x - e.clientX;
-        const dy = word.y - e.clientY;
-        if (Math.sqrt(dx * dx + dy * dy) <= (word.radius + 35) * RADIO_COLISION_MULT) {
-          catchWord(word, i);
-          break;
-        }
-      }
-    }
   });
 
   // Touch (instalación con dedo sobre pantalla táctil)

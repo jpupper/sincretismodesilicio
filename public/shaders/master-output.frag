@@ -456,7 +456,7 @@ float getDepthMask(vec2 p) {
     vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
     if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
     vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
-    return (d.a > 0.001) ? d.a : max(d.r, max(d.g, d.b));
+    return (d.a > 0.005) ? clamp(d.a, 0.0, 1.0) : 0.0;
 }
 
 void main() {
@@ -484,13 +484,13 @@ void main() {
     vec2 camUvG = vec2(1.0 - uvG.x, 1.0 - uvG.y);
     vec2 camUvB = vec2(1.0 - uvB.x, 1.0 - uvB.y);
 
-    // 1) Render Cámara con aberración cromática glitcheada
-    vec3 camCol = texture2D(u_cameraTexture, camUvR).rgb;
-  /*  if (u_hasCamera == 1) {
+    // 1) Render Cámara con aberración cromática glitcheada suave
+    vec3 camCol = vec3(0.0);
+    if (u_hasCamera == 1) {
         camCol.r = texture2D(u_cameraTexture, camUvR).r;
         camCol.g = texture2D(u_cameraTexture, camUvG).g;
         camCol.b = texture2D(u_cameraTexture, camUvB).b;
-    }*/
+    }
     // TINTE DE LA CÁMARA con la paleta unificada (u_camPal = 0 → imagen original).
     if (u_hasCamera == 1 && u_camPal > 0.001) {
         float camLum = dot(camCol, vec3(0.299, 0.587, 0.114));
