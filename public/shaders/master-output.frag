@@ -106,6 +106,8 @@ uniform vec2  u_depthTexel;     // 1.0 / tamaño real del canvas de depth
 // Comprime el alto en shader para palabras y reduce un poquito el ancho
 #define WORD_BOX_KY       1.0
 #define WORD_BOX_PAD      1.0
+#define WORD_BOX_FILL    0.0    // 0 = el fondo lo pone el NEGRO opaco; el color es solo la ENERGIA
+#define WORD_BOX_DARK    0.55   // opacidad del fondo oscuro de la caja (0 = caja invisible)   // relleno base CON COLOR de la caja de la palabra (0 = apagado)
 
 // Tamaño del contenedor del HAIKU (media medida, en UV)
 // 0.38 media medida = 0.76 ancho total (~1460px en 1920) para que 3 versos queden cómodos en una sola línea
@@ -273,25 +275,30 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
         float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
         float border = max(0.0, full - inner);
 
-        // REQUERIMIENTO 6: Relleno animado en el shader cuando se toca la palabra (dwell)
-        // Animación como si se estuviera prendiendo (ignición incandescente / plasma)
+        // PEDIDO USUARIO (2026-10-06): el FONDO de la palabra SIEMPRE se dibuja CON COLOR
+        // (antes, sin dwell, quedaba solo la silueta del rombo y se veia el patron del fondo
+        // a traves) y mientras la mano/cursor la va llenando, el frente de llenado avanza
+        // de IZQUIERDA a DERECHA en espacio de pantalla.
         float dwell = (i < MAX_WORDS) ? u_wordDwell[i] : 0.0;
+        float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
+        // Coordenada horizontal normalizada dentro del contenedor de la palabra
+        float normX = clamp((uv.x - (wPos.x - effAncho)) / (2.0 * effAncho), 0.0, 1.0);
+
+        // 1) RELLENO BASE CON COLOR: la caja nunca queda como un agujero negro.
+        vec3 baseCol = (u_palModo > 0.5) ? (mix(u_palA, u_palB, normX) * 0.85) : vec3(0.30, 0.62, 0.95);
+        wordsEffect.rgb += baseCol * full * WORD_BOX_FILL;
+
+        // 2) FRENTE DE LLENADO (dwell 0..1): lo que la mano ya cargo queda incandescente.
         if (dwell > 0.001 && full > 0.01) {
-            float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
-            // Coordenada horizontal normalizada dentro del contenedor
-            float normX = clamp((uv.x - (wPos.x - effAncho)) / (2.0 * effAncho), 0.0, 1.0);
-            
             // Frente de carga que se va llenando
             float fillProgress = smoothstep(0.0, 0.02, dwell - normX);
             // Filamento / chispa brillante en el frente activo de llenado
             float sparkLine = exp(-abs(normX - dwell) * 45.0) * (1.3 + 0.6 * sin(uv.y * 140.0 + u_time * 30.0));
-            // Chisporroteo / calor de ignición
+            // Chisporroteo / calor de ignicion
             float sizzle = 0.8 + 0.25 * sin(uv.x * 90.0 + u_time * 28.0) * cos(uv.y * 90.0 - u_time * 22.0);
-            
-            // Color que se prende: cobre fundido a núcleo blanco-ámbar incandescente
+            // Color que se prende: cobre fundido a nucleo blanco-ambar incandescente
             vec3 igniteCol = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.92, 0.55), normX);
             if (u_palModo > 0.5) igniteCol = mix(u_palA * 1.3, u_palB * 1.8, normX);
-            
             float igniteIntensity = (fillProgress * 0.70 * sizzle + sparkLine * 1.6) * full;
             wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
         }
@@ -598,25 +605,17 @@ void main() {
         fin = mix(fin, vec3(1.0), silBorde * maskVis);
     }
 
-    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
-    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
-    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
-    //     trackingConfig.boneWidth / pointRadius del overlay).
-    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
-    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
-    //     huesos de colores.
-    if (u_hasOpenpose == 1) {
-        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
-        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
-        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
-    }
 
     // Capa D: Integración del contenedor del Haiku detrás de los textos
     fin = mix(fin, haikuBox.rgb, haikuBox.a);
 
-    // Fondo del interior de las cajas de las palabras: NEGRO PURO según requerimiento
+    // CONTENEDOR DE LAS PALABRAS: SE DIBUJA SOLO ACA, EN EL SHADER (pedido usuario).
+    // Fondo NEGRO OPACO siempre (idle, enganchada arriba y en el MEDIO mientras se vacia:
+    // lo que se vacia es la ENERGIA, el fondo NO queda transparente, queda negro) y encima
+    // la energia (wordsq.rgb) que se LLENA con el puntero/mano y se VACIA en el medio.
     float wordMask = clamp(wordsq.a, 0.0, 1.0);
     fin = mix(fin, vec3(0.0), wordMask);
+    fin += wordsq.rgb * wordMask;
 
     // Borde de las palabras: ELIMINADO según requerimiento (sin marco exterior)
     // fin += wordsq.rgb * wordQuadCol;
@@ -630,6 +629,23 @@ void main() {
     // tinte iba modulado por una senoidal vertical que barria toda la pantalla).
     fin += vec3(0.04, 0.01, 0.02) * weights.z * (1.0 - maskTotal);
 
+
+    /* ============ OPENPOSE: SIEMPRE ARRIBA DE TODO (pedido usuario) ============
+       Se compone AL FINAL, despues de la silueta/camara, del contenedor del haiku
+       y de las cajas de las palabras: nada puede taparlo. Antes iba antes de esas
+       cajas y el interior NEGRO de las palabras lo tapaba. */
+    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
+    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
+    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
+    //     trackingConfig.boneWidth / pointRadius del overlay).
+    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
+    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
+    //     huesos de colores.
+    if (u_hasOpenpose == 1) {
+        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
+        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
+        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    }
 
     gl_FragColor = vec4(fin, 1.0);
 }

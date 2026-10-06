@@ -517,14 +517,14 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* SIN CONTENEDOR: la palabra es sólo texto flotando sobre el shader maestro.
+  /* SIN CONTENEDOR en el DOM: el fondo lo dibuja SOLO EL SHADER.
      El padding no se ve (fondo transparente) y sólo agranda el área de clic. */
   padding: 6px 12px;
   background: transparent;
   border: none;
   border-radius: 0;
   font-family: var(--word-font-family, var(--font-organic));
-  font-size: var(--word-font-size, 24px);
+  font-size: var(--word-font-size, 50px);
   font-weight: 600;
   letter-spacing: 1px;
   color: var(--word-color, #ffffff);
@@ -543,7 +543,7 @@ body {
   transition: color 0.2s ease, filter 0.2s ease, text-shadow 0.2s ease;
 }
 
-/* Sin cápsula: el relleno progresivo ya no existe (la palabra es texto libre) */
+/* El contenedor y su energia los dibuja SOLO EL SHADER: aca no hay nada. */
 .word-pill-fill {
   display: none !important;
 }
@@ -613,7 +613,7 @@ body {
   position: fixed !important;
   z-index: 30 !important;
   padding: 8px 24px !important;
-  font-size: var(--word-font-size, 24px) !important;
+  font-size: var(--word-font-size, 50px) !important;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -2721,15 +2721,18 @@ input[type="color"]:hover {
   width: 250px;
 }
 
-.pip-top-left {
-  top: 65px;
-  left: 24px;
+/* La cara y la mano derecha van TAMBIEN abajo (segunda fila del pie): NINGUNA
+   ventanita puede quedar por encima de las palabras seleccionadas, que se clavan
+   ARRIBA al 20% del alto (x 25/50/75). */
+.pip-bottom-left-2 {
+  bottom: 80px;
+  left: 272px;
   width: 230px;
 }
 
-.pip-top-right {
-  top: 65px;
-  right: 24px;
+.pip-bottom-right-2 {
+  bottom: 80px;
+  right: 300px;
   width: 220px;
 }
 
@@ -3274,9 +3277,10 @@ textarea {
   font-family: var(--gs-fuente, 'Share Tech Mono', monospace) !important;
 }
 
-/* Look consola: paddings y brillos reducidos (sin cápsula).
+/* Look consola: paddings y brillos reducidos.
    OJO: NO fijar font-size acá con !important — mataba los controles de
-   tamaño por estado de la pestaña PARTÍCULAS (--word-font-size*). */
+   tamaño por estado de la pestaña PARTÍCULAS (--word-font-size*).
+   PEDIDO: el contenedor de fondo lo dibuja SOLO EL SHADER -> acá, transparente. */
 .organic-word-item {
   padding: 4px 10px !important;
   border: none !important;
@@ -3284,9 +3288,7 @@ textarea {
   background: transparent !important;
 }
 
-.word-pill-fill {
-  box-shadow: none !important;
-}
+
 
 .mutation-word-card {
   padding: 8px 22px !important;

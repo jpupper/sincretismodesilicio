@@ -543,6 +543,45 @@ const IDLE_CTA_CAMERA_MOVE_PX = 26;     // movimiento mínimo para contar en cá
 // ============================================================================
 const FORZAR_CAMARA_SILUETA_OPENPOSE = true;
 
+// VENTANITAS DE MANOS (PiP IZQ/DER): se muestran SOLO si la confianza de que eso es
+// una mano es MUY alta y la muñeca NO esta pegada a la cabeza. Antes bastaba 0.25 y,
+// cuando MediaPipe confundia la muñeca (tipico con la mano cerca de la cara), la
+// ventanita encuadraba la CARA. Los landmarks 15/16 son las muñecas del Pose.
+const MANO_PIP_MIN_VIS = 0.92;        // visibilidad minima de la muñeca (0..1)
+const MANO_PIP_MIN_DIST_CARA = 0.10;  // distancia minima a la nariz (normalizada)
+
+// ALTERNANCIA DEL CUERPO (pedido): cada CICLO_CUERPO_MS el relleno del cuerpo cambia
+// entre la SILUETA (depth pintada con el patron RDM + borde blanco) y la CAMARA (depth
+// cam en color). El esqueleto OpenPose va SIEMPRE encima (el shader lo compone ultimo).
+const CICLO_CUERPO_MS = 7000;
+
+// TAMANO DE LAS PALABRAS (pedido: "que sean mas grandes"). Se aplica como multiplicador
+// sobre lo que tenga el panel, asi agranda tambien perfiles con config ya guardada.
+const BOOST_PALABRAS = 1.45;         // palabras flotantes y enganchadas
+
+// PEDIDO: tamano BASE de las palabras en 50px (el panel solo puede agrandarlas mas).
+// Las 3 del MEDIO NO llevan piso: vuelven al tamano del panel (pedido posterior).
+const PALABRA_PX_MIN_BASE = 50;
+
+// PEDIDO: al posicionarse en el MEDIO las palabras se van VACIANDO de energia hasta
+// llegar al haiku (recorrido completo: se llenan con el puntero/mano -> mantienen la
+// carga arriba -> se vacian en el centro -> llegan al haiku sin energia).
+const ENERGIA_VACIADO_MS = 5500;
+
+// Con el mouse, el puntero sigue activo VENTANA_MOUSE_MS despues del ultimo movimiento
+// (asi pasar por encima de una palabra la llena, pero el cursor quieto del centro no
+// dispara nada por su cuenta).
+const VENTANA_MOUSE_MS = 4000;
+
+// PEDIDO: la colision del puntero/mano con las palabras tiene el DOBLE de radio
+// (mas facil engancharlas: si el punto de la mano/cursor esta cerca, ya cuenta como
+// colision). Multiplica el umbral de distancia en los 3 tests de puntero:
+//   - proximidad/dwell sobre palabras flotantes
+//   - agarre "al toque" (mano cerrada)
+//   - clic del mouse
+// 1.0 = comportamiento viejo; 2.0 = el doble de radio.
+const RADIO_COLISION_MULT = 2.0;
+
 const PIP_RANDOM_MIN_S = 5;
 const PIP_RANDOM_MAX_S = 30;
 
@@ -787,6 +826,7 @@ const appState = {
   config: { ...DEFAULT_CONFIG },
 
   // Posiciones de Cursor
+  mouseMovido: false,       // true recien con un mousemove real (ver VENTANA_MOUSE_MS)
   cursorX: window.innerWidth / 2,
   cursorY: window.innerHeight / 2,
   targetCursorX: window.innerWidth / 2,
@@ -1769,6 +1809,8 @@ uniform vec2  u_depthTexel;     // 1.0 / tamaño real del canvas de depth
 // Comprime el alto en shader para palabras y reduce un poquito el ancho
 #define WORD_BOX_KY       1.75
 #define WORD_BOX_PAD      0.78
+#define WORD_BOX_FILL    0.0    // 0 = el fondo lo pone el NEGRO opaco; el color es solo la ENERGIA
+#define WORD_BOX_DARK    0.55   // opacidad del fondo oscuro de la caja (0 = caja invisible)   // relleno base CON COLOR de la caja de la palabra (0 = apagado)
 
 // Tamaño del contenedor del HAIKU (media medida, en UV)
 #define HAIKU_BOX_W       0.38
@@ -1934,25 +1976,30 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
         float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
         float border = max(0.0, full - inner);
 
-        // REQUERIMIENTO 6: Relleno animado en el shader cuando se toca la palabra (dwell)
-        // Animación como si se estuviera prendiendo (ignición incandescente / plasma)
+        // PEDIDO USUARIO (2026-10-06): el FONDO de la palabra SIEMPRE se dibuja CON COLOR
+        // (antes, sin dwell, quedaba solo la silueta del rombo y se veia el patron del fondo
+        // a traves) y mientras la mano/cursor la va llenando, el frente de llenado avanza
+        // de IZQUIERDA a DERECHA en espacio de pantalla.
         float dwell = (i < MAX_WORDS) ? u_wordDwell[i] : 0.0;
+        float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
+        // Coordenada horizontal normalizada dentro del contenedor de la palabra
+        float normX = clamp((uv.x - (wPos.x - effAncho)) / (2.0 * effAncho), 0.0, 1.0);
+
+        // 1) RELLENO BASE CON COLOR: la caja nunca queda como un agujero negro.
+        vec3 baseCol = (u_palModo > 0.5) ? (mix(u_palA, u_palB, normX) * 0.85) : vec3(0.30, 0.62, 0.95);
+        wordsEffect.rgb += baseCol * full * WORD_BOX_FILL;
+
+        // 2) FRENTE DE LLENADO (dwell 0..1): lo que la mano ya cargo queda incandescente.
         if (dwell > 0.001 && full > 0.01) {
-            float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
-            // Coordenada horizontal normalizada dentro del contenedor
-            float normX = clamp((uv.x - (wPos.x - effAncho)) / (2.0 * effAncho), 0.0, 1.0);
-            
             // Frente de carga que se va llenando
             float fillProgress = smoothstep(0.0, 0.02, dwell - normX);
             // Filamento / chispa brillante en el frente activo de llenado
             float sparkLine = exp(-abs(normX - dwell) * 45.0) * (1.3 + 0.6 * sin(uv.y * 140.0 + u_time * 30.0));
-            // Chisporroteo / calor de ignición
+            // Chisporroteo / calor de ignicion
             float sizzle = 0.8 + 0.25 * sin(uv.x * 90.0 + u_time * 28.0) * cos(uv.y * 90.0 - u_time * 22.0);
-            
-            // Color que se prende: cobre fundido a núcleo blanco-ámbar incandescente
+            // Color que se prende: cobre fundido a nucleo blanco-ambar incandescente
             vec3 igniteCol = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.92, 0.55), normX);
             if (u_palModo > 0.5) igniteCol = mix(u_palA * 1.3, u_palB * 1.8, normX);
-            
             float igniteIntensity = (fillProgress * 0.70 * sizzle + sparkLine * 1.6) * full;
             wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
         }
@@ -2256,25 +2303,17 @@ void main() {
         fin = mix(fin, vec3(1.0), silBorde * maskVis);
     }
 
-    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
-    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
-    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
-    //     trackingConfig.boneWidth / pointRadius del overlay).
-    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
-    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
-    //     huesos de colores.
-    if (u_hasOpenpose == 1) {
-        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
-        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
-        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
-    }
 
     // Capa D: Integración del contenedor del Haiku detrás de los textos
     fin = mix(fin, haikuBox.rgb, haikuBox.a);
 
-    // Fondo del interior de las cajas de las palabras: NEGRO PURO según requerimiento
+    // CONTENEDOR DE LAS PALABRAS: SE DIBUJA SOLO ACA, EN EL SHADER (pedido usuario).
+    // Fondo NEGRO OPACO siempre (idle, enganchada arriba y en el MEDIO mientras se vacia:
+    // lo que se vacia es la ENERGIA, el fondo NO queda transparente, queda negro) y encima
+    // la energia (wordsq.rgb) que se LLENA con el puntero/mano y se VACIA en el medio.
     float wordMask = clamp(wordsq.a, 0.0, 1.0);
     fin = mix(fin, vec3(0.0), wordMask);
+    fin += wordsq.rgb * wordMask;
 
     // Borde de las palabras: ELIMINADO según requerimiento (sin marco exterior)
     // fin += wordsq.rgb * wordQuadCol;
@@ -2288,6 +2327,23 @@ void main() {
     // tinte iba modulado por una senoidal vertical que barria toda la pantalla).
     fin += vec3(0.04, 0.01, 0.02) * weights.z * (1.0 - maskTotal);
 
+
+    /* ============ OPENPOSE: SIEMPRE ARRIBA DE TODO (pedido usuario) ============
+       Se compone AL FINAL, despues de la silueta/camara, del contenedor del haiku
+       y de las cajas de las palabras: nada puede taparlo. Antes iba antes de esas
+       cajas y el interior NEGRO de las palabras lo tapaba. */
+    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
+    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
+    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
+    //     trackingConfig.boneWidth / pointRadius del overlay).
+    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
+    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
+    //     huesos de colores.
+    if (u_hasOpenpose == 1) {
+        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
+        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
+        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    }
 
     gl_FragColor = vec4(fin, 1.0);
 }
@@ -2604,7 +2660,8 @@ void main() {
       posBuffer[i * 2] = px / winW;
       posBuffer[i * 2 + 1] = 1.0 - (py / winH);
       widthBuffer[i] = anchoPx ? (anchoPx / winW) : 0;
-      dwellBuffer[i] = (w.isTargeted ? (w.dwellProgress || 0) : 0);
+      // ENERGIA por palabra (la dibuja el shader): llenado -> 100% -> vaciado en el medio.
+      dwellBuffer[i] = (w.energy !== undefined) ? w.energy : (w.isTargeted ? (w.dwellProgress || 0) : 0);
     }
     gl.uniform2fv(this.uniforms.wordPositions, posBuffer);
     if (this.uniforms.wordWidths) gl.uniform1fv(this.uniforms.wordWidths, widthBuffer);
@@ -2751,9 +2808,17 @@ void main() {
     const finalMaskOn = !appState.hasHuman
       ? 0.0
       : (FORZAR_CAMARA_SILUETA_OPENPOSE ? 1.0 : (auto * appState._maskLerp + (1 - auto) * manualOn));
+    /* ALTERNANCIA SILUETA <-> CAMARA (pedido del usuario): cada CICLO_CUERPO_MS el
+       relleno del cuerpo cambia entre la SILUETA (patron RDM + borde blanco) y la CAMARA.
+       El OpenPose va SIEMPRE encima (compuesto ultimo en el shader). */
+    const faseSilueta = ((Math.floor(performance.now() / CICLO_CUERPO_MS) % 2) === 0);
     const camVisFinal = (FORZAR_CAMARA_SILUETA_OPENPOSE && appState.hasHuman)
-      ? 1.0
+      ? (faseSilueta ? 0.0 : 1.0)
       : (auto * mezclaAuto + (1 - auto) * baseCam);
+    const silRdmFinal = (FORZAR_CAMARA_SILUETA_OPENPOSE && appState.hasHuman)
+      ? (faseSilueta ? 1.0 : 0.0)
+      : Math.max(0, Math.min(1, (Number(rdmParams.silRdm === undefined ? 100 : rdmParams.silRdm) || 0) / 100));
+    if (this.uniforms.silRdm) gl.uniform1f(this.uniforms.silRdm, silRdmFinal);
     if (this.uniforms.maskOn) gl.uniform1f(this.uniforms.maskOn, finalMaskOn);
     if (this.uniforms.camVis) gl.uniform1f(this.uniforms.camVis, camVisFinal);
     // Diagnostico: estado real de las 3 capas (maximo 1 linea por segundo y solo si cambia).
@@ -5193,10 +5258,17 @@ function renderHandCameras(landmarks) {
 
     const lm = targetLandmarks[s.lmIndex];
     const vis = lm && lm.visibility !== undefined ? lm.visibility : (lm ? 0.9 : 0);
-    if (!lm || vis < 0.25) {
-      // La mano NO está trackeada: se oculta el contenedor (SOLO APARECE SI LAS MANOS ESTAN TRACKEADAS)
+    // CONFIANZA MUY ALTA (pedido del usuario): antes bastaba 0.25, asi que una muñeca
+    // mal detectada (casi siempre sobre la cara) hacia que la ventanita encuadrara la CARA.
+    const cabeza = targetLandmarks[0];                                  // nariz
+    const hombro = targetLandmarks[11] || targetLandmarks[12];
+    const anchoRef = (cabeza && hombro) ? Math.hypot(hombro.x - cabeza.x, hombro.y - cabeza.y) : 0.22;
+    const distCara = (lm && cabeza) ? Math.hypot(lm.x - cabeza.x, lm.y - cabeza.y) : 1.0;
+    const pegadaALaCara = distCara < Math.max(MANO_PIP_MIN_DIST_CARA, anchoRef * 0.55);
+    if (!lm || vis < MANO_PIP_MIN_VIS || pegadaALaCara) {
+      // Sin mano confiable: la ventanita NO se muestra.
       if (!s.pip.classList.contains('hidden')) s.pip.classList.add('hidden');
-      if (s.statusEl) s.statusEl.textContent = 'SIN MANO';
+      if (s.statusEl) s.statusEl.textContent = (!lm || vis < MANO_PIP_MIN_VIS) ? 'SIN MANO' : 'DESCARTADA';
       continue;
     }
 
@@ -6520,9 +6592,11 @@ function syncUiColorsInputs() {
 function applyParticlesConfig() {
   const p = appState.particlesConfig;
   const root = document.documentElement;
-  root.style.setProperty('--word-font-size', `${p.fontSize}px`);
+  // PEDIDO: palabras MAS GRANDES (multiplicador sobre lo que tenga el panel).
+  root.style.setProperty('--word-font-size', `${Math.max(PALABRA_PX_MIN_BASE, Math.round(p.fontSize * BOOST_PALABRAS))}px`);
   // Tamaño por ESTADO: centro (girando/transformando) y frase final (+ auxiliares)
-  root.style.setProperty('--word-font-size-center', `${Number(p.fontSizeCenter) || 52}px`);
+  // PEDIDO: las 3 del MEDIO vuelven al tamano anterior del panel (sin boost ni piso).
+  root.style.setProperty('--word-font-size-center', `${Number(p.fontSizeCenter) || 56}px`);
   root.style.setProperty('--word-font-size-phrase', `${Number(p.fontSizePhrase) || 62}px`);
   root.style.setProperty('--word-font-family', PARTICLE_FONT_FAMILIES[p.fontFamily] || PARTICLE_FONT_FAMILIES.organic);
   root.style.setProperty('--word-color', p.color);
@@ -7203,15 +7277,9 @@ class FloatingWord {
       this.el.className = 'organic-word-item word-auxiliary';
     }
 
-    this.el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if ((appState.currentState === STATES.IDLE || appState.currentState === STATES.INTERACT) && (this.state === WORD_STATES.FLOATING || this.state === WORD_STATES.LOCKING)) {
-        const idx = appState.floatingWords.indexOf(this);
-        if (idx !== -1 && !this.isCaught) {
-          catchWord(this, idx);
-        }
-      }
-    });
+    // PEDIDO: tocar/cliquear una palabra NO la selecciona de una. Se LLENA con el
+    // puntero encima (mismo dwell que con la mano) y se captura sola al llegar al 100%.
+    this.el.addEventListener('click', (e) => { e.stopPropagation(); });
 
     if (DOM.floatingLayer && this.state !== WORD_STATES.AUXILIARY) {
       DOM.floatingLayer.appendChild(this.el);
@@ -7310,11 +7378,13 @@ class FloatingWord {
   setTargeted(targeted, progress = 0) {
     this.isTargeted = targeted;
     this.dwellProgress = targeted ? Math.min(1.0, Math.max(0, progress)) : 0;
+    // ENERGIA de la palabra: la dibuja SOLO el shader (wordsq.rgb). Se llena con el
+    // puntero/mano, se mantiene al engancharse y se VACIA cuando baja al medio.
+    this.energy = this.dwellProgress;
     if (targeted) {
       this.state = WORD_STATES.LOCKING;
       this.el.classList.add('targeting');
       const pct = Math.min(100, Math.round(progress * 100));
-      if (this.pillFill) this.pillFill.style.width = `${pct}%`;
       if (this.lockBadge) {
         this.lockBadge.textContent = `[${pct}%]`;
         this.lockBadge.style.display = 'inline-block';
@@ -7322,7 +7392,6 @@ class FloatingWord {
     } else {
       if (this.state === WORD_STATES.LOCKING) this.state = WORD_STATES.FLOATING;
       this.el.classList.remove('targeting');
-      if (this.pillFill) this.pillFill.style.width = '0%';
       if (this.lockBadge) {
         this.lockBadge.textContent = '';
         this.lockBadge.style.display = 'none';
@@ -7376,7 +7445,8 @@ class FloatingWord {
     this.state = WORD_STATES.SLOTTED;
     this.slotIndex = stageIdx;
     this.el.className = 'organic-word-item word-slotted word-charged';
-    if (this.pillFill) this.pillFill.style.width = '0%';
+    // PEDIDO: la palabra llega ARRIBA con toda la energia del llenado (se vacia en el centro).
+    this.energy = 1;
     if (this.lockBadge) this.lockBadge.style.display = 'none';
     if (this.label) this.label.textContent = this.text.toUpperCase();
 
@@ -7388,6 +7458,7 @@ class FloatingWord {
   moveToCenter(stageIdx) {
     this.state = WORD_STATES.SCRAMBLING;
     this.el.className = 'organic-word-item word-scrambling word-charged';
+    this.empezarVaciadoEnergia();   // PEDIDO: en el medio se VACIA la energia
     const xs = [0.25, 0.5, 0.75];
     const x = window.innerWidth * xs[Math.max(0, Math.min(2, stageIdx))];
     return this.flyTo(x, window.innerHeight * 0.47, 1100);
@@ -7461,6 +7532,27 @@ class FloatingWord {
 
       requestAnimationFrame(updateFrame);
     });
+  }
+
+  /* PEDIDO: las palabras se van VACIANDO de energia mientras estan en el MEDIO
+     (barra interior de 100% -> 0%) hasta que se van al haiku. */
+  empezarVaciadoEnergia() {
+    if (this._drenando) return;
+    this._drenando = true;
+    const t0 = performance.now();
+    const tick = () => {
+      if (!this._drenando) return;
+      const avance = Math.min(1, (performance.now() - t0) / ENERGIA_VACIADO_MS);
+      // La energia la dibuja el shader: el fondo negro se queda y la parte llena se retrae.
+      this.energy = Math.max(0, 1 - avance);
+      if (avance >= 1 || this.state !== WORD_STATES.SCRAMBLING) {
+        this._drenando = false;
+        this.energy = 0;
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   moveToPhraseFlow(containerEl, beforeEl) {
@@ -7695,8 +7787,13 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
   const collisionPointOn = (key, fallback = true) => (key in cp ? cp[key] !== false : fallback);
   const testPoints = [];
   if (collisionPointOn('mouse', true)) {
-    // Si se usa el mouse, sólo agregar punto de interacción si el mouse está apretado
-    if (!appState.isUsingMouse || appState.isMouseDown) {
+    // PEDIDO: con el mouse alcanza con pasar por encima de la palabra para que se vaya
+    // llenando (antes habia que mantener apretado y el clic la seleccionaba de golpe).
+    // OJO: solo mientras el mouse se esta usando (lastUserActivity lo marca el mousemove).
+    // Si no, el puntero virtual se queda quieto en el CENTRO de la pantalla y llenaba
+    // palabras solo, disparando la secuencia sin que nadie toque nada.
+    const movReciente = appState.mouseMovido && appState.lastUserActivity && (Date.now() - appState.lastUserActivity) < VENTANA_MOUSE_MS;
+    if (movReciente) {
       testPoints.push({ x: appState.cursorX, y: appState.cursorY, name: appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL' });
     }
   }
@@ -7759,7 +7856,7 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
       const dy = word.y - pt.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist <= word.radius + 38) {
+      if (dist <= (word.radius + 38) * RADIO_COLISION_MULT) {
         foundTarget = true;
         targetIndex = i;
         lockingPoint = pt;
@@ -7805,7 +7902,7 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
               const fw = appState.floatingWords[wi];
               if (fw.isCaught) continue;
               const distToHand = Math.hypot(fw.x - handPos.x, fw.y - handPos.y);
-              if (distToHand <= fw.radius + 65) {
+              if (distToHand <= (fw.radius + 65) * RADIO_COLISION_MULT) {
                 wordToGrab = fw;
                 wordToGrabIdx = wi;
                 break;
@@ -9399,7 +9496,15 @@ function setPipVisible(which, visible, now) {
     const lms = targetP ? targetP.landmarks : appState.lastLandmarks;
     const lm = lms ? lms[lmIndex] : null;
     const vis = lm && lm.visibility !== undefined ? lm.visibility : (lm ? 0.9 : 0);
-    if (!lm || vis < 0.25) {
+    // MISMA REGLA QUE EN renderHandCameras (pedido del usuario): confianza MUY alta y
+    // muñeca NO pegada a la cabeza; si no, la ventanita se apaga (antes 0.25 dejaba
+    // pasar muñecas mal detectadas sobre la cara).
+    const cabeza = lms ? lms[0] : null;
+    const hombro = lms ? (lms[11] || lms[12]) : null;
+    const anchoRef = (cabeza && hombro) ? Math.hypot(hombro.x - cabeza.x, hombro.y - cabeza.y) : 0.22;
+    const distCara = (lm && cabeza) ? Math.hypot(lm.x - cabeza.x, lm.y - cabeza.y) : 1.0;
+    const pegadaALaCara = distCara < Math.max(MANO_PIP_MIN_DIST_CARA, anchoRef * 0.55);
+    if (!lm || vis < MANO_PIP_MIN_VIS || pegadaALaCara) {
       visible = false;
     }
   }
@@ -9667,6 +9772,7 @@ function setupEventListeners() {
   // REQUERIMIENTO 1: MOUSE TRACKING DINÁMICO & CLIC DIRECTO
   window.addEventListener('mousemove', (e) => {
     markUserActivity();
+    appState.mouseMovido = true;   // el puntero recien queda activo con un movimiento REAL
     // Si el usuario mueve el mouse, activamos control de mouse y anulamos OpenPose
     appState.isUsingMouse = true;
     appState.targetCursorX = e.clientX;
@@ -9717,7 +9823,7 @@ function setupEventListeners() {
         if (word.isCaught) continue;
         const dx = word.x - e.clientX;
         const dy = word.y - e.clientY;
-        if (Math.sqrt(dx * dx + dy * dy) <= word.radius + 35) {
+        if (Math.sqrt(dx * dx + dy * dy) <= (word.radius + 35) * RADIO_COLISION_MULT) {
           catchWord(word, i);
           break;
         }

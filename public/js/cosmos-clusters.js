@@ -2,7 +2,7 @@
  * SINCRETISMO DE SILICIO // CÚMULO 3D DE NEURONAS & SINAPSIS
  * Script de inicialización y control dedicado para cosmos-clusters.html
  */
-import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js?v=3.50';
+import { ClusterCosmos3D } from './visualizer/clusterCosmos3D.js?v=3.53';
 
 let visualizer = null;
 
@@ -241,8 +241,8 @@ function initPanelAjustes(viz) {
     const ventanasConfig = [
       { id: 'alien-nav-hud', btnCloseId: 'btn-close-alien-nav', label: 'Vectores 3D & Giroscopio' },
       { id: 'semantic-tree-hud', btnCloseId: 'btn-close-semantic-tree', label: 'Distancia Semántica / Grafo 2D' },
-      { id: 'neural-orders-hud', btnCloseId: 'btn-close-neural-hud', label: 'Órdenes Cerebrales (Sicre2)' },
-      { id: 'cosmos-hud-telemetry', btnCloseId: 'btn-close-telemetry-hud', label: 'Telemetría Nodal 3D' }
+      { id: 'neural-orders-hud', btnCloseId: 'btn-close-neural-hud', label: 'Órdenes Cerebrales (Sicre2)' }
+      /* La ventana "Telemetría Nodal 3D" se eliminó a pedido del artista. */
     ];
 
     ventanasConfig.forEach((vc) => {
@@ -369,6 +369,76 @@ function initPanelAjustes(viz) {
   sincronizar();
 }
 
+/* ============================================================================
+   PARPADEO PROGRAMADO DE LOS PANELES HUD (pedido del artista)
+   ----------------------------------------------------------------------------
+   Los paneles de palabras aledañas y el contenedor que muestra los vectores
+   APARECEN 10 s, DESAPARECEN 20 s y vuelven a aparecer 10 s, cada uno en una
+   FASE DISTINTA: nunca aparecen ni desaparecen al mismo tiempo.
+
+   Ciclo = 30 s (10 visible + 20 oculto). Con las fases 0 / 10 / 20 s cada panel
+   está visible exactamente un tercio del tiempo y en ningún instante hay dos
+   visibles: ronda perfecta. El desvanecido lo hace el CSS (.hud-fase-oculto).
+   Para cambiar qué paneles parpadean, editá la lista PARPADEO.paneles.
+
+   Fase de reposo: mientras el panel de configuración (tecla P) está abierto el
+   parpadeo se suspende y todos los paneles quedan visibles, para poder ajustarlos.
+   ========================================================================== */
+const PARPADEO = {
+  cicloMs: 30000,        // 10 s visible + 20 s oculto
+  visibleMs: 10000,
+  pasoMs: 200,           // cada cuánto se recalcula el estado
+  paneles: [
+    { id: 'alien-nav-hud',     faseMs: 0,     nombre: 'VECTORES 3D' },
+    { id: 'semantic-tree-hud', faseMs: 10000, nombre: 'PALABRAS ALEDAÑAS' },
+    { id: 'neural-orders-hud', faseMs: 20000, nombre: 'ÓRDENES CEREBRALES' }
+  ]
+};
+
+/** ¿Está visible este panel en el instante t (ms desde el arranque)? Pura, testeable. */
+function visibleEnT(t, faseMs, cicloMs, visibleMs) {
+  const c = cicloMs === undefined ? PARPADEO.cicloMs : cicloMs;
+  const v = visibleMs === undefined ? PARPADEO.visibleMs : visibleMs;
+  return (((t + faseMs) % c) + c) % c < v;
+}
+
+function initParpadeoHud() {
+  const items = PARPADEO.paneles
+    .map((p) => ({ el: document.getElementById(p.id), faseMs: p.faseMs, nombre: p.nombre }))
+    .filter((p) => p.el);
+  if (!items.length) return;
+
+  const t0 = performance.now();
+  const panelAjustes = document.getElementById('panel-ajustes-cosmos');
+
+  function paso() {
+    // Con la configuración abierta se suspende (todos visibles) para poder ajustarlos.
+    const suspendido = !!(panelAjustes && panelAjustes.classList.contains('abierto'));
+    const t = (performance.now() - t0) % PARPADEO.cicloMs;
+    items.forEach((p) => {
+      p.el.classList.toggle('hud-fase-oculto', !(suspendido || visibleEnT(t, p.faseMs)));
+    });
+  }
+
+  setInterval(paso, PARPADEO.pasoMs);
+  paso();
+
+  // Diagnóstico: window.__parpadeoHud.estado() -> qué panel está visible ahora.
+  window.__parpadeoHud = {
+    cicloMs: PARPADEO.cicloMs,
+    visibleMs: PARPADEO.visibleMs,
+    paneles: PARPADEO.paneles,
+    visibleEnT: visibleEnT,
+    t: () => (performance.now() - t0) % PARPADEO.cicloMs,
+    estado: () => items.map((p) => ({
+      id: p.el.id,
+      nombre: p.nombre,
+      faseMs: p.faseMs,
+      visible: !p.el.classList.contains('hud-fase-oculto')
+    }))
+  };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('cosmos-clusters-viewport');
   if (!container) return;
@@ -388,6 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   initPanelAjustes(visualizer);
+  initParpadeoHud();
 
   // Tecla 'F' para pantalla completa
   window.addEventListener('keydown', (e) => {

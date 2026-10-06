@@ -412,7 +412,7 @@ const fondoStarVertex = `
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
-    float tw = 0.55 + 0.45 * sin(uTime * 0.9 + aPhase * 6.2831);
+    float tw = 0.55 + 0.45 * sin(uTime * 0.30 + aPhase * 6.2831);
     vTw = 0.30 + 0.70 * tw;
     gl_PointSize = aSize * uPixelRatio * (720.0 / max(1.0, -mv.z)) * (0.65 + 0.7 * tw);
   }
@@ -424,7 +424,7 @@ const fondoStarFragment = `
     vec2 c = gl_PointCoord - vec2(0.5);
     float d = length(c);
     float a = smoothstep(0.5, 0.0, d);
-    gl_FragColor = vec4(uColor * vTw, a * a * vTw * 0.55);
+    gl_FragColor = vec4(uColor * vTw, a * a * vTw * 0.30);
   }
 `;
 const fondoCellVertex = `
@@ -501,19 +501,28 @@ const fondoCellFragment = `
     vec3 dir = normalize(vDir);
     // Mapa equirectangular de la esfera: la direccion (fija en el mundo) es la UV.
     vec2 uvSky = vec2(atan(dir.z, dir.x) * 0.15915494 + 0.5, dir.y * 0.5 + 0.5);
-    uvSky *= vec2(4.0, 2.6);
+    // Frecuencia BAJA: el patron ya no se ve como ruido fino (pedido del artista:
+    // "es un ruido que tiene mucha frecuencia"). Antes esto valia vec2(12.0, 7.8)
+    // y las capas llegaban a escala 4.5 -> ~54 ciclos por unidad de cielo; ahora
+    // 5.0/3.2 con capas hasta 0.28*9 = 2.5 -> ~12, y las manchas son grandes y lisas.
+    uvSky *= vec2(5.0, 3.2);
 
-    float pat = rdmPattern(uvSky, uTime);
-    /* EDGE: banda fina donde el patron cruza el nivel medio. Dibuja el CONTORNO de
-       las manchas (como un mapa topografico) en vez del relleno cuadrado. */
-    float edge = 1.0 - smoothstep(0.0, 0.10, abs(pat - 0.5));
-    float membrana = smoothstep(0.30, 0.95, pat);            // relleno suave
-    float nucleo = smoothstep(0.70, 1.0, pat);               // crestas
-    float resp = 0.82 + 0.18 * sin(uTime * 0.11);            // respiracion muy lenta
+    /* NUBES ROJAS PEQUENAS SOBRE NEGRO (pedido del artista: "que se vea como unas
+       pequenas nubes rojas nada mas"). Dos cambios respecto de la version vieja:
+         1) la banda del patron (RDM_BASE sm1/sm2 = 0.62/0.74) recorta la parte
+            ALTA del ruido crudo, que vive entre ~0.36 y ~0.77 (medido), sin
+            saturar: antes saturaba todo el cielo en una mancha clara gigante;
+         2) se abandona el relleno de membrana y el contorno topografico y la
+            salida queda muy atenuada (0.45 de brillo, 0.50 de alpha).
+       Resultado: cielo practicamente negro con jirones rojos chicos y dispersos. */
+    float nube = rdmPattern(uvSky, uTime);
+    float resp = 0.82 + 0.18 * sin(uTime * 0.11);           // respiracion muy lenta
     float m = uIntensity * resp;
-    vec3 col = uColorA * (membrana * 0.55) + uColorB * (nucleo * 0.35) + uColorB * (edge * 0.55);
-    float alpha = (membrana * 0.55 + nucleo * 0.20 + edge * 0.55) * m;
-    gl_FragColor = vec4(col * m, alpha);
+    vec3 col = uColorA * nube;
+    float alpha = nube * 0.50 * m;
+    // Salida mucho mas oscura que antes (0.75 de brillo, medido en vivo: picos de
+    // ~R 110 sobre un cielo de media ~1.5/255).
+    gl_FragColor = vec4(col * 0.75 * m, alpha);
   }
 `;
 
@@ -580,7 +589,17 @@ export class ClusterCosmos3D {
     this.fondo = { intensidad: 1, vel: 1 };
     // Valores BASE de fabrica de cada uniform del patron RDM del fondo: el panel los
     // mueve en % sobre esto (100% = como estaba).
-    this.RDM_BASE = { cnt: 11, iteScale: 0.5, speedRnd: 0.5, sm1: 0.12, sm2: 0.58, force: 0.95 };
+    // sm1/sm2 (0.55/0.70) recortan la parte ALTA del ruido crudo: el patron crudo
+    // vive entre ~0.45 y ~0.71 (medido), asi que con los umbrales viejos (0.12/0.58)
+    // TODO el cielo saturaba por encima de 0.9 y salia una unica mancha gigante y
+    // clara. Con estos sobrevive ~15% del cielo: nubes chicas y separadas.
+    // iteScale 0.28 (antes 0.5) baja la frecuencia: menos detalle fino, manchas mas
+    // lisas y grandes.
+    this.RDM_BASE = { cnt: 11, iteScale: 0.28, speedRnd: 0.5, sm1: 0.55, sm2: 0.70, force: 0.95 };
+    // VELOCIDAD DEL TIEMPO DEL FONDO: pedido explicito del artista -> 0.00001, o sea
+    // el fondo queda practicamente CONGELADO (el patron y el titileo apenas avanzan).
+    // El panel (pestana FONDO -> velocidad) sigue escalando encima de esto.
+    this.FONDO_TIME_BASE = 0.00001;
     // VELOCIDAD DE LOS RAYOS (independiente del pulso de las pelotitas) y efecto de
     // LLEGADA de un impulso a un planeta: halo sutil + pico de brillo + rayos mas lentos.
     // Cada rig de rayos acumula su PROPIO tiempo (rig.tMs) para poder frenarse solo.
@@ -890,10 +909,10 @@ export class ClusterCosmos3D {
         // sm2 alto el cielo sale CASI NEGRO (medido: media 1.19/255 con sm2 0.86).
         // Estos valores lo dejan VISIBLE como celulas sin tapar las neuronas.
         uRdmCnt: { value: 11 },
-        uRdmIteScale: { value: 0.5 },
+        uRdmIteScale: { value: 0.28 },
         uRdmSpeedRnd: { value: 0.5 },
-        uRdmSm1: { value: 0.12 },
-        uRdmSm2: { value: 0.58 },
+        uRdmSm1: { value: 0.55 },
+        uRdmSm2: { value: 0.70 },
         uRdmForce: { value: 0.95 }
       },
       transparent: true,
@@ -2518,9 +2537,9 @@ export class ClusterCosmos3D {
       this.electricMaterial.uniforms.uTime.value = now * 0.001;
     }
 
-    if (this.bgStarMat) this.bgStarMat.uniforms.uTime.value = this.fondoMs * 0.001;
-    if (this.bgCellMat) this.bgCellMat.uniforms.uTime.value = this.fondoMs * 0.001;
-    if (this.bgStars) this.bgStars.rotation.y += dt * 0.0000035 * fv;
+    if (this.bgStarMat) this.bgStarMat.uniforms.uTime.value = this.fondoMs * 0.001 * this.FONDO_TIME_BASE;
+    if (this.bgCellMat) this.bgCellMat.uniforms.uTime.value = this.fondoMs * 0.001 * this.FONDO_TIME_BASE;
+    if (this.bgStars) this.bgStars.rotation.y += dt * 0.0000035 * fv * this.FONDO_TIME_BASE;
 
     if (this.neuronMaterials && this.neuronMaterials.length > 0) {
       for (let i = 0; i < this.neuronMaterials.length; i++) {
@@ -2768,8 +2787,6 @@ export class ClusterCosmos3D {
         systemGroup.rotation.y = now * 0.00015 * (idx % 2 === 0 ? 1 : -1);
       });
     }
-
-    this.updateHUD(this.hoveredNode || this.followingNode || this.targetNode);
   }
 
   render() {
@@ -2791,12 +2808,6 @@ export class ClusterCosmos3D {
     this.warpTime = 0;
     this.warpDuration = 1.8;
     soundFX.playActivate();
-
-    const hudTarget = document.getElementById('cluster-hud-target');
-    if (hudTarget) {
-      hudTarget.textContent = 'CÚMULOS SEMÁNTICOS 3D // VISTA PANORÁMICA';
-      hudTarget.style.color = '#ff000d';
-    }
   }
 
   warpToNode(node, isSlowIdle = false) {
@@ -2847,8 +2858,6 @@ export class ClusterCosmos3D {
 
     this._prevPlanetPos.copy(targetPos);
     this._followInitialized = false;
-
-    this.updateHUD(node);
   }
 
   updateDendriticSparks(dt, now) {
@@ -3481,7 +3490,6 @@ export class ClusterCosmos3D {
         soundFX.playHover();
       }
       this.renderer.domElement.style.cursor = 'pointer';
-      this.updateHUD(hitNode);
 
       if (hitNode.mesh && hitNode.mesh.material && hitNode.mesh.material.uniforms && hitNode.mesh.material.uniforms.uHover) {
         hitNode.mesh.material.uniforms.uHover.value = 1.0;
@@ -3493,34 +3501,12 @@ export class ClusterCosmos3D {
         }
         this.hoveredNode = null;
         this.renderer.domElement.style.cursor = 'grab';
-        this.updateHUD(this.targetNode);
       }
     }
   }
 
-  updateHUD(node) {
-    const targetEl = document.getElementById('cluster-hud-target');
-    const coordsEl = document.getElementById('cluster-hud-coords');
-
-    if (coordsEl && this.camera) {
-      coordsEl.textContent = `X: ${Math.round(this.camera.position.x)}  Y: ${Math.round(this.camera.position.y)}  Z: ${Math.round(this.camera.position.z)}`;
-    }
-
-    if (targetEl) {
-      if (node) {
-        if (node.isClusterCenter) {
-          targetEl.textContent = `CÚMULO: ${node.name.toUpperCase()}`;
-          targetEl.style.color = node.color || '#ff000d';
-        } else {
-          targetEl.textContent = `${node.word.toUpperCase()} [${String(node.clusterName || '').toUpperCase()}]`;
-          targetEl.style.color = node.color || '#f7555d';
-        }
-      } else {
-        targetEl.textContent = 'NINGUNO (CLIC PARA ENFOCAR NEURONA)';
-        targetEl.style.color = '#b89496';
-      }
-    }
-  }
+  /* updateHUD() ELIMINADO: alimentaba el contenedor "TELEMETRÍA NODAL"
+     (OBJETIVO / COORDENADAS), que el artista pidió sacar por completo. */
 
   handleResize() {
     if (!this.container || !this.renderer || !this.camera) return;

@@ -93,10 +93,8 @@ body.menu-visible .neural-orders-hud {
 
 /* Doble red: también por el pseudo-clase nativo del fullscreen. */
 #cosmos-clusters-viewport:fullscreen .neural-orders-hud,
-#cosmos-clusters-viewport:fullscreen .cosmos-hud-telemetry,
 #cosmos-clusters-viewport:fullscreen .cosmos-flight-hints,
 #cosmos-clusters-viewport:-webkit-full-screen .neural-orders-hud,
-#cosmos-clusters-viewport:-webkit-full-screen .cosmos-hud-telemetry,
 #cosmos-clusters-viewport:-webkit-full-screen .cosmos-flight-hints {
   display: none !important;
 }
@@ -418,45 +416,9 @@ body.menu-visible .neural-orders-hud {
 }
 
 /* ==========================================================================
-   Telemetría & Controles Inferiores
+   Controles Inferiores (el contenedor TELEMETRÍA NODAL se eliminó a pedido
+   del artista: ya no existe en el DOM ni tiene estilos propios)
    ========================================================================== */
-.cosmos-hud-telemetry {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  background: rgba(24, 6, 7, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 0, 13, 0.25);
-  border-radius: var(--radius-sm);
-  padding: 10px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  z-index: 80;
-  pointer-events: none;
-}
-
-.telemetry-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.tel-label {
-  color: var(--text-dim);
-}
-
-.tel-val {
-  color: #ffffff;
-}
-
-.tel-val.highlight {
-  color: var(--accent-cyan);
-  font-weight: 700;
-}
-
 .cosmos-flight-hints {
   position: absolute;
   bottom: 20px;
@@ -755,21 +717,25 @@ body.menu-visible .neural-orders-hud {
   pointer-events: none !important;
 }
 
-.telemetry-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 0, 13, 0.2);
-  padding-bottom: 4px;
+/* ==========================================================================
+   PARPADEO PROGRAMADO DE LOS PANELES HUD
+   Lo maneja cosmos-clusters.js (PARPADEO): cada panel aparece 10 s, desaparece
+   20 s y vuelve, con una fase distinta por panel para que nunca coincidan. El
+   paso a invisible es un desvanecido suave (1.2 s) y el panel deja de recibir
+   el mouse mientras está oculto.
+   ========================================================================== */
+.alien-nav-hud,
+.semantic-tree-hud,
+.neural-orders-hud {
+  transition: opacity 1.2s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.telemetry-title {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.8px;
-  color: var(--accent-cyan);
-  font-weight: 700;
+.hud-fase-oculto {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
+
+/* (bloque .telemetry-header / .telemetry-title eliminado junto con el
+   contenedor TELEMETRÍA NODAL, a pedido del artista) */
 
 /* ==========================================================================
    MONITOR ALIENÍGENA 2D & GIROSCÓPIO CIBERNÉTICO (Abajo a la izquierda)
