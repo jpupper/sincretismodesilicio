@@ -395,12 +395,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.code === 'KeyF' && !e.ctrlKey && !e.altKey) {
       visualizer.toggleFullscreen();
     }
-    // Tecla 'M' para simular selección de 3 órdenes / esferas
+    // Tecla 'M' para alternar la barra de navegación superior y el HUD de 3 órdenes (Requerimiento 3)
     if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      if (visualizer && typeof visualizer.simulateDemoOrders === 'function') {
-        console.log('[Cosmos] ⚡ Tecla M presionada: Simulando selección de 3 esferas...');
-        visualizer.simulateDemoOrders();
-      }
+      e.preventDefault();
+      const visible = document.body.classList.toggle('menu-visible');
+      console.log(`[Cosmos] ⚡ Tecla M presionada: Menú de navegación y órdenes ${visible ? 'VISIBLES' : 'OCULTOS'}.`);
     }
   });
 });

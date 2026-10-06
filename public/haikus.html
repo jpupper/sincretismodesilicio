@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S·S // ARCHIVO DE HAIKUS</title>
+<link rel="icon" href="favicon.svg">
+<style>
+  :root {
+    --bg: #07070a;
+    --fg: #e8e6e1;
+    --acento: #ff2a3c;
+    --amarillo: #ffe14d;
+    --cian: #4de3ff;
+    --dim: #6b6b76;
+    --panel: rgba(255,255,255,.035);
+    --font: var(--font-cyber, "VT323", "Courier New", monospace);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: var(--font);
+    font-size: 17px;
+    line-height: 1.45;
+    padding: 22px 18px 60px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  header { border-bottom: 1px solid #23232b; padding-bottom: 12px; margin-bottom: 18px; }
+  h1 { font-size: 1.5em; letter-spacing: .12em; margin: 0 0 6px; text-transform: uppercase; }
+  h1 .sil { color: var(--acento); }
+  .sub { color: var(--dim); font-size: .95em; letter-spacing: .06em; }
+  .barra {
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    margin: 14px 0 22px; padding: 10px 12px;
+    background: var(--panel); border: 1px solid #23232b;
+  }
+  .barra b { color: var(--amarillo); font-weight: 400; }
+  .barra a, .barra button {
+    font-family: inherit; font-size: 1em; color: var(--cian);
+    background: none; border: 1px solid #2c2c36; padding: 3px 10px;
+    cursor: pointer; text-decoration: none; letter-spacing: .05em;
+  }
+  .barra a:hover, .barra button:hover { border-color: var(--cian); }
+  .estado { color: var(--dim); font-size: .9em; margin-left: auto; }
+  .vacio { color: var(--dim); padding: 40px 0; text-align: center; letter-spacing: .08em; }
+
+  .haiku {
+    border: 1px solid #1e1e26; border-left: 3px solid var(--acento);
+    padding: 14px 16px; margin-bottom: 14px; background: var(--panel);
+  }
+  .haiku .cab {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-size: .85em; color: var(--dim); margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .haiku .n { color: var(--amarillo); }
+  .haiku .palabras { margin-bottom: 10px; font-size: .95em; }
+  .haiku .palabras .p { color: var(--acento); }
+  .haiku .palabras .flecha { color: var(--dim); }
+  .haiku .palabras .t { color: var(--cian); }
+  .haiku .versos { color: #ffffff; white-space: pre-line; font-size: 1.05em; }
+  footer { color: var(--dim); font-size: .85em; margin-top: 30px; border-top: 1px solid #1a1a21; padding-top: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SINCRETISMO DE <span class="sil">SILICIO</span> · ARCHIVO DE HAIKUS</h1>
+  <div class="sub">todo lo que la máquina escribió, en orden inverso (lo más nuevo arriba)</div>
+</header>
+
+<div class="barra">
+  <span>HAIKUS REGISTRADOS <b id="total">—</b></span>
+  <a href="/api/haikus?format=csv" download>DESCARGAR CSV</a>
+  <button id="btn-refresh" title="También con la tecla R">ACTUALIZAR · R</button>
+  <a href="/log" target="_blank" rel="noopener">CONSOLA · /log</a>
+  <span class="estado" id="estado">cargando…</span>
+</div>
+
+<main id="lista"><div class="vacio">leyendo el archivo…</div></main>
+
+<footer>
+  Fuente: <code>public/data/haikus.csv</code> · API: <code>/api/haikus</code> (opcional <code>?limit=N</code>)
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var lista = document.getElementById('lista');
+  var totalEl = document.getElementById('total');
+  var estadoEl = document.getElementById('estado');
+  var refrescando = false;
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatoFecha(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() +
+           ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  function pintar(datos) {
+    var hks = (datos && datos.haikus) ? datos.haikus : [];
+    totalEl.textContent = (datos && datos.total !== undefined) ? datos.total : hks.length;
+    if (!hks.length) {
+      lista.innerHTML = '<div class="vacio">todavía no hay haikus registrados</div>';
+      return;
+    }
+    var html = '';
+    hks.forEach(function (h, i) {
+      var pares = (h.palabras || []).map(function (w, k) {
+        var t = (h.terminos && h.terminos[k]) ? h.terminos[k] : '';
+        return '<span class="p">' + esc(w).toUpperCase() + '</span>' +
+               (t ? ' <span class="flecha">→</span> <span class="t">' + esc(t).toUpperCase() + '</span>' : '');
+      }).join(' &nbsp;·&nbsp; ');
+      html += '<article class="haiku">' +
+        '<div class="cab"><span class="n">#' + (i + 1) + '</span><span>' + esc(formatoFecha(h.fecha)) + '</span></div>' +
+        '<div class="palabras">' + pares + '</div>' +
+        '<div class="versos">' + esc(h.haiku) + '</div>' +
+        '</article>';
+    });
+    lista.innerHTML = html;
+  }
+
+  function cargar() {
+    if (refrescando) return;
+    refrescando = true;
+    estadoEl.textContent = 'actualizando…';
+    fetch('/api/haikus?ts=' + Date.now())
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (datos) {
+        pintar(datos);
+        var d = new Date();
+        estadoEl.textContent = 'actualizado ' + d.toLocaleTimeString();
+      })
+      .catch(function (e) {
+        estadoEl.textContent = 'error: ' + e.message;
+      })
+      .finally(function () { refrescando = false; });
+  }
+
+  document.getElementById('btn-refresh').addEventListener('click', cargar);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'r' || e.key === 'R') cargar();
+  });
+
+  cargar();
+  setInterval(cargar, 15000);   // se refresca solo cada 15 s (queda lindo en un monitor)
+})();
+</script>
+</body>
+</html>

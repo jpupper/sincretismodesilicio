@@ -524,7 +524,7 @@ body {
   border: none;
   border-radius: 0;
   font-family: var(--word-font-family, var(--font-organic));
-  font-size: var(--word-font-size, 19px);
+  font-size: var(--word-font-size, 24px);
   font-weight: 600;
   letter-spacing: 1px;
   color: var(--word-color, #ffffff);
@@ -613,7 +613,7 @@ body {
   position: fixed !important;
   z-index: 30 !important;
   padding: 8px 24px !important;
-  font-size: var(--word-font-size, 19px) !important;
+  font-size: var(--word-font-size, 24px) !important;
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -633,7 +633,7 @@ body {
   min-width: 280px !important;
   max-width: 85vw !important;
   padding: 14px 36px !important;
-  font-size: var(--word-font-size-center, 52px) !important;
+  font-size: var(--word-font-size-center, 56px) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 700 !important;
   letter-spacing: 4px !important;
@@ -654,7 +654,7 @@ body {
   min-width: 280px !important;
   max-width: 85vw !important;
   padding: 14px 36px !important;
-  font-size: var(--word-font-size-center, 52px) !important;
+  font-size: var(--word-font-size-center, 56px) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 800 !important;
   letter-spacing: 3px !important;
@@ -675,7 +675,7 @@ body {
   transform: none !important;
   margin: 0 0.16em !important;
   padding: 0.08em 0.28em !important;
-  font-size: var(--word-font-size-phrase, 34px) !important;
+  font-size: var(--word-font-size-phrase, 48px) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 800 !important;
   letter-spacing: 1.2px !important;
@@ -699,7 +699,7 @@ body {
   transform: none !important;
   margin: 0 0.12em !important;
   padding: 0.08em 0.20em !important;
-  font-size: calc(var(--word-font-size-phrase, 34px) * 0.92) !important;
+  font-size: calc(var(--word-font-size-phrase, 48px) * 0.92) !important;
   font-family: var(--font-cyber) !important;
   font-weight: 600 !important;
   letter-spacing: 0.8px !important;
@@ -3393,7 +3393,7 @@ textarea {
   font-weight: 800;
   letter-spacing: 1.2px;
   /* Debe medir EXACTAMENTE igual que la palabra real que va a ocupar el hueco */
-  font-size: var(--word-font-size-phrase, 34px);
+  font-size: var(--word-font-size-phrase, 48px);
   white-space: nowrap;
   flex-shrink: 0;
   visibility: hidden;

@@ -28,3 +28,6 @@ public/data/jsons_guardados.json
 
 # Modelos ONNX pesados (superan el limite de 100MB de GitHub)
 public/models/**/*.onnx
+
+# === Datos generados en vivo (haikus de la obra) ===
+public/data/haikus.csv

@@ -73,11 +73,22 @@ html, body {
    telemetría (OBJETIVO / COORDENADAS) y la guía de vuelo. El panel de ajustes (P)
    queda disponible.
    ========================================================================== */
-body.cosmos-pantalla-completa .cosmos-standalone-header,
-body.cosmos-pantalla-completa .neural-orders-hud,
-body.cosmos-pantalla-completa .cosmos-hud-telemetry,
-body.cosmos-pantalla-completa .cosmos-flight-hints {
+/* ==========================================================================
+   NAVEGACIÓN Y HUD DE ÓRDENES OCULTOS POR DEFECTO (REQUERIMIENTO M)
+   Por defecto se mantienen SIEMPRE OCULTOS. Solo se muestran cuando se
+   presiona la tecla 'M' (que añade la clase .menu-visible al <body>).
+   ========================================================================== */
+.cosmos-standalone-header,
+.neural-orders-hud {
   display: none !important;
+}
+
+body.menu-visible .cosmos-standalone-header {
+  display: flex !important;
+}
+
+body.menu-visible .neural-orders-hud {
+  display: flex !important;
 }
 
 /* Doble red: también por el pseudo-clase nativo del fullscreen. */
@@ -812,7 +823,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
   100% { transform: scale(1.25); opacity: 1; }
 }
 .alien-hud-title {
-  font-size: 13.5px !important;
+  font-size: 16px !important;
   font-weight: 700 !important;
   letter-spacing: 0.6px;
   color: var(--accent-cyan);
@@ -836,14 +847,14 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
   text-align: center;
 }
 .vel-box-header {
-  font-size: 13px !important;
+  font-size: 15px !important;
   letter-spacing: 0.8px;
   color: #a8676b;
   font-weight: 700 !important;
   margin-bottom: 3px;
 }
 #label-vec-rot {
-  font-size: 14px !important;
+  font-size: 16px !important;
   color: #dca876;
 }
 .vel-box-canvas {
@@ -853,14 +864,14 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
   border-radius: 2px;
 }
 .vel-box-val {
-  font-size: 14.5px !important;
+  font-size: 17.5px !important;
   color: #00f0ff;
   font-weight: 700 !important;
   margin-top: 3px;
   letter-spacing: 0.4px;
 }
 #val-vel-x {
-  font-size: 15.5px !important;
+  font-size: 18.5px !important;
   font-weight: 900 !important;
 }
 
@@ -875,7 +886,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px !important;
+  font-size: 15px !important;
   color: #ff8f96;
   letter-spacing: 0.6px;
   margin-bottom: 6px;
@@ -884,7 +895,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
 .alien-angle-tags {
   color: #00f0ff;
   font-weight: 700 !important;
-  font-size: 13.5px !important;
+  font-size: 16px !important;
 }
 .alien-gyro-canvas {
   width: 100%;
@@ -944,7 +955,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
 }
 
 .semantic-hud-title {
-  font-size: 11px;
+  font-size: 15px !important;
   font-weight: 700;
   letter-spacing: 0.8px;
   color: var(--gs-acento, #c85a32);
@@ -965,7 +976,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 13px !important;
   letter-spacing: 0.6px;
 }
 
@@ -985,7 +996,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
-  font-size: 9.5px;
+  font-size: 13.5px !important;
 }
 
 .semantic-active-word-row {
@@ -996,13 +1007,13 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
 }
 
 .semantic-active-prefix {
-  font-size: 10.5px;
+  font-size: 14px !important;
   color: var(--gs-texto-dim, #8f634b);
   font-weight: 600;
 }
 
 .semantic-active-word {
-  font-size: 19px;
+  font-size: 25px !important;
   font-weight: 900;
   letter-spacing: 1px;
   color: var(--gs-texto, #edd3be);
@@ -1015,7 +1026,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
 }
 
 .semantic-radar-delta {
-  font-size: 12px;
+  font-size: 15px !important;
   color: var(--gs-acento, #c85a32);
   font-weight: 700;
 }
@@ -1031,7 +1042,7 @@ body.cosmos-pantalla-completa .cosmos-flight-hints {
 }
 
 .semantic-tree-footer {
-  font-size: 9.5px;
+  font-size: 13px !important;
   letter-spacing: 0.8px;
   color: var(--gs-texto-dim, #8f634b);
   text-align: center;

@@ -294,10 +294,9 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
             
             float igniteIntensity = (fillProgress * 0.70 * sizzle + sparkLine * 1.6) * full;
             wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
-            border *= (1.0 + dwell * 0.9);
         }
 
-        wordsEffect.rgb += vec3(border);
+        // Borde exterior eliminado según requerimiento de diseño
         wordsEffect.a = max(wordsEffect.a, full);
     }
     return wordsEffect;
@@ -615,17 +614,12 @@ void main() {
     // Capa D: Integración del contenedor del Haiku detrás de los textos
     fin = mix(fin, haikuBox.rgb, haikuBox.a);
 
-    // Fondo del interior de las cajas de las palabras: patrón RDM del panel
-    // MASTER RDM (u_rdmMix = 1 lo tapa por completo; en 0 queda el grano viejo).
+    // Fondo del interior de las cajas de las palabras: NEGRO PURO según requerimiento
     float wordMask = clamp(wordsq.a, 0.0, 1.0);
-    vec3 wordNoise = mix(getHighFreqNoiseBg(rawUv), getRdmBg(rawUv), u_rdmMix);
-    fin = mix(fin, wordNoise, wordMask);
+    fin = mix(fin, vec3(0.0), wordMask);
 
-    // Borde de las palabras: rojo→oro de siempre, o la paleta global si está activa.
-    vec3 wordQuadFijo = mix(vec3(1.0, 0.05, 0.05), vec3(1.0, 0.65, 0.15), weights.y);
-    vec3 wordQuadPal  = mix(u_palA, u_palB, clamp(weights.y * 0.85 + 0.15, 0.0, 1.0));
-    vec3 wordQuadCol = mix(wordQuadFijo, wordQuadPal, clamp(u_palModo, 0.0, 1.0));
-    fin += wordsq.rgb * wordQuadCol;
+    // Borde de las palabras: ELIMINADO según requerimiento (sin marco exterior)
+    // fin += wordsq.rgb * wordQuadCol;
 
     // Tinte y efectos sutiles de estado (sólo fuera de cajas de haiku y palabras)
     float maskTotal = max(haikuBox.a, wordMask);

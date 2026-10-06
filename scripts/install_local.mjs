@@ -169,7 +169,11 @@ async function ollama() {
 // --------------------------------------------------------- 7) JP SHADER EDITOR
 async function editor() {
   H('JP Shader Editor LOCAL (fondo de nodos, puerto 3250)');
-  const DIR = 'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor';
+  const DIR = process.env.JP_SHADER_DIR || [
+    path.join(ROOT, '..', 'sistemasfullscreen', 'jpshadereditor'),
+    'C:/jpupper/programacion/sistemasfullscreen/jpshadereditor',
+    'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor'
+  ].find(exists) || path.join(ROOT, '..', 'sistemasfullscreen', 'jpshadereditor');
   let data;
   try {
     const r = await fetch('http://localhost:3250/jpshadereditor/api/shaders', { signal: AbortSignal.timeout(8000) });

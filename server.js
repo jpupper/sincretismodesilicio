@@ -22,6 +22,108 @@ app.use((err, req, res, next) => {
 });
 
 const publicPath = path.join(__dirname, 'public');
+
+/* Manda un HTML SIN CACHE. El kiosco tiene que recibir SIEMPRE la ultima version:
+   con "public, max-age=0" el navegador revalida, pero una pestana ya abierta se
+   queda con el DOM viejo (asi se vio un layout anterior). */
+function enviarHtml(res, archivo) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(publicPath, archivo), { cacheControl: false });
+}
+
+/* ============================================================================
+   REGISTRO DE HAIKUS EN CSV  (pedido 2026-10-05)
+   ----------------------------------------------------------------------------
+   Cada haiku terminado (el mensaje game3:words_sequence con coldWords + phrase que
+   el nucleo manda al bus) se apila en public/data/haikus.csv:
+       fecha, palabras_originales, terminos_frios, haiku
+   Lo sirve /api/haikus (JSON o ?format=csv) y lo usan la pagina /haikus y log.html
+   para mostrar los ultimos 5 haikus.
+   ============================================================================ */
+const haikusCsvPath = path.join(publicPath, 'data', 'haikus.csv');
+const HAIKUS_CSV_HEADER = 'fecha,palabras_originales,terminos_frios,haiku';
+
+function csvCampo(valor) {
+  return '"' + String(valor === null || valor === undefined ? '' : valor).replace(/"/g, '""') + '"';
+}
+
+// Parser CSV minimo pero correcto: respeta comillas y saltos de linea DENTRO de un campo.
+function csvParsear(texto) {
+  const filas = [];
+  let fila = [], campo = '', comillas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (comillas) {
+      if (c === '"') {
+        if (texto[i + 1] === '"') { campo += '"'; i++; } else comillas = false;
+      } else campo += c;
+    } else if (c === '"') {
+      comillas = true;
+    } else if (c === ',') {
+      fila.push(campo); campo = '';
+    } else if (c === '\n') {
+      fila.push(campo); campo = '';
+      if (fila.some((v) => v !== '')) filas.push(fila);
+      fila = [];
+    } else if (c === '\r') {
+      /* CR: se ignora */
+    } else campo += c;
+  }
+  if (campo !== '' || fila.length) { fila.push(campo); if (fila.some((v) => v !== '')) filas.push(fila); }
+  return filas;
+}
+
+let ultimoHaikuCsv = { firma: '', ts: 0 };
+
+function registrarHaiku(payload) {
+  try {
+    const palabras = Array.isArray(payload.words) ? payload.words.map((w) => String(w)) : [];
+    const terminos = Array.isArray(payload.coldWords) ? payload.coldWords.map((w) => String(w)) : [];
+    const haiku = String(payload.phrase || '');
+    if (!haiku.trim() || !terminos.length) return;
+    const firma = palabras.join('|') + '::' + haiku;
+    const ahora = Date.now();
+    // El nucleo puede emitir el mismo haiku dos veces (camino normal + respaldo):
+    if (firma === ultimoHaikuCsv.firma && ahora - ultimoHaikuCsv.ts < 8000) return;
+    ultimoHaikuCsv = { firma, ts: ahora };
+    fs.mkdirSync(path.dirname(haikusCsvPath), { recursive: true });
+    if (!fs.existsSync(haikusCsvPath) || fs.statSync(haikusCsvPath).size === 0) {
+      fs.writeFileSync(haikusCsvPath, HAIKUS_CSV_HEADER + '\n', 'utf-8');
+    }
+    const fecha = new Date(payload.timestamp || ahora).toISOString();
+    const linea = [fecha, csvCampo(palabras.join(' | ')), csvCampo(terminos.join(' | ')), csvCampo(haiku)].join(',') + '\n';
+    fs.appendFileSync(haikusCsvPath, linea, 'utf-8');
+    console.log('[Haikus CSV] guardado: ' + palabras.join(' / '));
+  } catch (e) {
+    console.warn('[Haikus CSV] no pude guardar:', e.message);
+  }
+}
+
+function leerHaikus(limite) {
+  try {
+    if (!fs.existsSync(haikusCsvPath)) return [];
+    const filas = csvParsear(fs.readFileSync(haikusCsvPath, 'utf-8'));
+    const datos = [];
+    for (let i = 1; i < filas.length; i++) {          // fila 0 = cabecera
+      const f = filas[i];
+      if (!f || !f.length) continue;
+      datos.push({
+        fecha: f[0] || '',
+        palabras: (f[1] || '').split(' | ').filter(Boolean),
+        terminos: (f[2] || '').split(' | ').filter(Boolean),
+        haiku: f[3] || ''
+      });
+    }
+    datos.reverse();                                  // mas reciente primero
+    const n = Number(limite);
+    return (n > 0) ? datos.slice(0, n) : datos;
+  } catch (e) {
+    console.warn('[Haikus CSV] no pude leer:', e.message);
+    return [];
+  }
+}
 const configFilePath = path.join(publicPath, 'data', 'game_config.json');
 const clustersFilePath = path.join(publicPath, 'data', 'user_clusters.json');
 const monitoresPath = path.join(__dirname, 'monitores.json');
@@ -315,7 +417,7 @@ app.post('/api/clusters', (req, res) => {
 
 // CAMBIAPALABRAS (ex game3): la app de secuestro cibernético
 app.get(['/cambiapalabras', '/cambiapalabras.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'cambiapalabras.html'));
+  enviarHtml(res, 'cambiapalabras.html');
 });
 
 // Compatibilidad: los links viejos a /game3 redirigen a cambiapalabras.html
@@ -326,21 +428,41 @@ app.get(['/game3', '/game3.html', '/hijack', '/cyber-hijack'], (req, res) => {
 app.use('/game3/', (req, res) => res.redirect(301, '/cambiapalabras.html'));
 
 app.get(['/game2', '/game2.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'game2.html'));
+  enviarHtml(res, 'game2.html');
 });
 
 app.get(['/game', '/game.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'game.html'));
+  enviarHtml(res, 'game.html');
 });
 
 // Consola de telemetría / logs ficticios del agente (sincronizada por WebSocket)
 app.get(['/console', '/console.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'console.html'));
+  enviarHtml(res, 'console.html');
 });
 
 // Log de sucesos puro (solo stream, sin mapa ni paneles) — sincronizado por WebSocket
 app.get(['/log', '/log.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'log.html'));
+  enviarHtml(res, 'log.html');
+});
+
+// INDICE DE HAIKUS: pagina que lista todos los haikus generados (pedido 2026-10-05)
+app.get(['/haikus', '/haikus.html'], (req, res) => {
+  enviarHtml(res, 'haikus.html');
+});
+
+// API: HAIKUS -----------------------------------------------------------------
+// Lo que hay en public/data/haikus.csv. ?limit=N devuelve los N mas nuevos;
+// ?format=csv baja el archivo crudo.
+app.get('/api/haikus', (req, res) => {
+  const formato = String(req.query.format || '').toLowerCase();
+  if (formato === 'csv') {
+    const cuerpo = fs.existsSync(haikusCsvPath) ? fs.readFileSync(haikusCsvPath, 'utf-8') : (HAIKUS_CSV_HEADER + '\n');
+    res.setHeader('Content-Disposition', 'attachment; filename="haikus.csv"');
+    return res.type('text/csv').send(cuerpo);
+  }
+  const haikus = leerHaikus(req.query.limit);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ total: leerHaikus(0).length, mostrados: haikus.length, haikus });
 });
 
 // Universo 3D por Cúmulos (Neuronas & Sinapsis standalone)
@@ -443,15 +565,15 @@ app.get('/api/jsons-guardados', (req, res) => {
 });
 
 app.get(['/jsons', '/jsons.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'jsons.html'));
+  enviarHtml(res, 'jsons.html');
 });
 
 app.get(['/globalstyle', '/globalstyle.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'globalstyle.html'));
+  enviarHtml(res, 'globalstyle.html');
 });
 
 app.get(['/cosmos-clusters', '/cosmos-clusters.html', '/clusters3d', '/cosmos3d'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'cosmos-clusters.html'));
+  enviarHtml(res, 'cosmos-clusters.html');
 });
 
 // ============================================================================
@@ -603,7 +725,7 @@ app.post('/config', (req, res) => {
 // API: ASIGNACION DE MONITORES (panel de admin + arranque de 3 monitores)
 // ============================================================================
 app.get(['/admin', '/admin.html'], (req, res) => {
-  res.sendFile(path.join(publicPath, 'admin.html'));
+  enviarHtml(res, 'admin.html');
 });
 
 app.get('/api/monitors', (req, res) => {
@@ -1023,7 +1145,26 @@ app.post('/api/ollama/generate', async (req, res) => {
 // Permite que cambiapalabras cargue include.js, webglrenderer.js, jp-node-graph.js
 // y resuelva planes de renderizado hacia el backend del VPS sin errores de CORS ni bloqueos
 // ============================================================================
-const JP_SHADER_DIR = 'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor';
+// Ruta del editor local. El repo vive en 'sistemasfullscreen/jpshadereditor', hermano de
+// sincretismodesilicio, pero la unidad/ruta cambió (antes D:\Programacion, ahora
+// C:\jpupper\programacion): se prueban candidatos y manda JP_SHADER_DIR si está definido.
+const JP_SHADER_CANDIDATES = [
+  process.env.JP_SHADER_DIR,
+  path.resolve(__dirname, '..', 'sistemasfullscreen', 'jpshadereditor'),
+  path.resolve(__dirname, '..', 'sistemasfullscreen', 'jpshaderszone', 'jpshadereditor'),
+  'C:/jpupper/programacion/sistemasfullscreen/jpshadereditor',
+  'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor'
+].filter(Boolean);
+const JP_SHADER_DIR = JP_SHADER_CANDIDATES.find(
+  (p) => fs.existsSync(path.join(p, 'public', 'js', 'lib', 'jp-node-graph.js'))
+) || JP_SHADER_CANDIDATES[0];
+if (!fs.existsSync(JP_SHADER_DIR)) {
+  console.warn('[JPShaderEditor] No encuentro el editor local; /jpshadereditor/* dará 404.');
+  console.warn('[JPShaderEditor] Rutas probadas: ' + JP_SHADER_CANDIDATES.join(' | '));
+  console.warn('[JPShaderEditor] Define JP_SHADER_DIR=<ruta al jpshadereditor> para forzarla.');
+} else {
+  console.log('[JPShaderEditor] Sirviendo engine local desde: ' + JP_SHADER_DIR);
+}
 // 100% LOCAL: el engine de nodos sale del jpshadereditor LOCAL (puerto 3250),
 // no del VPS. Configurable por si el editor corre en otro host/puerto.
 const JP_EDITOR_ORIGIN = process.env.JP_EDITOR_ORIGIN || 'http://localhost:3250';
@@ -1113,6 +1254,13 @@ app.use(express.static(publicPath, {
     if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     }
+    // El HTML NUNCA se cachea: el kiosco tiene que ver siempre la ultima version
+    // (una copia vieja en el navegador fue la que mostro el layout anterior).
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
   }
 }));
 
@@ -1120,7 +1268,7 @@ app.use((req, res) => {
   if (path.extname(req.path)) {
     return res.status(404).type('text/plain').send(`Recurso no encontrado: ${req.path}`);
   }
-  res.sendFile(path.join(publicPath, 'index.html'));
+  enviarHtml(res, 'index.html');
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
@@ -1187,6 +1335,13 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (message) => {
     try {
       const parsed = JSON.parse(message.toString());
+
+      // HAIKU TERMINADO -> al CSV (pedido 2026-10-05). Es el mismo mensaje que hace
+      // que log.html muestre el haiku: palabras humanas + terminos frios + la frase.
+      if (parsed.type === 'game3:words_sequence' && Array.isArray(parsed.coldWords) && parsed.coldWords.length && parsed.phrase) {
+        registrarHaiku(parsed);
+      }
+
       if (parsed.type === 'globalstyle:update' && parsed.config) {
         try {
           fs.writeFileSync(globalStylePath, JSON.stringify(parsed.config, null, 2), 'utf-8');

@@ -19,8 +19,16 @@ REM  Este .bat es el que corre en el arranque de Windows.
 REM  Para levantarlo a mano: doble clic.  Salir: cerrar las ventanas.
 REM =====================================================================
 
-set "SINC=D:\Programacion\sincretismodesilicio\sincretismodesilicio"
-set "JPSE=D:\Programacion\sistemasfullscreen\jpshaderszone\jpshadereditor"
+REM  Rutas: primero relativas al propio .bat (instalacion_arranque esta dentro del
+REM  repo), y si no, los layouts absolutos conocidos (antiguo D:\Programacion y
+REM  actual C:\jpupper\programacion).
+set "SINC=%~dp0.."
+set "JPSE=%~dp0..\..\sistemasfullscreen\jpshadereditor"
+if not exist "%SINC%\server.js" set "SINC=C:\jpupper\programacion\sincretismodesilicio"
+if not exist "%SINC%\server.js" set "SINC=D:\Programacion\sincretismodesilicio\sincretismodesilicio"
+if not exist "%JPSE%\server.js" set "JPSE=%~dp0..\..\sistemasfullscreen\jpshaderszone\jpshadereditor"
+if not exist "%JPSE%\server.js" set "JPSE=C:\jpupper\programacion\sistemasfullscreen\jpshadereditor"
+if not exist "%JPSE%\server.js" set "JPSE=D:\Programacion\sistemasfullscreen\jpshaderszone\jpshadereditor"
 set "PS1=%~dp0abrir_3_monitores.ps1"
 
 if not exist "%SINC%\server.js" (

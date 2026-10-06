@@ -371,14 +371,6 @@ const DEFAULT_WORDS_POOL = [
   "Anónimo",
   "Ciberperson",
   "Cyborgs",
-  "transexual",
-  "pansexual",
-  "bisexual",
-  "lesbiana",
-  "homosexual",
-  "gay",
-  "LGBT",
-  "lgtbyq",
   "placer",
   "poliamor",
   "poliamoroso",
@@ -541,6 +533,16 @@ const IDLE_CTA_CAMERA_MOVE_PX = 26;     // movimiento mínimo para contar en cá
 // Cada uno prende y apaga SOLO, con tiempos aleatorios entre MIN y MAX segundos
 // (apagado X s -> prendido Y s -> apagado Z s ...). Con 5/30 el ritmo es "vivo":
 // aparece, te muestra los datos y se va.
+// ============================================================================
+// PEDIDO 2026-10-05: la CAMARA RGB (dentro de la silueta), la SILUETA y el
+// esqueleto OPENPOSE tienen que verse SIEMPRE. Con esto en true se ignoran el
+// switch del panel RENDER y el parpadeo aleatorio de los monitores PiP: la
+// mascarilla del cuerpo queda en 1, u_camVis en 1 (camara RGB pura) y las
+// texturas de depth/openpose se suben siempre que haya humano detectado.
+// Poner en false = comportamiento viejo (todo gobernado por los switches).
+// ============================================================================
+const FORZAR_CAMARA_SILUETA_OPENPOSE = true;
+
 const PIP_RANDOM_MIN_S = 5;
 const PIP_RANDOM_MAX_S = 30;
 
@@ -790,13 +792,18 @@ const appState = {
   targetCursorX: window.innerWidth / 2,
   targetCursorY: window.innerHeight / 2,
   cursorActive: true,
+  isMouseDown: false, // Puntero sólo visible y activo al hacer clic/mantener apretado
 
-  // MediaPipe
+  // MediaPipe & Tracking Multijugador (Hasta 2 personas simultáneas)
   poseInstance: null,
   cameraReady: false,
   landmarkConfidence: 0,
   hasHuman: false,
   lastHumanSeenTimestamp: 0,
+  players: [], // Array con [{ id: 1, landmarks: [...] }, { id: 2, landmarks: [...] }]
+  playerSlots: [null, null], // Slots temporales para inferencia por ROI alternada
+  currentInferenceSlot: 0,
+  pipPlayerAssign: { face: 0, leftHand: 0, rightHand: 1 }, // Asignación dinámica de monitores a Jugador 1 o 2
 
   // Shader ASCII
   asciiShader: null,
@@ -823,7 +830,7 @@ const appState = {
   // Motor de Partículas & Palabras Orgánicas (Pestaña PARTÍCULAS)
   particlesConfig: {
     fontFamily: 'share-tech',
-    fontSize: 16,
+    fontSize: 24,
     color: '#ffffff',
     outline: 1.5,
     outlineGlow: false,
@@ -831,8 +838,8 @@ const appState = {
     maxWords: 9,
     speed: 1.0,
     maxSpeed: 2.0,
-    fontSizeCenter: 44,
-    fontSizePhrase: 34
+    fontSizeCenter: 56,
+    fontSizePhrase: 48
   },
 
   // Sistema de Física y Colisiones de Palabras (Pestaña FÍSICAS & COLISIÓN)
@@ -925,7 +932,7 @@ const appState = {
     // Monitores PiP de MANOS: recorte de la cámara sobre la muñeca 15 (izq) / 16 (der)
     showLeftHand: false,
     showRightHand: false,
-    handZoom: 2.6,
+    handZoom: 1.6,
     frameDifference: false, // REQUERIMIENTO 2: Capa FRAME DIFFERENCE de análisis óptico en GPU
     frameDiffLimit: 0.08,   // Umbral de sensibilidad (limit)
     frameDiffForce: 0.85,   // Fuerza del buffer de feedback (force)
@@ -1004,7 +1011,7 @@ const appState = {
     asciiOpacity: 0.92,
     frameDiffEnabled: false,
     frameDiffOpacity: 0.88,
-    openposeEnabled: false,
+    openposeEnabled: true,
     openposeOpacity: 1.0,
     flowfieldEnabled: false,
     flowfieldOpacity: 1.0,
@@ -1022,7 +1029,7 @@ const appState = {
     noiseScale: 2.0,
     corpParticlesEnabled: false,
     corpParticlesOpacity: 0.0,
-    cutoutEnabled: false,
+    cutoutEnabled: true,
     cutoutThreshold: 0.28
   },
 
@@ -1948,10 +1955,9 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
             
             float igniteIntensity = (fillProgress * 0.70 * sizzle + sparkLine * 1.6) * full;
             wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
-            border *= (1.0 + dwell * 0.9);
         }
 
-        wordsEffect.rgb += vec3(border);
+        // Borde exterior eliminado según requerimiento de diseño
         wordsEffect.a = max(wordsEffect.a, full);
     }
     return wordsEffect;
@@ -2266,17 +2272,12 @@ void main() {
     // Capa D: Integración del contenedor del Haiku detrás de los textos
     fin = mix(fin, haikuBox.rgb, haikuBox.a);
 
-    // Fondo del interior de las cajas de las palabras: patrón RDM del panel
-    // MASTER RDM (u_rdmMix = 1 lo tapa por completo; en 0 queda el grano viejo).
+    // Fondo del interior de las cajas de las palabras: NEGRO PURO según requerimiento
     float wordMask = clamp(wordsq.a, 0.0, 1.0);
-    vec3 wordNoise = mix(getHighFreqNoiseBg(rawUv), getRdmBg(rawUv), u_rdmMix);
-    fin = mix(fin, wordNoise, wordMask);
+    fin = mix(fin, vec3(0.0), wordMask);
 
-    // Borde de las palabras: rojo→oro de siempre, o la paleta global si está activa.
-    vec3 wordQuadFijo = mix(vec3(1.0, 0.05, 0.05), vec3(1.0, 0.65, 0.15), weights.y);
-    vec3 wordQuadPal  = mix(u_palA, u_palB, clamp(weights.y * 0.85 + 0.15, 0.0, 1.0));
-    vec3 wordQuadCol = mix(wordQuadFijo, wordQuadPal, clamp(u_palModo, 0.0, 1.0));
-    fin += wordsq.rgb * wordQuadCol;
+    // Borde de las palabras: ELIMINADO según requerimiento (sin marco exterior)
+    // fin += wordsq.rgb * wordQuadCol;
 
     // Tinte y efectos sutiles de estado (sólo fuera de cajas de haiku y palabras)
     float maskTotal = max(haikuBox.a, wordMask);
@@ -2490,7 +2491,7 @@ void main() {
 
     // 2) Depth Map (Texture 1) — SOLO subir textura si hay humano captado
     const depthCanvas = DOM.depthCanvas || (appState.asciiShader && appState.asciiShader.lastMaskSource);
-    const hasDepthActual = Boolean(depthCanvas && layers.cutoutEnabled !== false && appState.hasHuman);
+    const hasDepthActual = Boolean(depthCanvas && appState.hasHuman && (FORZAR_CAMARA_SILUETA_OPENPOSE || layers.cutoutEnabled !== false));
     if (hasDepthActual) {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.depthTexture);
@@ -2508,7 +2509,7 @@ void main() {
 
     // 3) OpenPose (Texture 2) — SOLO si hay humano presente
     const openposeCanvas = DOM.openposeCanvas;
-    const isPoseEnabled = Boolean(openposeCanvas && openposeCanvas.width > 0 && (layers.openposeEnabled || appState.trackingConfig.showOpenPose) && appState.hasHuman);
+    const isPoseEnabled = Boolean(openposeCanvas && openposeCanvas.width > 0 && appState.hasHuman && (FORZAR_CAMARA_SILUETA_OPENPOSE || layers.openposeEnabled || appState.trackingConfig.showOpenPose));
     if (isPoseEnabled) {
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, this.openposeTexture);
@@ -2745,9 +2746,25 @@ void main() {
     const mezclaAuto = appState._maskCamLerp > 0.5
       ? Math.min(1, baseCam + (1 - baseCam) * 0.65)
       : baseCam * 0.35;
-    const finalMaskOn = appState.hasHuman ? (auto * appState._maskLerp + (1 - auto) * manualOn) : 0.0;
+    // FORZADO (pedido): la mascarilla del cuerpo queda SIEMPRE encendida mientras
+    // haya humano (sin el parpadeo del ciclo PiP) y su relleno es la CAMARA RGB pura.
+    const finalMaskOn = !appState.hasHuman
+      ? 0.0
+      : (FORZAR_CAMARA_SILUETA_OPENPOSE ? 1.0 : (auto * appState._maskLerp + (1 - auto) * manualOn));
+    const camVisFinal = (FORZAR_CAMARA_SILUETA_OPENPOSE && appState.hasHuman)
+      ? 1.0
+      : (auto * mezclaAuto + (1 - auto) * baseCam);
     if (this.uniforms.maskOn) gl.uniform1f(this.uniforms.maskOn, finalMaskOn);
-    if (this.uniforms.camVis) gl.uniform1f(this.uniforms.camVis, auto * mezclaAuto + (1 - auto) * baseCam);
+    if (this.uniforms.camVis) gl.uniform1f(this.uniforms.camVis, camVisFinal);
+    // Diagnostico: estado real de las 3 capas (maximo 1 linea por segundo y solo si cambia).
+    if (window.__SS_DEBUG_CAPAS !== false) {
+      const _st = [appState.hasHuman ? 1 : 0, hasDepthActual ? 1 : 0, isPoseEnabled ? 1 : 0, finalMaskOn.toFixed(2), camVisFinal.toFixed(2)].join('|');
+      if (appState._capasDebug !== _st && (performance.now() - (appState._capasDebugTs || 0)) > 1000) {
+        appState._capasDebug = _st;
+        appState._capasDebugTs = performance.now();
+        console.log('[Master Capas] humano=' + (appState.hasHuman ? 'SI' : 'NO') + ' depth=' + (hasDepthActual ? 'SI' : 'NO') + ' openpose=' + (isPoseEnabled ? 'SI' : 'NO') + ' mascara=' + finalMaskOn.toFixed(2) + ' camaraRGB=' + camVisFinal.toFixed(2));
+      }
+    }
     aplicarTintePaletaPips(pal, rdmParams);
 
     const elapsed = (performance.now() - this.startTime) / 1000;
@@ -4592,12 +4609,254 @@ function updateHandGestures(landmarks) {
 
 // ============================================================================
 // SISTEMA 1: RENDER DE SUPERPOSICIÓN OPENPOSE (CANVAS OVERLAY FULLSCREEN)
-// REQUERIMIENTO: Conexiones cinemáticas no lineales (contracción y tensión dinámica)
+// REQUERIMIENTO: Conexiones cinemáticas no lineales y soporte MULTIJUGADOR (2 personas)
 // ============================================================================
+function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, boneWidth, ptRadius, shouldDrawBones, shouldDrawLandmarks, now) {
+  if (!landmarks || landmarks.length === 0) return;
+
+  appState.playerSmoothing = appState.playerSmoothing || {};
+  const pKey = 'p' + (playerIndex + 1);
+  if (!appState.playerSmoothing[pKey]) {
+    appState.playerSmoothing[pKey] = { suave: null, speeds: null, prev: null };
+  }
+  const smObj = appState.playerSmoothing[pKey];
+
+  const OPENPOSE_SUAVIZADO = 0.35;
+  if (!smObj.suave || smObj.suave.length !== landmarks.length) {
+    smObj.suave = landmarks.map((l) => ({
+      x: l.x, y: l.y, visibility: (l.visibility !== undefined ? l.visibility : 1)
+    }));
+  } else {
+    for (let i = 0; i < landmarks.length; i++) {
+      const l = landmarks[i], sm = smObj.suave[i];
+      sm.x += (l.x - sm.x) * OPENPOSE_SUAVIZADO;
+      sm.y += (l.y - sm.y) * OPENPOSE_SUAVIZADO;
+      sm.visibility = (l.visibility !== undefined ? l.visibility : 1);
+    }
+  }
+  const suaves = smObj.suave;
+
+  if (!smObj.speeds || smObj.speeds.length !== suaves.length) {
+    smObj.speeds = new Float32Array(suaves.length);
+    smObj.prev = suaves.map(s => ({ x: (1.0 - s.x) * w, y: s.y * h }));
+  }
+
+  for (let i = 0; i < suaves.length; i++) {
+    const curX = (1.0 - suaves[i].x) * w;
+    const curY = suaves[i].y * h;
+    const prev = smObj.prev[i];
+    const dx = curX - prev.x;
+    const dy = curY - prev.y;
+    const distDelta = Math.hypot(dx, dy);
+    smObj.speeds[i] += (distDelta - smObj.speeds[i]) * 0.28;
+    prev.x = curX;
+    prev.y = curY;
+  }
+
+  const isP2 = (playerIndex === 1);
+  const p2ThemeColor = '#ff007f';
+
+  // Graficar Articulaciones / Huesos con Dinámica de Curvatura y Contracción
+  if (shouldDrawBones) {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (let i = 0; i < POSE_CONNECTIONS.length; i++) {
+      const conn = POSE_CONNECTIONS[i];
+      const p1 = suaves[conn.from];
+      const p2 = suaves[conn.to];
+      if (!p1 || !p2) continue;
+
+      const conf1 = p1.visibility !== undefined ? p1.visibility : 1.0;
+      const conf2 = p2.visibility !== undefined ? p2.visibility : 1.0;
+
+      if (conf1 >= minConf && conf2 >= minConf) {
+        const x1 = (1.0 - p1.x) * w;
+        const y1 = p1.y * h;
+        const x2 = (1.0 - p2.x) * w;
+        const y2 = p2.y * h;
+
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len = Math.hypot(dx, dy);
+        if (len < 2.0) continue;
+
+        const speed1 = smObj.speeds[conn.from] || 0;
+        const speed2 = smObj.speeds[conn.to] || 0;
+        const avgSpeed = (speed1 + speed2) * 0.5;
+        const k = Math.min(1.0, Math.max(0.0, avgSpeed / 12.0));
+
+        const ux = dx / len;
+        const uy = dy / len;
+        const nx = -uy;
+        const ny = ux;
+
+        const maxSag = Math.min(18.0, len * 0.13);
+        const sag = maxSag * (1.0 - k);
+
+        let curveSign = 1.0;
+        if (conn.group === 'left_arm' || conn.group === 'left_leg') {
+          curveSign = -1.0;
+        } else if (conn.group === 'right_arm' || conn.group === 'right_leg') {
+          curveSign = 1.0;
+        } else {
+          curveSign = (i % 2 === 0) ? 1.0 : -1.0;
+        }
+
+        const breath = 1.0 + 0.12 * Math.sin(now * 0.0022 + i * 0.7);
+        const currentSag = sag * breath * curveSign;
+
+        const contractRatio = Math.min(0.24, 0.035 + k * 0.18);
+        const c1x = x1 + ux * (len * contractRatio);
+        const c1y = y1 + uy * (len * contractRatio);
+        const c2x = x2 - ux * (len * contractRatio);
+        const c2y = y2 - uy * (len * contractRatio);
+
+        const col = isP2 ? p2ThemeColor : getBoneColor(conn.group, theme);
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = rgbaDesdeHex(col, 0.42);
+        ctx.lineWidth = Math.max(0.25, boneWidth * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(c1x, c1y);
+        ctx.moveTo(c2x, c2y);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        const activeWidth = Math.max(boneWidth, boneWidth * (1.0 + k * 0.7));
+        ctx.strokeStyle = col;
+        ctx.lineWidth = activeWidth;
+
+        ctx.beginPath();
+        ctx.moveTo(c1x, c1y);
+        if (Math.abs(currentSag) > 0.4) {
+          const midX = (c1x + c2x) * 0.5 + nx * currentSag;
+          const midY = (c1y + c2y) * 0.5 + ny * currentSag;
+          ctx.quadraticCurveTo(midX, midY, c2x, c2y);
+        } else {
+          ctx.lineTo(c2x, c2y);
+        }
+        ctx.stroke();
+
+        if (k > 0.28) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.42 * k) + ')';
+          ctx.lineWidth = Math.max(0.25, activeWidth * 0.35);
+          ctx.beginPath();
+          ctx.moveTo(c1x, c1y);
+          if (Math.abs(currentSag) > 0.4) {
+            const midX = (c1x + c2x) * 0.5 + nx * currentSag;
+            const midY = (c1y + c2y) * 0.5 + ny * currentSag;
+            ctx.quadraticCurveTo(midX, midY, c2x, c2y);
+          } else {
+            ctx.lineTo(c2x, c2y);
+          }
+          ctx.stroke();
+        }
+
+        if (k > 0.15) {
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(c1x, c1y, Math.max(0.6, boneWidth * 0.8), 0, Math.PI * 2);
+          ctx.arc(c2x, c2y, Math.max(0.6, boneWidth * 0.8), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  // Graficar Puntos del Cuerpo (Landmarks) y Balizas de Manos
+  if (shouldDrawLandmarks) {
+    for (let i = 0; i < suaves.length; i++) {
+      const lm = suaves[i];
+      const conf = lm.visibility !== undefined ? lm.visibility : 1.0;
+      if (conf < minConf) continue;
+
+      const x = (1.0 - lm.x) * w;
+      const y = lm.y * h;
+
+      const isAnchor = (i === 0 || i === 15 || i === 16);
+      const isLeftWrist = (i === 15);
+      const isRightWrist = (i === 16);
+      const isHandWrist = isLeftWrist || isRightWrist;
+
+      ctx.shadowBlur = 0;
+
+      let ptFill = isP2 ? '#ff007f' : '#ffffff';
+      if (isHandWrist && appState.handGestures) {
+        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
+        const closure = hand ? hand.closure : 0;
+        ptFill = isP2 ? '#ff007f' : getHandMorphColor(closure, false);
+      } else if (i === 0) {
+        ptFill = isP2 ? '#ffb700' : '#ff0055';
+      } else if (theme === 'phosphor' && !isP2) {
+        ptFill = '#00ff41';
+      }
+
+      ctx.beginPath();
+      ctx.arc(x, y, isAnchor ? ptRadius + 1.5 : ptRadius, 0, Math.PI * 2);
+      ctx.fillStyle = ptFill;
+      ctx.fill();
+
+      // Indicador de Jugador [J1] / [J2] sobre la cabeza
+      if (i === 0) {
+        ctx.font = 'bold 11px "Share Tech Mono", monospace';
+        ctx.fillStyle = isP2 ? '#ff007f' : '#00f0ff';
+        ctx.shadowColor = isP2 ? '#ff007f' : '#00f0ff';
+        ctx.shadowBlur = 6;
+        ctx.fillText(`[J${playerIndex + 1}]`, x - 12, y - 18);
+        ctx.shadowBlur = 0;
+
+        ctx.beginPath();
+        ctx.arc(x, y, ptRadius + 3.5, 0, Math.PI * 2);
+        ctx.strokeStyle = isP2 ? 'rgba(255, 0, 127, 0.75)' : 'rgba(255, 0, 85, 0.75)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      if (isHandWrist && appState.handGestures) {
+        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
+        const closure = hand ? hand.closure : 0;
+        const grabPulse = hand ? Math.max(0, 1.0 - (now - (hand.lastGrabTime || 0)) / 420) : 0;
+        const morphCol = isP2 ? '#ff007f' : getHandMorphColor(closure, false);
+
+        const beaconRadius = (ptRadius + 4.5) * (1.0 - 0.28 * closure);
+        ctx.beginPath();
+        ctx.arc(x, y, beaconRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = morphCol;
+        ctx.lineWidth = 1.2 + closure * 1.0;
+        ctx.stroke();
+
+        const arcPulse = (now * 0.005) % (Math.PI * 2);
+        const arcSpread = (1.0 - closure) * 0.65;
+        if (arcSpread > 0.08) {
+          for (let a = 0; a < 3; a++) {
+            const ang = arcPulse + (a * Math.PI * 2 / 3);
+            ctx.beginPath();
+            ctx.arc(x, y, beaconRadius + 3.5, ang, ang + arcSpread);
+            ctx.strokeStyle = rgbaDesdeHex(morphCol, 0.75 * (1.0 - closure));
+            ctx.lineWidth = 1.0;
+            ctx.stroke();
+          }
+        }
+
+        if (grabPulse > 0.02) {
+          const shockR = beaconRadius + (1.0 - grabPulse) * 35;
+          ctx.beginPath();
+          ctx.arc(x, y, shockR, 0, Math.PI * 2);
+          ctx.strokeStyle = rgbaDesdeHex('#ff0055', grabPulse * 0.9);
+          ctx.lineWidth = 2.2 * grabPulse;
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
 function renderOpenPoseOverlay(landmarks) {
   const canvas = DOM.openposeCanvas;
   if (!canvas) return;
-  const isEnabled = appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose;
+  const isEnabled = FORZAR_CAMARA_SILUETA_OPENPOSE || appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose;
   if (!isEnabled) {
     if (canvas.style.display !== 'none') canvas.style.display = 'none';
     return;
@@ -4616,267 +4875,21 @@ function renderOpenPoseOverlay(landmarks) {
   const w = canvas.width;
   const h = canvas.height;
 
-  // 4) Esqueleto cinemático OpenPose (Bones & Landmarks)
-  if (!landmarks || landmarks.length === 0) {
-    return;
-  }
-
   const minConf = Math.min(0.2, appState.trackingConfig.minConfidence ?? 0.2);
   const theme = appState.trackingConfig.colorTheme || 'cyberpunk';
   const boneWidth = Math.max(0.25, Number(appState.trackingConfig.boneWidth) || 0.5);
   const ptRadius = Math.max(0.5, Number(appState.trackingConfig.pointRadius) || 0.75);
-
-  const OPENPOSE_SUAVIZADO = 0.35;   // 0 = congelado · 1 = sin suavizado (crudo)
-  if (!appState.openposeSuave || appState.openposeSuave.length !== landmarks.length) {
-    appState.openposeSuave = landmarks.map((l) => ({
-      x: l.x, y: l.y, visibility: (l.visibility !== undefined ? l.visibility : 1)
-    }));
-  } else {
-    for (let i = 0; i < landmarks.length; i++) {
-      const l = landmarks[i], sm = appState.openposeSuave[i];
-      sm.x += (l.x - sm.x) * OPENPOSE_SUAVIZADO;
-      sm.y += (l.y - sm.y) * OPENPOSE_SUAVIZADO;
-      sm.visibility = (l.visibility !== undefined ? l.visibility : 1);
-    }
-  }
-  const suaves = appState.openposeSuave;
   const shouldDrawBones = appState.trackingConfig.drawBones !== false;
   const shouldDrawLandmarks = appState.trackingConfig.drawLandmarks !== false;
-
-  // Buffer de velocidad para contracción y tensión cinemática no lineal
-  if (!appState.openposeSpeeds || appState.openposeSpeeds.length !== suaves.length) {
-    appState.openposeSpeeds = new Float32Array(suaves.length);
-    appState.openposePrev = suaves.map(s => ({ x: (1.0 - s.x) * w, y: s.y * h }));
-  }
-
-  for (let i = 0; i < suaves.length; i++) {
-    const curX = (1.0 - suaves[i].x) * w;
-    const curY = suaves[i].y * h;
-    const prev = appState.openposePrev[i];
-    const dx = curX - prev.x;
-    const dy = curY - prev.y;
-    const distDelta = Math.hypot(dx, dy);
-    // Suavizado exponencial de velocidad (px/frame)
-    appState.openposeSpeeds[i] += (distDelta - appState.openposeSpeeds[i]) * 0.28;
-    prev.x = curX;
-    prev.y = curY;
-  }
-
   const now = performance.now();
 
-  // 4.1) Graficar Articulaciones / Huesos con Dinámica de Curvatura y Contracción
-  if (shouldDrawBones) {
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+  const playersToDraw = (appState.players && appState.players.length > 0)
+    ? appState.players
+    : (landmarks && landmarks.length > 0 ? [{ id: 1, landmarks }] : []);
 
-    for (let i = 0; i < POSE_CONNECTIONS.length; i++) {
-      const conn = POSE_CONNECTIONS[i];
-      const p1 = suaves[conn.from];
-      const p2 = suaves[conn.to];
-      if (!p1 || !p2) continue;
-
-      const conf1 = p1.visibility !== undefined ? p1.visibility : 1.0;
-      const conf2 = p2.visibility !== undefined ? p2.visibility : 1.0;
-
-      if (conf1 >= minConf && conf2 >= minConf) {
-        // Coordenadas espejadas horizontalmente para alinear con el video CCTV
-        const x1 = (1.0 - p1.x) * w;
-        const y1 = p1.y * h;
-        const x2 = (1.0 - p2.x) * w;
-        const y2 = p2.y * h;
-
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const len = Math.hypot(dx, dy);
-        if (len < 2.0) continue;
-
-        // Velocidad cinética promedio de la conexión
-        const speed1 = appState.openposeSpeeds[conn.from] || 0;
-        const speed2 = appState.openposeSpeeds[conn.to] || 0;
-        const avgSpeed = (speed1 + speed2) * 0.5;
-
-        // Factor de movimiento cinético k en [0.0, 1.0] (0 = estático, 1 = movimiento rápido)
-        const k = Math.min(1.0, Math.max(0.0, avgSpeed / 12.0));
-
-        // Vector unitario y normal perpendicular
-        const ux = dx / len;
-        const uy = dy / len;
-        const nx = -uy;
-        const ny = ux;
-
-        // 1) CURVATURA VS RECTITUD EN RELACIÓN AL MOVIMIENTO:
-        // En reposo (k = 0): La conexión tiene una curvatura orgánica para que no quede rígida/lineal.
-        // Con movimiento (k -> 1): Se tensa y se hace completamente recta.
-        const maxSag = Math.min(18.0, len * 0.13);
-        const sag = maxSag * (1.0 - k);
-
-        // Signo anatómico de la curvatura para que flexione de forma natural
-        let curveSign = 1.0;
-        if (conn.group === 'left_arm' || conn.group === 'left_leg') {
-          curveSign = -1.0;
-        } else if (conn.group === 'right_arm' || conn.group === 'right_leg') {
-          curveSign = 1.0;
-        } else {
-          curveSign = (i % 2 === 0) ? 1.0 : -1.0;
-        }
-
-        // Respiración sutil en reposo
-        const breath = 1.0 + 0.12 * Math.sin(now * 0.0022 + i * 0.7);
-        const currentSag = sag * breath * curveSign;
-
-        // 2) CONTRACCIÓN EN RELACIÓN AL MOVIMIENTO:
-        // Al moverse, la masa de la conexión se contrae hacia el centro (como músculo activo)
-        // dejando tendones elásticos en los extremos anclados a las articulaciones.
-        const contractRatio = Math.min(0.24, 0.035 + k * 0.18);
-        const c1x = x1 + ux * (len * contractRatio);
-        const c1y = y1 + uy * (len * contractRatio);
-        const c2x = x2 - ux * (len * contractRatio);
-        const c2y = y2 - uy * (len * contractRatio);
-
-        const col = getBoneColor(conn.group, theme);
-        ctx.shadowBlur = 0;
-
-        // (A) Tendones de anclaje elásticos entre articulación y cuerpo contraído
-        ctx.strokeStyle = rgbaDesdeHex(col, 0.42);
-        ctx.lineWidth = Math.max(0.25, boneWidth * 0.55);
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(c1x, c1y);
-        ctx.moveTo(c2x, c2y);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-
-        // (B) Cuerpo contraído activo (se hace más recto con el movimiento)
-        const activeWidth = Math.max(boneWidth, boneWidth * (1.0 + k * 0.7));
-        ctx.strokeStyle = col;
-        ctx.lineWidth = activeWidth;
-
-        ctx.beginPath();
-        ctx.moveTo(c1x, c1y);
-        if (Math.abs(currentSag) > 0.4) {
-          // Arco cuadrático orgánico cuando está relajado / velocidad baja
-          const midX = (c1x + c2x) * 0.5 + nx * currentSag;
-          const midY = (c1y + c2y) * 0.5 + ny * currentSag;
-          ctx.quadraticCurveTo(midX, midY, c2x, c2y);
-        } else {
-          // Recto y tenso durante movimiento
-          ctx.lineTo(c2x, c2y);
-        }
-        ctx.stroke();
-
-        // (C) Filamento luminoso de tensión cinética cuando hay movimiento
-        if (k > 0.28) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, ' + (0.42 * k) + ')';
-          ctx.lineWidth = Math.max(0.25, activeWidth * 0.35);
-          ctx.beginPath();
-          ctx.moveTo(c1x, c1y);
-          if (Math.abs(currentSag) > 0.4) {
-            const midX = (c1x + c2x) * 0.5 + nx * currentSag;
-            const midY = (c1y + c2y) * 0.5 + ny * currentSag;
-            ctx.quadraticCurveTo(midX, midY, c2x, c2y);
-          } else {
-            ctx.lineTo(c2x, c2y);
-          }
-          ctx.stroke();
-        }
-
-        // (D) Pequeños nodos conectores en la transición tendón-músculo
-        if (k > 0.15) {
-          ctx.fillStyle = col;
-          ctx.beginPath();
-          ctx.arc(c1x, c1y, Math.max(0.6, boneWidth * 0.8), 0, Math.PI * 2);
-          ctx.arc(c2x, c2y, Math.max(0.6, boneWidth * 0.8), 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
+  for (let pi = 0; pi < playersToDraw.length; pi++) {
+    drawSingleSkeleton(ctx, playersToDraw[pi].landmarks, pi, w, h, theme, minConf, boneWidth, ptRadius, shouldDrawBones, shouldDrawLandmarks, now);
   }
-
-  // 4.2) Graficar Puntos del Cuerpo (Landmarks) y Balizas de Manos
-  if (shouldDrawLandmarks) {
-    for (let i = 0; i < suaves.length; i++) {
-      const lm = suaves[i];
-      const conf = lm.visibility !== undefined ? lm.visibility : 1.0;
-      if (conf < minConf) continue;
-
-      const x = (1.0 - lm.x) * w;
-      const y = lm.y * h;
-
-      const isAnchor = (i === 0 || i === 15 || i === 16);
-      const isLeftWrist = (i === 15);
-      const isRightWrist = (i === 16);
-      const isHandWrist = isLeftWrist || isRightWrist;
-
-      ctx.shadowBlur = 0;
-
-      // Render del punto base con interpolación de color según apertura/cierre de la mano
-      let ptFill = '#ffffff';
-      if (isHandWrist && appState.handGestures) {
-        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
-        const closure = hand ? hand.closure : 0;
-        ptFill = getHandMorphColor(closure, false);
-      } else if (i === 0) {
-        ptFill = '#ff0055';
-      } else if (theme === 'phosphor') {
-        ptFill = '#00ff41';
-      }
-
-      ctx.beginPath();
-      ctx.arc(x, y, isAnchor ? ptRadius + 1.5 : ptRadius, 0, Math.PI * 2);
-      ctx.fillStyle = ptFill;
-      ctx.fill();
-
-      // Anillo de fijación en puntos de interacción estándar (nariz)
-      if (isAnchor && !isHandWrist) {
-        ctx.beginPath();
-        ctx.arc(x, y, ptRadius + 3.5, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255, 0, 85, 0.75)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      // Baliza cinemática animada e interpolada en las muñecas / manos
-      if (isHandWrist && appState.handGestures) {
-        const hand = isLeftWrist ? appState.handGestures.left : appState.handGestures.right;
-        const closure = hand ? hand.closure : 0;
-        const grabPulse = hand ? Math.max(0, 1.0 - (now - (hand.lastGrabTime || 0)) / 420) : 0;
-        const morphCol = getHandMorphColor(closure, false);
-
-        // Anillo de agarre animado: se contrae continuamente al cerrar la mano
-        const beaconRadius = (ptRadius + 4.5) * (1.0 - 0.28 * closure);
-        ctx.beginPath();
-        ctx.arc(x, y, beaconRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = morphCol;
-        ctx.lineWidth = 1.2 + closure * 1.0;
-        ctx.stroke();
-
-        // 3 Arcos orbitales que rotan cuando la mano está abierta y se pliegan al cerrarse
-        const arcPulse = (now * 0.005) % (Math.PI * 2);
-        const arcSpread = (1.0 - closure) * 0.65;
-        if (arcSpread > 0.08) {
-          for (let a = 0; a < 3; a++) {
-            const ang = arcPulse + (a * Math.PI * 2 / 3);
-            ctx.beginPath();
-            ctx.arc(x, y, beaconRadius + 3.5, ang, ang + arcSpread);
-            ctx.strokeStyle = rgbaDesdeHex(morphCol, 0.75 * (1.0 - closure));
-            ctx.lineWidth = 1.0;
-            ctx.stroke();
-          }
-        }
-
-        // Onda de choque en el instante del agarre ("al toque")
-        if (grabPulse > 0.02) {
-          const shockR = beaconRadius + (1.0 - grabPulse) * 35;
-          ctx.beginPath();
-          ctx.arc(x, y, shockR, 0, Math.PI * 2);
-          ctx.strokeStyle = rgbaDesdeHex('#ff0055', grabPulse * 0.9);
-          ctx.lineWidth = 2.2 * grabPulse;
-          ctx.stroke();
-        }
-      }
-    }
-  }
-
   ctx.shadowBlur = 0;
 }
 
@@ -5031,6 +5044,31 @@ function renderFaceCamera(landmarks) {
     return;
   }
 
+  // Soporte para 2 jugadores: elegir el jugador asignado a la ventana facial
+  let activeLms = landmarks;
+  const pIdx = (appState.pipPlayerAssign && appState.pipPlayerAssign.face !== undefined)
+    ? appState.pipPlayerAssign.face
+    : 0;
+
+  if (appState.players && appState.players.length > 0) {
+    const pl = appState.players[pIdx] || appState.players[0];
+    if (pl && pl.landmarks && pl.landmarks.length > 0) {
+      activeLms = pl.landmarks;
+    }
+  } else if (!activeLms) {
+    activeLms = appState.lastLandmarks || [];
+  }
+
+  if (DOM.facePipStatus) {
+    DOM.facePipStatus.textContent = (appState.players && appState.players.length > 1)
+      ? `LOCK [J${pIdx + 1}]`
+      : 'LOCK';
+  }
+  const metaSubj = DOM.facePip ? DOM.facePip.querySelector('.meta-row span:last-child') : null;
+  if (metaSubj) {
+    metaSubj.textContent = `HUMANO_0${pIdx + 1}`;
+  }
+
   const canvas = DOM.faceCanvas;
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
@@ -5045,8 +5083,8 @@ function renderFaceCamera(landmarks) {
     return;
   }
 
-  if (landmarks && landmarks.length > 10) {
-    const faceSubset = landmarks.slice(0, 11);
+  if (activeLms && activeLms.length > 10) {
+    const faceSubset = activeLms.slice(0, 11);
     let minX = 1, maxX = 0, minY = 1, maxY = 0;
     let confSum = 0;
 
@@ -5089,14 +5127,14 @@ function renderFaceCamera(landmarks) {
     ctx.drawImage(DOM.video, sx, sy, cropPx, cropPx, 0, 0, w, h);
     ctx.restore();
 
-    ctx.fillStyle = 'rgba(0, 240, 255, 0.06)';
+    ctx.fillStyle = (pIdx === 1) ? 'rgba(255, 0, 127, 0.08)' : 'rgba(0, 240, 255, 0.06)';
     ctx.fillRect(0, 0, w, h);
 
     if (appState.trackingConfig.faceReticle) {
       const scanY = (Math.sin(s.scanPhase) * 0.5 + 0.5) * h;
-      ctx.strokeStyle = 'rgba(255, 0, 85, 0.8)';
+      ctx.strokeStyle = (pIdx === 1) ? 'rgba(255, 0, 127, 0.85)' : 'rgba(255, 0, 85, 0.8)';
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = '#ff0055';
+      ctx.shadowColor = (pIdx === 1) ? '#ff007f' : '#ff0055';
       ctx.shadowBlur = 6;
       ctx.beginPath();
       ctx.moveTo(0, scanY);
@@ -5114,6 +5152,7 @@ function renderFaceCamera(landmarks) {
 // SISTEMA 4: MONITORES PiP DE MANOS (SOLO MANO IZQUIERDA / SOLO MANO DERECHA)
 // La cámara se recorta y centra sobre la MUÑECA de cada mano (landmarks 15 y 16
 // del OpenPose de MediaPipe) y se muestra un encuadre cuadrado de SOLO esa mano.
+// Soporta alternar entre Jugador 1 y Jugador 2 según la asignación táctica.
 // ============================================================================
 function renderHandCameras(landmarks) {
   const specs = [
@@ -5123,12 +5162,27 @@ function renderHandCameras(landmarks) {
       lmIndex: 15, statusEl: DOM.leftHandPipStatus, zoomEl: DOM.leftHandFooterZoom }
   ];
 
-  const noHuman = !appState.hasHuman || !landmarks || landmarks.length < 17;
   const videoReady = DOM.video && DOM.video.readyState >= 2;
-  const zoom = Math.max(1, Number(appState.trackingConfig.handZoom) || 2.6);
+  const zoom = Math.max(1, Number(appState.trackingConfig.handZoom) || 1.6);
 
   for (const s of specs) {
     if (!s.pip || !s.canvas) continue;
+
+    let targetLandmarks = landmarks;
+    const pIdx = (appState.pipPlayerAssign && appState.pipPlayerAssign[s.which] !== undefined)
+      ? appState.pipPlayerAssign[s.which]
+      : (s.which === 'leftHand' ? 0 : 1);
+
+    if (appState.players && appState.players.length > 0) {
+      const pl = appState.players[pIdx] || appState.players[0];
+      if (pl && pl.landmarks && pl.landmarks.length > 0) {
+        targetLandmarks = pl.landmarks;
+      }
+    } else if (!targetLandmarks) {
+      targetLandmarks = appState.lastLandmarks || [];
+    }
+
+    const noHuman = !appState.hasHuman || !targetLandmarks || targetLandmarks.length < 17;
 
     // Sin humano (o sin video): el monitor no tiene nada que mostrar.
     if (noHuman || !videoReady) {
@@ -5137,19 +5191,12 @@ function renderHandCameras(landmarks) {
       continue;
     }
 
-    const lm = landmarks[s.lmIndex];
+    const lm = targetLandmarks[s.lmIndex];
     const vis = lm && lm.visibility !== undefined ? lm.visibility : (lm ? 0.9 : 0);
     if (!lm || vis < 0.25) {
-      // La mano está fuera de cuadro: se avisa dentro del monitor sin apagarlo.
+      // La mano NO está trackeada: se oculta el contenedor (SOLO APARECE SI LAS MANOS ESTAN TRACKEADAS)
+      if (!s.pip.classList.contains('hidden')) s.pip.classList.add('hidden');
       if (s.statusEl) s.statusEl.textContent = 'SIN MANO';
-      const c = s.canvas.getContext('2d');
-      if (c) {
-        c.fillStyle = '#050a12';
-        c.fillRect(0, 0, s.canvas.width, s.canvas.height);
-        c.fillStyle = '#64748b';
-        c.font = '11px Share Tech Mono, monospace';
-        c.fillText('SIN SEÑAL DE MANO', 14, s.canvas.height / 2);
-      }
       continue;
     }
 
@@ -5179,7 +5226,7 @@ function renderHandCameras(landmarks) {
     ctx.restore();
 
     // Retícula de encuadre de mano (cruz central + marco de esquinas).
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.75)';
+    ctx.strokeStyle = (pIdx === 1) ? 'rgba(255, 0, 127, 0.85)' : 'rgba(0, 240, 255, 0.75)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(8.5, 8.5, w - 17, h - 17);
     ctx.beginPath();
@@ -5187,13 +5234,19 @@ function renderHandCameras(landmarks) {
     ctx.moveTo(w / 2 - 12, h / 2); ctx.lineTo(w / 2 + 12, h / 2);
     ctx.stroke();
 
-    if (s.statusEl) s.statusEl.textContent = 'LOCK';
+    if (s.statusEl) {
+      s.statusEl.textContent = (appState.players && appState.players.length > 1)
+        ? `LOCK [J${pIdx + 1}]`
+        : 'LOCK';
+    }
     if (s.zoomEl) s.zoomEl.textContent = `${zoom.toFixed(1)}x`;
 
-    if (!s.pip.classList.contains('hidden')) continue;
-    // La VISIBILIDAD la maneja el ciclo aleatorio (setPipVisible); acá sólo se
-    // permite volver a mostrarlo si el flag del ciclo lo tiene encendido.
-    if (appState.pipCycleVisible[s.which]) s.pip.classList.remove('hidden');
+    // Si la mano SÍ está trackeada y está activa por ciclo o config, mostrar el contenedor
+    if (appState.pipCycleVisible[s.which] || appState.trackingConfig[s.which === 'leftHand' ? 'showLeftHand' : 'showRightHand']) {
+      if (s.pip.classList.contains('hidden')) s.pip.classList.remove('hidden');
+    } else {
+      if (!s.pip.classList.contains('hidden')) s.pip.classList.add('hidden');
+    }
   }
 }
 
@@ -5297,6 +5350,34 @@ function scheduleNextPoseInference(delayMs = 40) {
   posePacingTimer = setTimeout(stepPoseInference, delayMs);
 }
 
+// Canvases offscreen para multiplexado espacial por ROI (Jugador 1 y Jugador 2)
+let poseInferenceCropIndex = 0;
+let cropCanvasP1 = null, cropCtxP1 = null;
+let cropCanvasP2 = null, cropCtxP2 = null;
+let masterMaskCanvas = null, masterMaskCtx = null;
+
+function getCropCanvases() {
+  if (!cropCanvasP1) {
+    cropCanvasP1 = document.createElement('canvas');
+    cropCanvasP1.width = 480;
+    cropCanvasP1.height = 480;
+    cropCtxP1 = cropCanvasP1.getContext('2d');
+  }
+  if (!cropCanvasP2) {
+    cropCanvasP2 = document.createElement('canvas');
+    cropCanvasP2.width = 480;
+    cropCanvasP2.height = 480;
+    cropCtxP2 = cropCanvasP2.getContext('2d');
+  }
+  if (!masterMaskCanvas) {
+    masterMaskCanvas = document.createElement('canvas');
+    masterMaskCanvas.width = 640;
+    masterMaskCanvas.height = 360;
+    masterMaskCtx = masterMaskCanvas.getContext('2d');
+  }
+  return { cropCanvasP1, cropCtxP1, cropCanvasP2, cropCtxP2, masterMaskCanvas, masterMaskCtx };
+}
+
 async function stepPoseInference() {
   // Si la cámara no está lista o MediaPipe aún no existe, esperar en standby
   if (!appState.cameraReady || !DOM.video || DOM.video.readyState < 2 || !appState.poseInstance) {
@@ -5305,7 +5386,6 @@ async function stepPoseInference() {
   }
 
   // Si no se requiere tracking (Modo Mouse estándar con capas de tracking apagadas):
-  // STANDBY TOTAL: 0 llamadas a pose.send, 0% CPU, framerate del juego a 60 FPS fijos.
   if (!isTrackingNeeded()) {
     scheduleNextPoseInference(250);
     return;
@@ -5317,9 +5397,28 @@ async function stepPoseInference() {
     return;
   }
 
+  const vw = DOM.video.videoWidth || 1280;
+  const vh = DOM.video.videoHeight || 720;
+  const { cropCanvasP1, cropCtxP1, cropCanvasP2, cropCtxP2 } = getCropCanvases();
+
+  // Multiplexado espacial ROI: alternar entre mitad izquierda (Jugador 1) y mitad derecha (Jugador 2)
+  const isP1 = (poseInferenceCropIndex === 0);
+  poseInferenceCropIndex = (poseInferenceCropIndex + 1) % 2;
+
+  let activeCanvas = null;
+  if (isP1) {
+    cropCtxP1.drawImage(DOM.video, 0, 0, vw * 0.62, vh, 0, 0, cropCanvasP1.width, cropCanvasP1.height);
+    activeCanvas = cropCanvasP1;
+    appState.currentInferenceSlot = 0;
+  } else {
+    cropCtxP2.drawImage(DOM.video, vw * 0.38, 0, vw * 0.62, vh, 0, 0, cropCanvasP2.width, cropCanvasP2.height);
+    activeCanvas = cropCanvasP2;
+    appState.currentInferenceSlot = 1;
+  }
+
   isPoseProcessing = true;
   try {
-    await appState.poseInstance.send({ image: DOM.video });
+    await appState.poseInstance.send({ image: activeCanvas });
   } catch (err) {
     // Proteger contra errores transitorios de fotograma
   } finally {
@@ -5327,10 +5426,7 @@ async function stepPoseInference() {
   }
 
   // CRÍTICO PARA EL RENDIMIENTO (60 FPS LOCK):
-  // Ceder intencionalmente al menos 40ms al hilo principal de Chrome después de cada inferencia.
-  // Esto permite que requestAnimationFrame(mainLoop) dibuje múltiples fotogramas a 60 FPS estables
-  // mientras el suavizado lerp interpola el movimiento de los puntos sin ningún tirón a 18 FPS.
-  scheduleNextPoseInference(40);
+  scheduleNextPoseInference(35);
 }
 
 function initMediaPipePose() {
@@ -5346,7 +5442,6 @@ function initMediaPipePose() {
     });
 
     // Inferencia ultrarrápida: modelComplexity 0 (Lite) y sin segmentación densa
-    // Esto garantiza 60 FPS estables y evita que MediaPipe destruya/recree contextos WebGL
     pose.setOptions({
       modelComplexity: 0,
       smoothLandmarks: true,
@@ -5392,21 +5487,92 @@ function checkHumanPresent(landmarks) {
 }
 
 function onPoseResults(results) {
-  const landmarks = results.poseLandmarks || [];
+  const rawLandmarks = results.poseLandmarks || [];
+  const slot = appState.currentInferenceSlot ?? 0;
+  const now = performance.now();
+
+  let remapped = [];
+  if (rawLandmarks.length > 0) {
+    if (slot === 0) {
+      remapped = rawLandmarks.map(l => ({
+        x: l.x * 0.62,
+        y: l.y,
+        z: l.z,
+        visibility: l.visibility
+      }));
+    } else {
+      remapped = rawLandmarks.map(l => ({
+        x: 0.38 + l.x * 0.62,
+        y: l.y,
+        z: l.z,
+        visibility: l.visibility
+      }));
+    }
+  }
+
+  if (!appState.playerSlots) appState.playerSlots = [null, null];
+  if (remapped.length > 0 && checkHumanPresent(remapped)) {
+    appState.playerSlots[slot] = {
+      landmarks: remapped,
+      timestamp: now
+    };
+  } else {
+    if (appState.playerSlots[slot] && (now - appState.playerSlots[slot].timestamp > 450)) {
+      appState.playerSlots[slot] = null;
+    }
+  }
+
+  const s0 = appState.playerSlots[0];
+  const s1 = appState.playerSlots[1];
+  const v0 = s0 && (now - s0.timestamp < 450);
+  const v1 = s1 && (now - s1.timestamp < 450);
+
+  let activePlayers = [];
+  if (v0 && v1) {
+    const headDist = Math.abs(s0.landmarks[0].x - s1.landmarks[0].x);
+    if (headDist < 0.14) {
+      activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0 }];
+    } else {
+      activePlayers = [
+        { id: 1, landmarks: s0.landmarks, slot: 0 },
+        { id: 2, landmarks: s1.landmarks, slot: 1 }
+      ];
+    }
+  } else if (v0) {
+    activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0 }];
+  } else if (v1) {
+    activePlayers = [{ id: 1, landmarks: s1.landmarks, slot: 1 }];
+  }
+
+  appState.players = activePlayers;
+  const humanDetected = (activePlayers.length > 0);
+  if (humanDetected) {
+    appState.lastHumanSeenTimestamp = now;
+    appState.hasHuman = true;
+  } else if (now - (appState.lastHumanSeenTimestamp || 0) > 400) {
+    appState.hasHuman = false;
+  }
+
+  const landmarks = activePlayers[0] ? activePlayers[0].landmarks : [];
   appState.lastLandmarks = landmarks;
 
   // Actualizar cálculo de apertura/cierre de manos para agarre "al toque"
   updateHandGestures(landmarks);
 
-  // 1. Estadísticas de Inferencia y Telemetría en Vivo
-  const now = performance.now();
-  const humanDetected = checkHumanPresent(landmarks);
-  if (humanDetected) {
-    appState.lastHumanSeenTimestamp = now;
-    appState.hasHuman = true;
-  } else if (now - (appState.lastHumanSeenTimestamp || 0) > 350) {
-    appState.hasHuman = false;
+  // Composición de dos máscaras simultáneas en masterMaskCanvas
+  if (results.segmentationMask) {
+    const { masterMaskCanvas, masterMaskCtx } = getCropCanvases();
+    if (slot === 0) {
+      masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width * 0.55, masterMaskCanvas.height);
+      masterMaskCtx.drawImage(results.segmentationMask, 0, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+    } else {
+      masterMaskCtx.clearRect(masterMaskCanvas.width * 0.45, 0, masterMaskCanvas.width * 0.55, masterMaskCanvas.height);
+      masterMaskCtx.drawImage(results.segmentationMask, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+    }
+    results.segmentationMask = masterMaskCanvas;
   }
+
+  // 1. Estadísticas de Inferencia y Telemetría en Vivo
   const dtPose = now - appState.trackingStats.lastPoseTime;
   appState.trackingStats.lastPoseTime = now;
   if (dtPose > 0) {
@@ -5423,20 +5589,19 @@ function onPoseResults(results) {
   // Recorte de silueta (Depth Cutout) sobre la capa de fondo de la cámara
   renderSilhouetteCutout(results);
 
-  if (DOM.calibCamStatus) DOM.calibCamStatus.textContent = appState.cameraReady ? 'EN LÍNEA' : 'STANDBY';
-  if (DOM.calibPointsCount) DOM.calibPointsCount.textContent = `${landmarks.length} / 33`;
+  if (DOM.calibCamStatus) DOM.calibCamStatus.textContent = appState.cameraReady ? (activePlayers.length > 1 ? '2 JUGADORES' : 'EN LÍNEA') : 'STANDBY';
+  if (DOM.calibPointsCount) DOM.calibPointsCount.textContent = `${activePlayers.length} PERS // ${landmarks.length} PTS`;
   if (DOM.calibFps) DOM.calibFps.textContent = `${appState.trackingStats.fps} FPS`;
   if (DOM.depthPipFps) DOM.depthPipFps.textContent = `${appState.trackingStats.fps} FPS`;
 
   // 2. Renderizar Sistemas de Calibración ÚNICAMENTE si sus capas están habilitadas
-  if (appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose) {
+  if (FORZAR_CAMARA_SILUETA_OPENPOSE || appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose) {
     renderOpenPoseOverlay(landmarks);
   }
   if (appState.renderConfig.flowfieldEnabled || appState.trackingConfig.flowField) {
     renderFlowFieldOverlay(landmarks);
   }
   // SIEMPRE: el depth map y el seguimiento facial son ENTRADAS del shader maestro
-  // (u_depthTexture) y del cursor. Lo que parpadea es el MONITOR, no el dibujo.
   renderDepthMap(results, landmarks);
   renderFaceCamera(landmarks);
   renderHandCameras(landmarks);
@@ -5474,7 +5639,7 @@ function onPoseResults(results) {
     appState.targetCursorX = mappedX;
     appState.targetCursorY = mappedY;
 
-    if (DOM.telemetrySensor) DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorType.toUpperCase()}]`;
+    if (DOM.telemetrySensor) DOM.telemetrySensor.textContent = `MEDIAPIPE [${anchorType.toUpperCase()}]${activePlayers.length > 1 ? ' (2P)' : ''}`;
     if (DOM.telemetryConfidence) DOM.telemetryConfidence.textContent = `${Math.round(appState.landmarkConfidence * 100)}%`;
   } else {
     appState.landmarkConfidence = 0;
@@ -5565,8 +5730,8 @@ function syncTrackingConfigToInputs() {
   if (DOM.cfgTrackFaceReticle) DOM.cfgTrackFaceReticle.checked = c.faceReticle;
   if (DOM.cfgTrackLeftHand) DOM.cfgTrackLeftHand.checked = Boolean(c.showLeftHand);
   if (DOM.cfgTrackRightHand) DOM.cfgTrackRightHand.checked = Boolean(c.showRightHand);
-  if (DOM.cfgTrackHandZoom) DOM.cfgTrackHandZoom.value = c.handZoom || 2.6;
-  if (DOM.valTrackHandZoom) DOM.valTrackHandZoom.textContent = (c.handZoom || 2.6).toFixed(1);
+  if (DOM.cfgTrackHandZoom) DOM.cfgTrackHandZoom.value = c.handZoom || 1.6;
+  if (DOM.valTrackHandZoom) DOM.valTrackHandZoom.textContent = (c.handZoom || 1.6).toFixed(1);
   if (DOM.cfgTrackFrameDiff) DOM.cfgTrackFrameDiff.checked = Boolean(c.frameDifference);
   if (DOM.cfgTrackFrameDiffLimit) DOM.cfgTrackFrameDiffLimit.value = c.frameDiffLimit ?? 0.08;
   if (DOM.valTrackFrameDiffLimit) DOM.valTrackFrameDiffLimit.textContent = (c.frameDiffLimit ?? 0.08).toFixed(2);
@@ -6492,10 +6657,11 @@ function applyRenderLayers() {
 
   // 4. OpenPose Overlay (sincronizado con su toggle en Tab Tracking)
   if (DOM.openposeCanvas) {
-    t.showOpenPose = r.openposeEnabled;
+    const openposeOn = FORZAR_CAMARA_SILUETA_OPENPOSE || r.openposeEnabled;
+    t.showOpenPose = openposeOn;
     DOM.openposeCanvas.style.opacity = r.openposeOpacity;
-    DOM.openposeCanvas.style.display = r.openposeEnabled ? 'block' : 'none';
-    if (!r.openposeEnabled) {
+    DOM.openposeCanvas.style.display = openposeOn ? 'block' : 'none';
+    if (!openposeOn) {
       const ctx = DOM.openposeCanvas.getContext('2d');
       ctx.clearRect(0, 0, DOM.openposeCanvas.width, DOM.openposeCanvas.height);
     }
@@ -6881,18 +7047,31 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
 
 function renderUnifiedPointers() {
   if (!DOM.pointersCanvas || !appState.renderConfig.pointersEnabled) return;
-  // NO retornar en STATES.PROCESSING para que los puntos sigan moviéndose y respondiendo al usuario
   const ctx = DOM.pointersCanvas.getContext('2d');
   ctx.clearRect(0, 0, DOM.pointersCanvas.width, DOM.pointersCanvas.height);
 
+  // REQUERIMIENTO 7: Punteros (mouse y manos) APARECEN SOLO EN MODO IDLE (o INTERACT inicial).
+  // Cuando se seleccionan las 3 palabras y arranca la formación del haiku/frase, NO APARECEN.
+  const isIdle = (appState.currentState === STATES.IDLE || appState.currentState === STATES.INTERACT) &&
+                 (!appState.capturedWords || appState.capturedWords.length < 3);
+
+  if (!isIdle) {
+    if (DOM.reticle && !DOM.reticle.classList.contains('hidden')) {
+      DOM.reticle.classList.add('hidden');
+    }
+    return;
+  }
+
   const points = appState.activeInteractionPoints || [];
-  const lockingIdx = (appState.currentState === STATES.PROCESSING || appState.currentState === STATES.HIJACK)
-    ? -1
-    : appState.targetedWordIndex;
+  const lockingIdx = appState.targetedWordIndex;
   const progress = lockingIdx !== -1 ? Math.min(1.0, appState.dwellTimer / appState.dwellDuration) : 0;
 
   for (let i = 0; i < points.length; i++) {
     const pt = points[i];
+    // REQUERIMIENTO 7: El puntero del mouse SOLO APARECE si tenes el mouse apretado
+    if (pt.name.includes('MOUSE') && !appState.isMouseDown) {
+      continue;
+    }
     const isLocking = (lockingIdx !== -1 && appState.lockingPointName === pt.name);
     drawUnifiedReticle(ctx, pt.x, pt.y, isLocking, isLocking ? progress : 0, pt.name);
   }
@@ -7515,11 +7694,13 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
   const collisionPointOn = (key, fallback = true) => (key in cp ? cp[key] !== false : fallback);
   const testPoints = [];
   if (collisionPointOn('mouse', true)) {
-    testPoints.push({ x: appState.cursorX, y: appState.cursorY, name: appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL' });
+    // Si se usa el mouse, sólo agregar punto de interacción si el mouse está apretado
+    if (!appState.isUsingMouse || appState.isMouseDown) {
+      testPoints.push({ x: appState.cursorX, y: appState.cursorY, name: appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL' });
+    }
   }
 
-  if (appState.trackingConfig.bodyCollision && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
-    const lms = appState.lastLandmarks;
+  if (appState.trackingConfig.bodyCollision) {
     const minConf = appState.trackingConfig.minConfidence || 0.45;
     const candidates = [
       { idx: 15, name: 'MANO_IZQ', key: 'manoIzq', fallback: true },
@@ -7531,15 +7712,26 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
       { idx: 0, name: 'CENTRO_FACIAL', key: 'centroFacial', fallback: false }
     ];
 
-    for (const c of candidates) {
-      if (!collisionPointOn(c.key, c.fallback)) continue;
-      const lm = lms[c.idx];
-      if (lm && (lm.visibility === undefined || lm.visibility >= minConf)) {
-        testPoints.push({
-          x: (1.0 - lm.x) * window.innerWidth,
-          y: lm.y * window.innerHeight,
-          name: c.name
-        });
+    const playerList = (appState.players && appState.players.length > 0)
+      ? appState.players
+      : (appState.lastLandmarks && appState.lastLandmarks.length > 0 ? [{ id: 1, landmarks: appState.lastLandmarks }] : []);
+
+    for (let pIdx = 0; pIdx < playerList.length; pIdx++) {
+      const pl = playerList[pIdx];
+      const lms = pl.landmarks;
+      if (!lms || lms.length === 0) continue;
+      const prefix = playerList.length > 1 ? `J${pl.id}_` : '';
+
+      for (const c of candidates) {
+        if (!collisionPointOn(c.key, c.fallback)) continue;
+        const lm = lms[c.idx];
+        if (lm && (lm.visibility === undefined || lm.visibility >= minConf)) {
+          testPoints.push({
+            x: (1.0 - lm.x) * window.innerWidth,
+            y: lm.y * window.innerHeight,
+            name: `${prefix}${c.name}`
+          });
+        }
       }
     }
   }
@@ -8142,17 +8334,34 @@ async function startResignificationSequence() {
     emitAgentEvent('inference', 'respuesta del modelo recibida y parseada', 'ok');
   }
 
-  // Determinar los sinónimos cibernéticos fríos finales
-  let coldSynonyms = (aiResult && Array.isArray(aiResult.nuevas_palabras) && aiResult.nuevas_palabras.length >= 3)
+  // REQUERIMIENTO: Solo un 5% de posibilidades por palabra de que la IA las cambie.
+  // Si no (95% de los casos), quedan intactas las palabras que el usuario agregó.
+  const AI_MUTATION_CHANCE = 0.05;
+  const rawAiCandidates = (aiResult && Array.isArray(aiResult.nuevas_palabras) && aiResult.nuevas_palabras.length >= 3)
     ? aiResult.nuevas_palabras.map((w, idx) => sanitizeColdToken(w, caught[idx]))
     : caught.map(w => getColdSynonym(w));
 
-  emitAgentEvent('synthesis', 'términos resignificados resueltos', 'ok', {
+  const coldSynonyms = [];
+  const mutationFlags = [];
+
+  for (let idx = 0; idx < caught.length; idx++) {
+    const shouldMutate = Math.random() < AI_MUTATION_CHANCE;
+    mutationFlags.push(shouldMutate);
+    if (shouldMutate) {
+      coldSynonyms.push(rawAiCandidates[idx]);
+    } else {
+      coldSynonyms.push(caught[idx]); // Preserva la palabra original del usuario
+    }
+  }
+
+  emitAgentEvent('synthesis', 'términos resignificados resueltos (5% prob. mutación)', 'ok', {
     coldWords: [...coldSynonyms],
-    pairs: caught.map((w, i) => `${w} → ${coldSynonyms[i]}`)
+    pairs: caught.map((w, i) => `${w} → ${coldSynonyms[i]} (${mutationFlags[i] ? 'MUTADA 5%' : 'PRESERVADA'})`)
   });
-  emitReasoning(`[SÍNTESIS] Términos fríos fijados: ${coldSynonyms.join(' · ')}.\n`);
-  caught.forEach((w, i) => emitReasoning(`[SÍNTESIS]   ${w}  →  ${coldSynonyms[i]}\n`));
+  emitReasoning(`[SÍNTESIS] Términos resueltos: ${coldSynonyms.join(' · ')}.\n`);
+  caught.forEach((w, i) => {
+    emitReasoning(`[SÍNTESIS]   ${w}  →  ${coldSynonyms[i]} ${mutationFlags[i] ? '(mutación IA 5%)' : '(preservada del usuario)'}\n`);
+  });
   emitReasoning(`[PENSAMIENTO] Reviso si la frase de ${oraculo} realmente usa los 3 términos y si no los enumera seguidos.\n`);
 
   // Decodificación progresiva hacia la nueva palabra de cada objeto unificado
@@ -8269,7 +8478,7 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
   const maxLineChars = Math.max(...lines.map(l => l.length), 20);
   const availW = Math.min((window.innerWidth || 1920) * 0.72, 1360);
   let targetFontSize = Math.floor(availW / (maxLineChars * 0.62));
-  targetFontSize = Math.max(18, Math.min(34, targetFontSize));
+  targetFontSize = Math.max(26, Math.min(52, targetFontSize));
 
   document.documentElement.style.setProperty('--word-font-size-phrase', `${targetFontSize}px`);
   flowBox.style.setProperty('--word-font-size-phrase', `${targetFontSize}px`);
@@ -9175,11 +9384,30 @@ function setPipVisible(which, visible, now) {
   if (visible && !appState.hasHuman) {
     visible = false;
   }
+  // Si es monitor de mano, SOLO activar si la mano está trackeada en el jugador asignado
+  if (visible && (which === 'leftHand' || which === 'rightHand')) {
+    const lmIndex = which === 'leftHand' ? 15 : 16;
+    const pIdx = (appState.pipPlayerAssign && appState.pipPlayerAssign[which] !== undefined)
+      ? appState.pipPlayerAssign[which]
+      : (which === 'leftHand' ? 0 : 1);
+    const targetP = (appState.players && appState.players[pIdx]) ? appState.players[pIdx] : (appState.players ? appState.players[0] : null);
+    const lms = targetP ? targetP.landmarks : appState.lastLandmarks;
+    const lm = lms ? lms[lmIndex] : null;
+    const vis = lm && lm.visibility !== undefined ? lm.visibility : (lm ? 0.9 : 0);
+    if (!lm || vis < 0.25) {
+      visible = false;
+    }
+  }
   if (appState.pipCycleVisible[which] === visible) return;
   appState.pipCycleVisible[which] = visible;
   const pip = pipElement(which);
   if (pip) {
     if (visible) {
+      // Requerimiento 1: Asignar a veces al Jugador 1 y a veces al Jugador 2
+      if (appState.players && appState.players.length > 1) {
+        if (!appState.pipPlayerAssign) appState.pipPlayerAssign = { face: 0, leftHand: 0, rightHand: 1 };
+        appState.pipPlayerAssign[which] = Math.random() < 0.5 ? 0 : 1;
+      }
       randomizePipPosition(which, pip);
       pip.classList.remove('hidden');
     } else {
@@ -9253,6 +9481,10 @@ function mainLoop(currentTimestamp) {
 
   DOM.reticle.style.left = `${appState.cursorX}px`;
   DOM.reticle.style.top = `${appState.cursorY}px`;
+  const isIdleForPointers = (appState.currentState === STATES.IDLE || appState.currentState === STATES.INTERACT) &&
+                            (!appState.capturedWords || appState.capturedWords.length < 3);
+  const showReticle = isIdleForPointers && (!appState.isUsingMouse || appState.isMouseDown);
+  DOM.reticle.classList.toggle('hidden', !showReticle);
 
   // Suavizado continuo de gestos de manos a 60 FPS
   if (appState.handGestures) {
@@ -9289,7 +9521,7 @@ function mainLoop(currentTimestamp) {
   }
 
   // 4.2 Renderizar Esqueleto OpenPose con dinámicas cinéticas a 60 FPS
-  if ((appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose) && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
+  if ((FORZAR_CAMARA_SILUETA_OPENPOSE || appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose) && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
     renderOpenPoseOverlay(appState.lastLandmarks);
   }
 
@@ -9445,6 +9677,7 @@ function setupEventListeners() {
 
   // Clic en pantalla para atrapar palabra cercana inmediatamente
   window.addEventListener('mousedown', (e) => {
+    appState.isMouseDown = true;
     if (e.target.closest('#hud-container') || e.target.closest('#debug-hud-panel') || e.target.closest('.words-modal-backdrop') || e.target.closest('button') || e.target.closest('input')) return;
     if (appState.handGestures && appState.handGestures.mouse) {
       const m = appState.handGestures.mouse;
@@ -9457,11 +9690,16 @@ function setupEventListeners() {
   });
 
   window.addEventListener('mouseup', () => {
+    appState.isMouseDown = false;
     if (appState.handGestures && appState.handGestures.mouse) {
       const m = appState.handGestures.mouse;
       m.targetClosure = 0.0;
       m.isClosed = false;
     }
+  });
+
+  window.addEventListener('mouseleave', () => {
+    appState.isMouseDown = false;
   });
 
   window.addEventListener('click', (e) => {
@@ -10652,9 +10890,9 @@ function setupEventListeners() {
     DOM.btnPartReset.addEventListener('click', () => {
       appState.particlesConfig = {
         fontFamily: 'share-tech',
-        fontSize: 16,
-        fontSizeCenter: 38,
-        fontSizePhrase: 26,
+        fontSize: 24,
+        fontSizeCenter: 56,
+        fontSizePhrase: 48,
         color: '#ffffff',
         outline: 1.0,
         outlineGlow: true,
@@ -10774,7 +11012,7 @@ function setupEventListeners() {
         faceSmoothing: true,
         showLeftHand: false,
         showRightHand: false,
-        handZoom: 2.6,
+        handZoom: 1.6,
         frameDifference: false,
         frameDiffLimit: 0.08,
         frameDiffForce: 0.85,

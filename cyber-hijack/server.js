@@ -506,7 +506,27 @@ app.post('/api/ollama/generate', async (req, res) => {
 // Permite que el hijack cargue include.js, webglrenderer.js, jp-node-graph.js
 // y resuelva planes de renderizado hacia el backend del VPS sin errores de CORS ni bloqueos
 // ============================================================================
-const JP_SHADER_DIR = 'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor';
+// Ruta del editor local. El repo vive en 'sistemasfullscreen/jpshadereditor', hermano de
+// sincretismodesilicio, pero la unidad/ruta cambió (antes D:\Programacion, ahora
+// C:\jpupper\programacion): se prueban candidatos y manda JP_SHADER_DIR si está definido.
+const JP_SHADER_CANDIDATES = [
+  process.env.JP_SHADER_DIR,
+  path.resolve(__dirname, '..', '..', 'sistemasfullscreen', 'jpshadereditor'),
+  path.resolve(__dirname, '..', 'sistemasfullscreen', 'jpshadereditor'),
+  path.resolve(__dirname, '..', '..', 'sistemasfullscreen', 'jpshaderszone', 'jpshadereditor'),
+  'C:/jpupper/programacion/sistemasfullscreen/jpshadereditor',
+  'D:/Programacion/sistemasfullscreen/jpshaderszone/jpshadereditor'
+].filter(Boolean);
+const JP_SHADER_DIR = JP_SHADER_CANDIDATES.find(
+  (p) => fs.existsSync(path.join(p, 'public', 'js', 'lib', 'jp-node-graph.js'))
+) || JP_SHADER_CANDIDATES[0];
+if (!fs.existsSync(JP_SHADER_DIR)) {
+  console.warn('[JPShaderEditor] No encuentro el editor local; /jpshadereditor/* dará 404.');
+  console.warn('[JPShaderEditor] Rutas probadas: ' + JP_SHADER_CANDIDATES.join(' | '));
+  console.warn('[JPShaderEditor] Define JP_SHADER_DIR=<ruta al jpshadereditor> para forzarla.');
+} else {
+  console.log('[JPShaderEditor] Sirviendo engine local desde: ' + JP_SHADER_DIR);
+}
 // 100% LOCAL: el engine de nodos sale del jpshadereditor LOCAL (3250), no del VPS.
 const JP_EDITOR_ORIGIN = process.env.JP_EDITOR_ORIGIN || 'http://localhost:3250';
 

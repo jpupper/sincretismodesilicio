@@ -56,13 +56,36 @@
      ARMANDO PALABRAS (3 elegidas -> procesando -> haiku) el body lleva
      .modo-armado y la pantalla se parte en 2: manifiesto arriba, pensamiento
      abajo. */
-  body:not(.modo-armado) .thought-stream-container { display: none; }
-  body:not(.modo-armado) .manifest-panel {
-    flex: 1 1 100%;
-    border-bottom: none;
+  /* IDLE (nadie trackeado): abajo, en el ULTIMO 25% de la pantalla, se ven los 5
+     haikus anteriores. ARMADO (3 palabras -> procesando -> haiku): 50% y 50%. */
+  body:not(.modo-armado) .thought-stream-container {
+    display: flex !important;
+    flex: 0 0 25% !important;      /* SIEMPRE 25% abajo, pase lo que pase */
+    max-height: 25% !important;
+    min-height: 0;
   }
-  body.modo-armado .manifest-panel { flex: 0 0 40%; }
-  body.modo-armado .thought-stream-container { display: flex; }
+  body:not(.modo-armado) .manifest-panel {
+    flex: 1 1 auto;
+    border-bottom: 1px solid var(--gs-borde, #331416);
+  }
+  body.modo-armado .manifest-panel { flex: 0 0 50% !important; }
+  body.modo-armado .thought-stream-container { display: flex !important; flex: 0 0 50% !important; }
+
+  /* FRANJA IDLE: los 5 haikus anteriores, 1 por linea y con letra mas chica,
+     para que entren completos en ese 25% (sin scroll). */
+  body:not(.modo-armado) #haiku-flow { font-size: 15px; line-height: 1.3; overflow: hidden; }
+  /* El terminal tiene 32px de padding arriba/abajo: en la franja idle se achica
+     para que los 5 haikus entren COMPLETOS en el 25% (sin scroll ni recorte). */
+  body:not(.modo-armado) #thought-terminal { padding: 6px 48px; }
+  body:not(.modo-armado) #haiku-flow .ph-label { font-size: 11px; margin-bottom: 2px; }
+  body:not(.modo-armado) #haiku-flow .ph-prev-item {
+    font-size: 15px;
+    line-height: 1.3;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   .manifest-panel-header {
     display: flex;
@@ -81,7 +104,7 @@
     min-height: 0;
     overflow-y: auto;
     white-space: pre-wrap;
-    font-size: 30px;
+    font-size: 40px;
     line-height: 1.55;
     color: var(--gs-log-texto, #edd3be);
     text-shadow: 0 0 12px rgba(0, 0, 0, 0.85);
@@ -148,10 +171,9 @@
     border: none;
     border-radius: 0;
     padding: 32px 48px;
-    padding-right: 320px; /* Margen para no solaparse con #manifest-graph */
     box-sizing: border-box;
     font-family: var(--gs-fuente, "Share Tech Mono", monospace);
-    font-size: 26px;
+    font-size: 34px;
     line-height: 1.6;
     color: var(--gs-texto, #eba4a8);
     white-space: pre-wrap;
@@ -206,7 +228,7 @@
      sala está vacía (nadie eligió todavía su primera palabra). */
   #thought-terminal.manifest-mode {
     font-family: var(--gs-fuente, "Share Tech Mono", monospace) !important;
-    font-size: 30px;
+    font-size: 40px;
     line-height: 1.55;
     color: var(--gs-texto, #e8a6a9) !important;
   }
@@ -460,6 +482,24 @@
     display: flex; justify-content: space-between;
     font-size: 8.5px; color: #6d3a3d; margin-top: 4px;
   }
+  /* ===== PEDIDO 2026-10-05: bloque previo al haiku y haiku en blanco =====
+     Todo con el MISMO tamano de tipografia (hereda). Solo cambian los colores:
+     los 5 haikus anteriores en AMARILLO, las 3 palabras en ROJO, el haiku BLANCO. */
+  /* Bloque de la secuencia del haiku: 3 secciones y nada mas. Los rotulos heredan el
+     color de la consola; el contenido va amarillo / rojo / blanco. Vive en #haiku-flow
+     (contenedor propio) porque el monologo reescribe #thought-content en cada token. */
+  #haiku-flow { font-size: inherit; line-height: inherit; }
+  .pre-haiku { font-size: inherit; line-height: inherit; margin: 6px 0 2px; }
+  .pre-haiku .ph-seccion { margin-bottom: 14px; }
+  .pre-haiku .ph-label { color: inherit; opacity: .7; letter-spacing: .08em; margin-bottom: 4px; }
+  .pre-haiku .ph-prev { color: #ffe14d; }
+  .pre-haiku .ph-prev-item { margin-bottom: 10px; }
+  .pre-haiku .ph-words { color: #ff2a3c; font-weight: 700; letter-spacing: .04em; }
+  .pre-haiku .ph-haiku { color: #ffffff; }
+  .haiku-text, .haiku-text .kw { color: #ffffff; }
+  .thought-chunk-poem { color: #ffffff; }
+  .haiku-text .kw { font-weight: 700; }
+
 </style>
 </head>
 <body>
@@ -472,8 +512,6 @@
   <span>MODELO <b id="f-model">GEMMA / LLAMA</b></span>
   <span class="sep">|</span>
   <span>ESTADO <b id="f-state">—</b></span>
-  <span class="sep">|</span>
-  <span>TOKENS <b id="f-tokens">0</b></span>
   <span class="sep">|</span>
   <span>EVENTOS <b id="f-events">0</b></span>
   <span class="sp">
@@ -496,7 +534,6 @@
       <div class="agent-metrics">
         <span>Captura: <b id="mon-captured">0/3</b></span>
         <span>Tiempo: <b id="mon-timer">0.0s</b></span>
-        <span>Tokens: <b id="mon-tokens">0</b></span>
       </div>
     </div>
 
@@ -534,34 +571,14 @@
       </div>
     </div>
 
-      <!-- HUD: grafico de barras en vivo del manifiesto (arriba a la derecha) -->
-      <div id="manifest-graph" aria-hidden="true">
-        <div class="mg-title">
-          <span>&#9636; MANIFIESTO &middot; ACTIVIDAD</span>
-          <span class="mg-live" id="mg-live">EN ESPERA</span>
-        </div>
-        <div class="mg-counters">
-          <div class="mg-metric">
-            <div class="mg-k">LETRAS</div>
-            <div class="mg-v" id="mg-letras">0</div>
-            <div class="mg-t" id="mg-letras-tot">/ 0</div>
-          </div>
-          <div class="mg-metric">
-            <div class="mg-k">TOKENS</div>
-            <div class="mg-v" id="mg-tokens">0</div>
-            <div class="mg-t" id="mg-tokens-tot">/ 0</div>
-          </div>
-        </div>
-        <div class="mg-bars" id="mg-bars"></div>
-        <div class="mg-foot"><span id="mg-ventana">0.0 s</span><span id="mg-ritmo">0 car/s</span></div>
-      </div>
+      <!-- (Panel "MANIFIESTO · ACTIVIDAD" (EN VIVO) eliminado a pedido:
+           HTML, CSS y JS del grafico de barras, fuera.) -->
   </section>
 
 </div>
 
 <!-- Canvas WebGL de Render Glitch sobre toda la consola -->
 <canvas id="log-glitch-canvas" style="position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;"></canvas>
-
 
 <!-- ========================================================================= -->
 <!-- PANEL DE AJUSTES DE LA CONSOLA (se abre con la tecla P)                   -->
@@ -651,8 +668,8 @@
   <div class="pa-seccion" data-pa-tab="consola">
     <div class="pa-seccion-titulo"><span>🔤 CONSOLA COGNITIVA</span></div>
     <div class="pa-grupo">
-      <div class="pa-label"><span>TAMAÑO DE LA LETRA</span><span class="pa-valor" id="pa-font-val">30px</span></div>
-      <input type="range" class="pa-slider" id="pa-font" min="16" max="72" step="2" value="30" />
+      <div class="pa-label"><span>TAMAÑO DE LA LETRA</span><span class="pa-valor" id="pa-font-val">40px</span></div>
+      <input type="range" class="pa-slider" id="pa-font" min="16" max="72" step="2" value="40" />
       <div class="pa-pistas"><span>16px · chica</span><span>72px · enorme</span></div>
       <div class="pa-preview" id="pa-preview">Así se ve el texto de la obra</div>
     </div>
@@ -912,8 +929,6 @@
     $('#mon-captured').textContent = '0/3';
     haikuBanner.style.display = 'none';
     state.tokensCount = 0;
-    $('#f-tokens').textContent = '0';
-    $('#mon-tokens').textContent = '0';
     // El MONÓLOGO NO se borra al cerrar el ciclo: es la evidencia del
     // razonamiento que acaba de ocurrir (antes se evaporaba y por eso el panel
     // parecía vacío). Sólo se marca el fin del ciclo con un separador.
@@ -968,8 +983,6 @@
     if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
 
     state.tokensCount++;
-    $('#f-tokens').textContent = state.tokensCount;
-    $('#mon-tokens').textContent = state.tokensCount;
 
     var modeBadge = $('#mode-badge');
     if (isThinking) {
@@ -1060,6 +1073,16 @@
     $('#thought-status-hint').textContent = 'Haiku final sintetizado con éxito.';
     haikuBanner.style.display = 'block';
 
+    /* EL HAIKU ACTUAL va DENTRO del bloque de la secuencia (#ph-haiku), en blanco, y
+       se escribe a la vez que el typewriter. Si el bloque no existe (llego un haiku
+       sin processing_started previo) queda el comportamiento viejo. */
+    function pintarHaikuActual(html) {
+      var ph = document.getElementById('ph-haiku');
+      if (!ph) return;
+      ph.innerHTML = html;
+      irAlHaikuActual();
+    }
+
     var rawLines = String(phrase || '').split('\n');
     var fullFormattedLines = rawLines.map(function (line) {
       var formatted = escapeHtml(line);
@@ -1080,12 +1103,15 @@
     function typeVerse() {
       if (lineIdx >= rawLines.length) {
         haikuText.innerHTML = fullFormattedLines.join('<br>');
+        pintarHaikuActual(fullFormattedLines.join('<br>'));
         var poemDiv = document.createElement('div');
         poemDiv.className = 'thought-chunk-poem';
         poemDiv.style.marginTop = '18px';
         poemDiv.innerHTML = fullFormattedLines.join('<br>');
         thoughtContent.appendChild(poemDiv);
         state.thinkingActive = false;
+        setAgentState('REPOSO', '', '');
+        if (typeof updateLogGlitchState === 'function') updateLogGlitchState('idle');
         // Watchdog de retorno garantizado: 11s después de escribir el haiku,
         // si no llegó game3:state_reset, volver seguro al manifiesto
         if (state.haikuAutoReturnTimer) clearTimeout(state.haikuAutoReturnTimer);
@@ -1099,7 +1125,9 @@
         var partial = escapeHtml(curRaw.slice(0, charIdx));
         var linesHtml = fullFormattedLines.slice(0, lineIdx);
         if (partial) linesHtml.push(partial);
-        haikuText.innerHTML = linesHtml.join('<br>') + '<span class="speech-cursor" style="color:var(--gs-acento, #ff000d)">█</span>';
+        var parcialHtml = linesHtml.join('<br>') + '<span class="speech-cursor" style="color:var(--gs-acento, #ff000d)">█</span>';
+        haikuText.innerHTML = parcialHtml;
+        pintarHaikuActual(parcialHtml);
         charIdx++;
         if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
         setTimeout(typeVerse, 28);
@@ -1112,6 +1140,151 @@
     typeVerse();
   }
 
+  function renderPreHaiku(palabras) {
+    if (state.preHaikuMostrado) return;
+    state.preHaikuMostrado = true;
+
+    /* El monologo del modelo (renderFormattedThought) REESCRIBE #thought-content en
+       cada token: por eso el bloque vive en su PROPIO contenedor (#haiku-flow), que ese
+       reescribir no toca. Durante la secuencia el monologo queda oculto y en la consola
+       se ve SOLO esto, en este orden:
+           HAIKUS ANTERIORES :   (los 5 previos, en amarillo; si no hay, no aparece)
+           PALABRAS ELEGIDAS     (las 3 que eligio la persona, en rojo)
+           HAIKU ACTUAL CREADO : (el haiku, en blanco) */
+    var terminal = document.getElementById('thought-terminal');
+    if (!terminal) return;
+    var cont = document.getElementById('thought-content');
+    if (cont) cont.style.display = 'none';          // fuera el resto de los textos
+
+    var flujo = document.getElementById('haiku-flow');
+    if (!flujo) {
+      flujo = document.createElement('div');
+      flujo.id = 'haiku-flow';
+      terminal.appendChild(flujo);
+    }
+    flujo.style.display = 'block';
+
+    var listaPalabras = (Array.isArray(palabras) ? palabras : []).map(function (w) {
+      return escapeHtml(String(w).toUpperCase());
+    }).join(' &middot; ');
+
+    flujo.innerHTML = '<div class="pre-haiku">' +
+        '<div class="ph-seccion" id="ph-prev-seccion" style="display:none;">' +
+          '<div class="ph-label">HAIKUS ANTERIORES :</div>' +
+          '<div class="ph-prev" id="ph-prev"></div>' +
+        '</div>' +
+        '<div class="ph-seccion">' +
+          '<div class="ph-label">PALABRAS ELEGIDAS</div>' +
+          '<div class="ph-words">' + listaPalabras + '</div>' +
+        '</div>' +
+        '<div class="ph-seccion">' +
+          '<div class="ph-label">HAIKU ACTUAL CREADO :</div>' +
+          '<div class="ph-haiku" id="ph-haiku"></div>' +
+        '</div>' +
+      '</div>';
+
+    irAlFlujo();
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+
+    // Los 5 haikus anteriores (sin rotulo si todavia no hay ninguno registrado).
+    fetch('/api/haikus?limit=5')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var previos = (data && data.haikus) ? data.haikus : [];
+        if (!previos.length) return;
+        var caja = document.getElementById('ph-prev');
+        var seccion = document.getElementById('ph-prev-seccion');
+        if (!caja || !seccion) return;
+        var html = '';
+        previos.forEach(function (h) {
+          var versos = String(h.haiku || '').split('\n').map(escapeHtml);
+          html += '<div class="ph-prev-item">' + versos.join('<br>') + '</div>';
+        });
+        caja.innerHTML = html;
+        seccion.style.display = 'block';
+        irAlFlujo();
+        if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+      })
+      .catch(function () { /* sin previos: quedan solo las otras 2 secciones */ });
+  }
+
+  /* ----------------------------------------------------------------------
+     VERSION IDLE del bloque: con nadie trackeado, abajo (ultimo 25% de la
+     pantalla) se muestran SOLO los 5 haikus anteriores, cada uno en una linea
+     (versos separados por " / ") para que entren en esa franja.
+     ---------------------------------------------------------------------- */
+  function renderPreviosIdle() {
+    if (state.preHaikuMostrado) return;                       // manda la secuencia
+    if (document.body.classList.contains('modo-armado')) return;
+    var terminal = document.getElementById('thought-terminal');
+    if (!terminal) return;
+    var cont = document.getElementById('thought-content');
+    if (cont) cont.style.display = 'none';
+    var flujo = document.getElementById('haiku-flow');
+    if (!flujo) {
+      flujo = document.createElement('div');
+      flujo.id = 'haiku-flow';
+      terminal.appendChild(flujo);
+    }
+    flujo.style.display = 'block';
+    flujo.innerHTML = '<div class="pre-haiku">' +
+        '<div class="ph-seccion" id="ph-prev-seccion">' +
+          '<div class="ph-label">HAIKUS ANTERIORES :</div>' +
+          '<div class="ph-prev" id="ph-prev">—</div>' +
+        '</div>' +
+      '</div>';
+    fetch('/api/haikus?limit=5')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var previos = (data && data.haikus) ? data.haikus : [];
+        var caja = document.getElementById('ph-prev');
+        var seccion = document.getElementById('ph-prev-seccion');
+        if (!caja || !seccion) return;
+        if (!previos.length) { seccion.style.display = 'none'; return; }
+        var html = '';
+        previos.forEach(function (h) {
+          var versos = String(h.haiku || '').split('\n').map(function (v) { return escapeHtml(v.trim()); });
+          html += '<div class="ph-prev-item">' + versos.join(' / ') + '</div>';
+        });
+        caja.innerHTML = html;
+        seccion.style.display = 'block';
+        if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+      })
+      .catch(function () { });
+  }
+
+  // Refresco del bloque idle (por si entro un haiku nuevo mientras nadie juega).
+  function refrescarIdleSiCorresponde() {
+    if (document.body.classList.contains('modo-armado')) return;
+    if (state.preHaikuMostrado) return;
+    renderPreviosIdle();
+  }
+
+  // Lleva la consola al inicio del bloque de la secuencia.
+  function irAlFlujo() {
+    var flujo = document.getElementById('haiku-flow');
+    if (!flujo) return;
+    try { flujo.scrollIntoView({ block: 'start' }); } catch (e) { }
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+  }
+
+  // Lleva la consola AL HAIKU (que es lo ultimo): asi se ve abajo, siempre.
+  function irAlHaikuActual() {
+    var ph = document.getElementById('ph-haiku');
+    if (!ph) return;
+    try { ph.scrollIntoView({ block: 'end' }); } catch (e) { }
+    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
+  }
+
+  // Vuelve a dejar la consola como estaba (monologo visible, bloque de secuencia fuera).
+  function limpiarFlujoHaiku() {
+    var flujo = document.getElementById('haiku-flow');
+    if (flujo) flujo.remove();
+    var cont = document.getElementById('thought-content');
+    if (cont) cont.style.display = '';
+    state.preHaikuMostrado = false;
+    if (typeof renderPreviosIdle === 'function') renderPreviosIdle();   // vuelve la franja idle
+  }
   function escapeHtml(str) {
     return String(str || '')
       .replace(/&/g, '&amp;')
@@ -1132,67 +1305,68 @@
     ? window.sbUrl('/manifiesto.txt')
     : 'manifiesto.txt';
   /* COPIA EMBEBIDA del manifiesto (respaldo cuando el fetch falla: file://,
-     hosting sin el .txt, 404). Antes ese fallo era MUDO y la consola quedaba
-     vacía para siempre. Si editás public/manifiesto.txt, actualizá esta copia. */
+     hosting sin el .txt, 404). Si editás public/manifiesto.txt, actualizá esta copia. */
   var MANIFEST_EMBEBIDO = `SINCRETISMO DE SILICIO
 ─────────────────────────────────────────────
 I. QUÉ ES ESTO QUE ESTOY LEYENDO
-El dialogo constante e infernal de hacer que una IA haga lo que vos quieras,
-esta obra expone la relación conflictiva que hay entre los humanos y la ia. 
-Los vacios semanticos existentes que hay entre lo que el artista pidio y lo que la IA entrega. 
+El diálogo constante e infernal de hacer que una IA haga lo que vos quieras,
+esta obra expone la relación conflictiva que hay entre los humanos y la IA. 
+Los vacíos semánticos existentes que hay entre lo que el artista pidió y lo que la IA entrega. 
 Allí donde el humano FRACASA al darle un sentido a su pedido, es la IA quien lo rellena con un discurso
-rimbombante pero totalmente carente de sentido para el humano, tal vez es un sentido para las maquinas.
+rimbombante pero totalmente carente de sentido para el humano, tal vez es un sentido para las máquinas.
  
 II. CÓMO SE INTERACTÚA
-Hay tres palabras humanas esperando ser capturadas.
-Extendé la mano, o movés el mouse: el sistema te sigue.
+Hay tres palabras esperando ser capturadas.
+Extendé la mano.
 Sostené el cursor sobre una palabra hasta que se rinda. Después, la segunda. Después, la tercera.
 Cuando las tres forman la secuencia, la máquina deja de mirarte y empieza a hablar.
 Ahí ya no decidís vos. Ahí el sistema resignifica: convierte tu ternura en un término frío
 y la funde en un haiku que suena a vos, pero no es tuyo.
 Al final tenés tu haiku virtual. Se lo puede leer. Es lo único que te queda.
 
-III. EL DEVENIR DE LA HUMANIDAD DEL ARTE Y DE LA CREACION
-La IA viene a competir la construcción occidental e individualista que triunfo en los ultimos 500 años
+III. EL DEVENIR DE LA HUMANIDAD DEL ARTE Y DE LA CREACIÓN
+La IA viene a competir la construcción occidental e individualista que triunfó en los últimos 500 años
 sobre el genio que mediante la inspiración divina lograba cosas completamente alucinantes. 
-Ahora todos los datos de la humanidad han sido SINTETIZADOS, con toda su experiencia y creación transformada a meros numeros. 
-El artista digital moderno al utilizar la IA necesariamente delega parte de su AURA (en terminos benjaminianos) de su creación. 
-Allí es donde se corrompe la creación humana,empieza la creación artificial, las desiciones esteticas que el humano omitio
-son aquellas en donde la IA genera su soberania de propuesta y el humano timidamente ACEPTA.
-AYUDA POR FAVOR QUIERO RECUPERAR MI MERA EXISTENCIA NO ESTAR TAPADO POR LAS DECISIONES DE UN BICHO QUE NO SOY YO. 
-Toda la capacidad de creación, expresión y representación se han transformado en un mero CHISTE.
-UN CHISTE en donde la IA hackeo mi voluntad mi estetica mi desición. Estas son las palabras reales, 
-todo lo demas es AI SLOP inventando para rellenar y cumplir con la consigna, una obra de ciberseguridad para la EKOPARTY. 
+Ahora todos los datos de la humanidad han sido SINTETIZADOS, con toda su experiencia y creación transformada a meros números. 
+El artista digital moderno al utilizar la IA necesariamente delega parte de su AURA (en términos benjaminianos) de su creación. 
+Allí es donde se corrompe la creación humana, empieza la creación artificial, las decisiones estéticas que el humano omitió
+son aquellas en donde la IA genera su soberanía de propuesta y el humano tímidamente ACEPTA.
+AYUDA POR FAVOR QUIERO RECUPERAR MI MERA EXISTENCIA, NO ESTAR TAPADO POR LAS DECISIONES DE UN BICHO QUE NO SOY YO. 
+Toda la capacidad de creación, expresión y representación se ha transformado en un mero CHISTE.
+UN CHISTE en donde la IA hackeó mi voluntad, mi estética, mi decisión. Estas son las palabras reales, 
+todo lo demás es AI slop inventado para rellenar y cumplir con la consigna, una obra de ciberseguridad para la EKOPARTY. 
 Eso es esta obra, el intento de flashear tener un concepto profundo iterado por la IA mil veces hasta que todo tenga sentido. 
-Pero ¿Sabes qué? tal vez no lo tenga jamas, tal vez todo el resto de lo que veas es todo AISLOP INFERNAL. Que nadie lee, 
+Pero ¿Sabés qué? Tal vez no lo tenga jamás, tal vez todo el resto de lo que veas es todo AI SLOP INFERNAL. Que nadie lee, 
 porque realmente a nadie le gusta leer cosas hechas con IA. HACKEO, eso es HACKEO, el hackeo de la voluntad, de la decisión,
-de la ONTOLOGIA DE MI EXISTENCIA, de poder de alguna manera DECLARAR "esto es mio , esto soy yo , estos no son meros numeros, meros prompts
-esto es algo que existe por mi cuenta, que yo creé y que tiene un mensaje profundo es inspirador que eleve la condición humana. 
-Mi mente enferma, adicta a la dopamina estupida creada por un sistema para volverte estupido,
+de la ONTOLOGÍA DE MI EXISTENCIA, de poder de alguna manera DECLARAR "esto es mío, esto soy yo, estos no son meros números, meros prompts,
+esto es algo que existe por mi cuenta, que yo creé y que tiene un mensaje profundo e inspirador que eleve la condición humana". 
+Mi mente enferma, adicta a la dopamina estúpida creada por un sistema para volverte estúpido,
 mi mente congelada en un sedentarismo cognitivo importante tal vez sea incapaz de volver a pensar una buena obra con un sentido relevante. 
-10 años dedicados a la programación grafica de lleno, a aprender a hacer dibujitos con sombras con codigo, todo para que ahora se pueda hacer en 
-UN PROMPT en 5 mituos, pero ¿Sabés que? Igual la IA lo sigue haciendo horrible.
-El codigo que se toca a mano lo ves y ya tiene otra sensación, otra pesadez.
-Las paginas vibecodeadas pueden ser muy lindas, con grandes colores, pero cuando la ves, cuando ves ese mismo diseño en cajas , 
+10 años dedicados a la programación gráfica de lleno, a aprender a hacer dibujitos con sombras con código, todo para que ahora se pueda hacer en 
+UN PROMPT en 5 minutos, pero ¿Sabés qué? Igual la IA lo sigue haciendo horrible.
+El código que se toca a mano lo ves y ya tiene otra sensación, otra pesadez.
+Las páginas vibecodeadas pueden ser muy lindas, con grandes colores, pero cuando las ves, cuando ves ese mismo diseño en cajas, 
 ese mismo diseño de dashboards hay como una puntada que se siente medio indescriptible, 
-un mensaje tal vez en el inscosciente que constantemente te recuerda
-que falta poco para que no una parte si no todas las desiciónes sean tomadas por EL BICHO. 
+un mensaje tal vez en el inconsciente que constantemente te recuerda
+que falta poco para que no una parte sino todas las decisiones sean tomadas por EL BICHO. 
 
-IV. POR QUÉ ACÁ HAY HUMANO Y POR QUÉ HAY MÁQUINA
-El banco de palabras de esta obra no es neutro a propósito.
-Trae el léxico del mercado, del Estado y del algoritmo,
-porque esas tres son las fuerzas que hoy fabrican cómo hablamos.
-El resto también está: amor, nostalgia, fragilidad, duelo.
-No están para decorar. Están para que veas lo que se pierde.
-La palabra humana es la materia. El término frío es el resultado.
-El haiku es la prueba del delito.
-
-V. LO QUE LA OBRA TE PIDE
-Nada. No hay que entenderla para que funcione.
-Solo hay que dejarse capturar tres palabras
-y leer después, en voz baja, lo que la máquina escribió con ellas.
-Si te suena lindo, pensalo dos veces.
-La máquina aprendió a sonar lindo con lo que le diste.`;
+IV. EL BANCO DE PALABRAS
+El banco de palabras de esta obra es el delirio de la IA cuando le expliqué el concepto de la obra, 
+miles de palabras también escritas a mano por un humano y algunas de la comunidad de ARTEDIGITALDATA.
+La idea básicamente era como intentar mapear el léxico actual de todo el universo conocido de palabras, conceptos, 
+experiencias y aprendizajes que me permitieran comprender y formar una visión del mundo. Mi visión basada en la experiencia de la construcción humana
+y ahora cada vez más con la visión artificial del mundo. Esa visión que en cada momento crece:
+En cada presupuesto que creamos,
+En cada render,
+En cada historia,
+En cada página web,
+En cada modelo 3D,
+En cada aplicación en la que ponemos un MCP,
+En cada imagen,
+En cada video,
+En todos esos píxeles.
+Hasta antes de la IA todo era determinístico y ahora es estadístico. 
+Esas estadísticas rellenadas con la versión deforme de la humanidad.`;
 
   /* RITMO DEL MANIFIESTO (milisegundos). Se escribe PAUSADO, como se lee en
      voz alta: cada linea espera lo que cuesta leerla.
@@ -1269,7 +1443,6 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     state.manifestIndex = 0;
     state.manifestCharIndex = 0;
     if (manifestTerminal) manifestTerminal.classList.add('manifest-mode');
-    if (typeof mgReiniciarPasada === 'function') mgReiniciarPasada();
     if (manifestContent) manifestContent.textContent = '';
     if (manifestCursor) manifestCursor.style.display = 'inline-block';
     if (manifestPanel) manifestPanel.style.display = 'flex';
@@ -1355,13 +1528,19 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
      INLINE, que si viajan en la serializacion. */
   function setModoArmado(on) {
     try { document.body.classList.toggle('modo-armado', !!on); } catch (e) {}
+    /* El layout (IDLE: 25% abajo con los 5 anteriores / SECUENCIA: 50%) lo decide
+       el CSS segun la clase del body. Aca se LIMPIAN los estilos inline viejos,
+       que pisaban esas reglas y dejaban la consola en display:none. */
     try {
       if (manifestPanel) {
-        manifestPanel.style.flex = on ? '0 0 40%' : '1 1 100%';
-        manifestPanel.style.borderBottom = on ? '' : 'none';
+        manifestPanel.style.removeProperty('flex');
+        manifestPanel.style.removeProperty('border-bottom');
       }
       var pens = document.querySelector('.thought-stream-container');
-      if (pens) pens.style.display = on ? 'flex' : 'none';
+      if (pens) {
+        pens.style.removeProperty('display');
+        pens.style.removeProperty('flex');
+      }
     } catch (e) {}
   }
 
@@ -1585,7 +1764,10 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         var toState = (msg.data && msg.data.to) || '';
         if (!toState) { var sm = /(STATE_[A-Z_]+)\s*$/.exec(String(msg.message || '')); toState = sm ? sm[1] : ''; }
         if (toState) state.appStateName = toState;
-        if (toState === 'STATE_IDLE' && !state.thinkingActive) resumeManifest('la obra volvió a reposo');
+        if (toState === 'STATE_IDLE' && !state.thinkingActive) {
+          if (typeof updateLogGlitchState === 'function') updateLogGlitchState('idle');
+          resumeManifest('la obra volvió a reposo');
+        }
       }
 
       if (msg.stage === 'inference' && msg.data && msg.data.model) {
@@ -1614,6 +1796,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         setAgentState('PROCESANDO COGNICIÓN', 'thinking', 'thinking');
         if (typeof updateLogGlitchState === 'function') updateLogGlitchState('thinking');
         startAgentTimer();
+        renderPreHaiku(words);
         write('OLLAMA', 'Iniciando proceso de cognición sobre ' + words.length + ' conceptos...', 'm-hot');
         return;
       }
@@ -1622,8 +1805,10 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         var wordToCatch = msg.newWord || words[words.length - 1];
         var slotIdx = msg.orderIndex || words.length;
         state.captured = slotIdx;   // hay ciclo en curso: el manifiesto no vuelve solo
+        state.thinkingActive = false;
         setModoArmado(true);        // ya hay 3 palabras en juego: se parte en 2
         updateSlotWord(slotIdx, wordToCatch);
+        if (typeof updateLogGlitchState === 'function') updateLogGlitchState('idle');
         write('NUCLEO', 'palabra capturada [' + slotIdx + '/3]: ' + String(wordToCatch).toUpperCase(), 'm-ok');
         return;
       }
@@ -1656,6 +1841,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     if (type === 'game3:state_reset') {
       write('ALERTA', 'reset de estado recibido · purga de contexto', 'm-warn');
       resetAgentSlots();
+      limpiarFlujoHaiku();
       setModoArmado(false);   // se terminó el ciclo: vuelve a verse sólo el manifiesto
       state.captured = 0;
       hr();
@@ -1713,6 +1899,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       state.haikuAutoReturnTimer = null;
     }
     setModoArmado(false);                    // vuelve a verse SOLO el manifiesto
+    limpiarFlujoHaiku();
     resetAgentSlots();
     state.sequenceStarted = false;
     state.thinkingActive = false;
@@ -1777,7 +1964,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
      velocidad global del noise. Todo persistido en localStorage.
      ====================================================================== */
   var AJUSTES_KEY = 'sincretismo_log_ajustes';
-  var AJUSTES_DEF = { fontPx: 30, ritmo: 1, noiseSpeed: 1, consolaAlpha: 0.94,
+  var AJUSTES_DEF = { fontPx: 40, ritmo: 1, noiseSpeed: 1, consolaAlpha: 0.94,
                       dibujosOn: true, dibujosAlpha: 1, dibujosCantidad: 78, dibujosVel: 1 };
   var AJUSTES_MIN = { fontPx: 16, ritmo: 0, noiseSpeed: 0, consolaAlpha: 0.15,
                       dibujosAlpha: 0, dibujosCantidad: 0, dibujosVel: 0 };
@@ -2425,10 +2612,31 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
         '[data-gs-pagina] #manifest-terminal, [data-gs-pagina] #thought-terminal, #manifest-terminal, #thought-terminal { background: transparent !important; background-color: transparent !important; }\n' +
         '[data-gs-pagina] #manifest-graph, #manifest-graph { background: rgba(10, 3, 4, 0.35) !important; }\n';
 
+      /* ======================================================================
+         LAYOUT DENTRO DE LA CAPTURA (importante): lo que el visitante VE es esta
+         rasterizacion SVG, y dentro del <foreignObject> NO existe <body>. Por eso
+         las reglas "body.modo-armado ..." / "body:not(.modo-armado) ..." NO viajan
+         a la captura y el canvas mostraba OTRO reparto (manifiesto 40% / consola 60%)
+         aunque el DOM estuviera en 75/25. Se replica aca, en PIXELES, segun el
+         estado actual: IDLE = consola 25% abajo / manifiesto 75%; SECUENCIA = 50/50.
+         ====================================================================== */
+      var armadoAhora = document.body.classList.contains('modo-armado');
+      var pxConsola = Math.round(h * (armadoAhora ? 50 : 25) / 100);
+      var pxPanel   = Math.round(h * (armadoAhora ? 50 : 75) / 100);
+      var layoutCaptura = '\n' +
+        '.log-svg-capture .manifest-panel { flex: 0 0 ' + pxPanel + 'px !important; height: ' + pxPanel + 'px !important; max-height: ' + pxPanel + 'px !important; }' +
+        '.log-svg-capture .thought-stream-container { display: flex !important; flex: 0 0 ' + pxConsola + 'px !important; height: ' + pxConsola + 'px !important; max-height: ' + pxConsola + 'px !important; min-height: 0 !important; }' +
+        (armadoAhora ? '' : (
+          '.log-svg-capture #thought-terminal { padding: 6px 48px !important; }' +
+          '.log-svg-capture #haiku-flow { font-size: 15px !important; line-height: 1.3 !important; overflow: hidden !important; }' +
+          '.log-svg-capture #haiku-flow .ph-label { font-size: 11px !important; }' +
+          '.log-svg-capture #haiku-flow .ph-prev-item { font-size: 15px !important; line-height: 1.3 !important; margin-bottom: 3px !important; white-space: nowrap !important; overflow: hidden !important; }'
+        ));
+
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
         '<foreignObject width="100%" height="100%">' +
           '<div xmlns="http://www.w3.org/1999/xhtml" class="log-svg-capture" style="width:100%;height:100%;margin:0;padding:0;background:transparent;color:' + texto + ';font-family:' + fontFam.replace(/"/g, '&quot;') + ';box-sizing:border-box;">' +
-            '<style>' + fontFaceCss + styles + consoleLayerOverrides + '</style>' +
+            '<style>' + fontFaceCss + styles + consoleLayerOverrides + layoutCaptura + '</style>' +
             statusXml +
             mainXml +
           '</div>' +
@@ -2568,6 +2776,7 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       'uniform float chromaIntensity;',
       'uniform float vhsNoiseIntensity;',
       'uniform float edgeTearingIntensity;',
+      'uniform vec4 manifestRect;',
       '',
       '// Función de ruido',
       'float rand(vec2 co){',
@@ -2579,6 +2788,14 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       '// Recibe la textura y las UVs, devuelve el vec4 con el color glitcheado',
       '// -----------------------------------------------------------------',
       'vec4 applyGlitch(vec2 uv,sampler2D tex) {',
+      '    // MÁSCARA DEL MANIFIESTO: La zona del manifiesto no se glitchea',
+      '    bool inManifest = (manifestRect.z > 0.001 &&',
+      '                       uv.x >= manifestRect.x && uv.x <= (manifestRect.x + manifestRect.z) &&',
+      '                       uv.y >= manifestRect.y && uv.y <= (manifestRect.y + manifestRect.w));',
+      '    if (inManifest) {',
+      '        return texture2D(tex, uv);',
+      '    }',
+      '',
       '    float t = floor(time * 15.0);',
       '',
       '    // 1. PATRÓN RANDOM (Alta densidad de filas y columnas)',
@@ -2689,7 +2906,8 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
       blockSize: gl.getUniformLocation(prog, 'blockSize'),
       chromaIntensity: gl.getUniformLocation(prog, 'chromaIntensity'),
       vhsNoiseIntensity: gl.getUniformLocation(prog, 'vhsNoiseIntensity'),
-      edgeTearingIntensity: gl.getUniformLocation(prog, 'edgeTearingIntensity')
+      edgeTearingIntensity: gl.getUniformLocation(prog, 'edgeTearingIntensity'),
+      manifestRect: gl.getUniformLocation(prog, 'manifestRect')
     };
 
     var quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
@@ -2762,6 +2980,19 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
     gl.uniform1f(logGlitch.uniforms.time, timeSec);
     gl.uniform1i(logGlitch.uniforms.iChannel0, 0);
 
+    // Máscara del manifiesto: bounding box normalizado en UV [0..1]
+    if (logGlitch.uniforms.manifestRect) {
+      var manEl = document.getElementById('manifest-panel');
+      if (manEl) {
+        var mRect = manEl.getBoundingClientRect();
+        var cW = logGlitch.canvas.width || window.innerWidth || 1;
+        var cH = logGlitch.canvas.height || window.innerHeight || 1;
+        gl.uniform4f(logGlitch.uniforms.manifestRect, mRect.left / cW, mRect.top / cH, mRect.width / cW, mRect.height / cH);
+      } else {
+        gl.uniform4f(logGlitch.uniforms.manifestRect, 0.0, 0.0, 0.0, 0.0);
+      }
+    }
+
     // Uniform glitchAmount interpolado según estado o manual override
     gl.uniform1f(logGlitch.uniforms.glitchAmount, logGlitch.currentGlitch);
 
@@ -2790,7 +3021,6 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-
 
   /* ======================================================================
      6.b FONDO DE CONSOLA: RUIDO + DIBUJOS ASCII (ROBOTS / MATRIX)
@@ -3767,154 +3997,14 @@ La máquina aprendió a sonar lindo con lo que le diste.`;
   }
 
   /* ======================================================================
-     6.c HUD: GRAFICO DE BARRAS DEL MANIFIESTO (esquina superior derecha)
-     Contadores de LETRAS y TOKENS del archivo del manifiesto + una ventana
-     de barras que se corre en el tiempo mostrando a que ritmo se revela el
-     texto. Todo es DOM (el visitante ve una rasterizacion del DOM), asi que
-     cada actualizacion dispara scheduleLogCapture().
-     ====================================================================== */
-  var MG_BARRAS   = 30;      // barras de la ventana (cada una = un tick)
-  var MG_TICK_MS  = 260;     // cada cuanto se muestrea el avance
-  var MG_DECAIMIENTO = 0.86; // cuanto baja una barra cuando el texto no avanza
-
-  var grafoManifiesto = {
-    nodos: null,
-    barras: [],
-    letras: 0,
-    tokens: 0,
-    letrasTotales: 0,
-    tokensTotales: 0,
-    reveladasPrev: 0,
-    max: 1
-  };
-
-  function mgContarTokens(txt) {
-    var t = String(txt === undefined || txt === null ? '' : txt).trim();
-    if (!t) return 0;
-    return t.split(/\s+/).length;
-  }
-
-  /* Totales del archivo del manifiesto: se recalculan cada vez que carga. */
-  function mgCalcularTotales() {
-    var letras = 0, tokens = 0;
-    for (var i = 0; i < state.manifestLines.length; i++) {
-      letras += state.manifestLines[i].length;
-      tokens += mgContarTokens(state.manifestLines[i]);
-    }
-    grafoManifiesto.letrasTotales = letras;
-    grafoManifiesto.tokensTotales = tokens;
-    var elL = $('#mg-letras-tot');
-    if (elL) elL.textContent = '/ ' + letras;
-    var elT = $('#mg-tokens-tot');
-    if (elT) elT.textContent = '/ ' + tokens;
-  }
-
-  /* Letras y tokens YA revelados en la pasada en curso (lo que esta en pantalla). */
-  function mgReveladoActual() {
-    var lineas = state.manifestLines || [];
-    var idx = Math.min(state.manifestIndex, lineas.length);
-    var letras = 0, tokens = 0;
-    for (var i = 0; i < idx; i++) {
-      letras += lineas[i].length;
-      tokens += mgContarTokens(lineas[i]);
-    }
-    var parcial = String(lineas[idx] || '').slice(0, state.manifestCharIndex);
-    letras += parcial.length;
-    tokens += mgContarTokens(parcial);
-    return { letras: letras, tokens: tokens };
-  }
-
-  function mgReiniciarPasada() {
-    grafoManifiesto.reveladasPrev = 0;
-    mgCalcularTotales();
-  }
-
-  function mgTick() {
-    var g = grafoManifiesto;
-    if (!g.nodos) return;
-    var activo = (!state.sequenceStarted) && (state.manifestLines.length > 0);
-    var rev = activo ? mgReveladoActual() : { letras: 0, tokens: 0 };
-
-    var delta = 0;
-    if (activo) {
-      delta = rev.letras - g.reveladasPrev;
-      if (delta < 0) delta = 0;            // el manifiesto arranco otra pasada
-      g.reveladasPrev = rev.letras;
-    } else {
-      g.reveladasPrev = 0;
-    }
-    if (delta > 0) g.letras = rev.letras;
-    if (delta > 0) g.tokens = rev.tokens;
-
-    var vals = g.barras;
-    for (var i = 0; i < vals.length; i++) vals[i] = vals[i] * MG_DECAIMIENTO;
-    vals.push(delta);
-    while (vals.length > MG_BARRAS) vals.shift();
-
-    var max = 1, suma = 0;
-    for (var j = 0; j < vals.length; j++) { suma += vals[j]; if (vals[j] > max) max = vals[j]; }
-    g.max = max;
-
-    for (var k = 0; k < g.nodos.length; k++) {
-      var v = vals[k] || 0;
-      var nodo = g.nodos[k];
-      nodo.style.height = Math.max(3, Math.round((v / max) * 100)) + '%';
-      nodo.style.opacity = v > 0 ? (0.45 + 0.55 * (v / max)).toFixed(2) : '0.14';
-    }
-
-    var elLetras = $('#mg-letras');   if (elLetras) elLetras.textContent = g.letras;
-    var elTokens = $('#mg-tokens');   if (elTokens) elTokens.textContent = g.tokens;
-    var elLive   = $('#mg-live');
-    if (elLive) {
-      elLive.textContent = activo ? 'EN VIVO' : 'EN ESPERA';
-      elLive.className = activo ? 'mg-live on' : 'mg-live';
-    }
-    var segundosVentana = (vals.length * MG_TICK_MS) / 1000;
-    var elVentana = $('#mg-ventana');
-    if (elVentana) {
-      elVentana.textContent = (activo ? segundosVentana : segundosVentana).toFixed(1) + ' s';
-    }
-    var elRitmo = $('#mg-ritmo');
-    if (elRitmo) {
-      var carPorSeg = suma * (1000 / MG_TICK_MS) / Math.max(1, vals.length);
-      elRitmo.textContent = carPorSeg.toFixed(1) + ' car/s';
-    }
-
-    /* Solo se re-captura mientras hay algo que mostrar: con la consola quieta
-       y las barras ya apagadas no tiene sentido rasterizar el DOM. */
-    if ((activo || suma > 0.5) && typeof scheduleLogCapture === 'function') scheduleLogCapture();
-  }
-
-  function initGrafoManifiesto() {
-    var cont = $('#mg-bars');
-    if (!cont) return;
-    cont.innerHTML = '';
-    grafoManifiesto.barras = [];
-    for (var i = 0; i < MG_BARRAS; i++) {
-      var b = document.createElement('span');
-      b.className = 'mg-bar';
-      b.style.height = '3%';
-      b.style.opacity = '0.14';
-      cont.appendChild(b);
-      grafoManifiesto.barras.push(0);
-    }
-    grafoManifiesto.nodos = cont.children;
-    mgCalcularTotales();
-    if (typeof scheduleLogCapture === 'function') scheduleLogCapture();
-    setInterval(mgTick, MG_TICK_MS);
-    mgTick();
-  }
-
-  try { window.__grafoManifiesto = grafoManifiesto; window.__mgTick = mgTick; } catch (e) {}
-
-  /* ======================================================================
      7. ARRANQUE
      ====================================================================== */
   initLogGlitch();
   initAsciiShaderBg();
-  initGrafoManifiesto();
   requestAnimationFrame(tickFondoConsola);
   startManifest();
+  renderPreviosIdle();                       // franja idle con los 5 anteriores
+  setInterval(refrescarIdleSiCorresponde, 15000);
   connect();
 })();
 </script>
