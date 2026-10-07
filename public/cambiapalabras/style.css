@@ -581,9 +581,8 @@ body {
     0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
 }
 
-/* CARGA CONSERVADA: cuando la palabra termina de llenarse (se engancha sola) o
-   la agarrás, mantiene el MISMO resplandor de "llenando" durante el estado
-   enganchado (word-slotted). Se limpia recién al pasar al centro. */
+/* CARGA CONSERVADA: la palabra elegida se mantiene con texto nítido y legible
+   (sin bloom/glow: el efecto de energía/llenado lo dibuja el shader por detrás) */
 .organic-word-item.word-charged {
   -webkit-text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
   text-stroke: var(--word-stroke-width, 1.5px) #000000 !important;
@@ -593,7 +592,9 @@ body {
     1px -1px 0 #000,
     -1px 1px 0 #000,
     1px 1px 0 #000,
-    0 2px 12px rgba(0, 0, 0, 0.95), 0 0 22px var(--accent-1-strong), 0 0 40px var(--accent-1-mid);
+    0 2px 8px rgba(0, 0, 0, 0.9) !important;
+  filter: none !important;
+  animation: none !important;
 }
 
 /* Micro-reacción visual ante impacto de colisión física */
@@ -2690,6 +2691,11 @@ input[type="color"]:hover {
   transition: opacity 0.3s ease;
 }
 
+body.words-chosen #openpose-overlay-canvas,
+.words-chosen #openpose-overlay-canvas {
+  z-index: 10 !important;
+}
+
 /* ==========================================================================
    MONITORES TÁCTICOS PiP (DEPTH MAP & CÁMARA FACIAL)
    ========================================================================== */
@@ -2712,6 +2718,14 @@ input[type="color"]:hover {
   opacity: 0;
   pointer-events: none;
   transform: scale(0.92);
+}
+
+/* REQUERIMIENTO: En modo haiku no se ven las ventanas de biometría facial, depth map ni manos */
+body.mode-haiku .tactical-pip-card,
+.mode-haiku .tactical-pip-card {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 
@@ -3541,30 +3555,12 @@ textarea {
 }
 
 /* ==========================================================================
-   ENERGIA SOSTENIDA DE LA PALABRA ELEGIDA
-   La palabra queda "cargada" desde que se engancha arriba (word-charged)
-   hasta que ENTRA EL CONTENEDOR DEL HAIKU (ahi script.js la descarga).
-   Va al final del archivo a proposito: asi gana a las reglas de estado
-   (word-transformed / word-phrase-member) y el brillo se mantiene.
+   PALABRAS ELEGIDAS (SIN BLOOM):
+   El resplandor/bloom pulsante en el texto fue removido a pedido del usuario.
+   La animación de llenado va por detrás dibujada por el shader maestro.
    ========================================================================== */
-@keyframes energiaPalabra {
-  0%, 100% {
-    filter: brightness(1) saturate(1);
-    text-shadow:
-      -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
-      0 2px 12px rgba(0, 0, 0, 0.95),
-      0 0 18px var(--accent-1-strong, #00f0ff),
-      0 0 34px var(--accent-1-mid, #00f0ff);
-  }
-  50% {
-    filter: brightness(1.45) saturate(1.55);
-    text-shadow:
-      -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
-      0 2px 12px rgba(0, 0, 0, 0.95),
-      0 0 26px var(--accent-1-strong, #00f0ff),
-      0 0 52px var(--accent-1-mid, #00f0ff),
-      0 0 80px var(--accent-1-strong, #00f0ff);
-  }
+.organic-word-item.word-charged {
+  animation: none !important;
+  filter: none !important;
 }
-.organic-word-item.word-charged { animation: energiaPalabra 1.1s ease-in-out infinite; }
 

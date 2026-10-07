@@ -17,7 +17,7 @@
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="stylesheet" href="css/fonts-local.css?v=1">
-  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.59">
+  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.64">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="vendor/mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -910,7 +910,8 @@
               <div class="calib-telemetry-box">
                 <div class="telemetry-stat">
                   <span class="stat-lbl">SENSOR CAM:</span>
-                  <span class="stat-val" id="calib-cam-status" style="cursor: pointer;" title="Clic para reconectar cámara">STANDBY</span>
+                  <span class="stat-val" id="calib-cam-status" style="cursor: pointer;"
+                    title="Clic para reconectar cámara">STANDBY</span>
                 </div>
                 <div class="telemetry-stat">
                   <span class="stat-lbl">NODOS DETECTADOS:</span>
@@ -931,13 +932,15 @@
                 <label for="cfg-camera-select">
                   <strong>Dispositivo de Cámara Web:</strong>
                 </label>
-                <select id="cfg-camera-select" class="config-input-select" style="width: 100%; padding: 7px 10px; background: rgba(5,15,25,0.85); color: #00f0ff; border: 1px solid rgba(0,240,255,0.4); border-radius: 4px; font-family: monospace; font-size: 13px;">
+                <select id="cfg-camera-select" class="config-input-select"
+                  style="width: 100%; padding: 7px 10px; background: rgba(5,15,25,0.85); color: #00f0ff; border: 1px solid rgba(0,240,255,0.4); border-radius: 4px; font-family: monospace; font-size: 13px;">
                   <option value="">(Autoselección Inteligente / Predeterminada)</option>
                 </select>
               </div>
 
               <div class="calib-actions-row">
-                <button type="button" class="btn-calib-action" id="btn-reconnect-cam" style="border-color: #00f0ff; color: #00f0ff;">
+                <button type="button" class="btn-calib-action" id="btn-reconnect-cam"
+                  style="border-color: #00f0ff; color: #00f0ff;">
                   📷 Reconectar Cámara
                 </button>
                 <button type="button" class="btn-calib-action" id="btn-center-calibration">
@@ -1725,7 +1728,7 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="cambiapalabras/script.js?v=3.59"></script>
+  <script src="cambiapalabras/script.js?v=3.64"></script>
 </body>
 
 </html>

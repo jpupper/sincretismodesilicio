@@ -15,6 +15,7 @@ uniform int u_hasDepth;
 uniform sampler2D u_openposeTexture;
 uniform int u_hasOpenpose;
 uniform float u_openposeOpacity;
+uniform float u_openposeBehind;
 
 // 3b) Render de Vectores de Campo de Flujo (Flow Field)
 uniform sampler2D u_flowfieldTexture;
@@ -176,30 +177,31 @@ float rdRandom(vec2 st, float t) {
     return fract(sin(dot(floor(st.xy), vec2(12.9898, 78.233))) * 43000.3 + t);
 }
 
-vec3 rdmPattern(vec2 uv) {
+vec3 rdmPatternSlow(vec2 uv, float speedFactor) {
     float fix = u_resolution.x / u_resolution.y;
-    uv.x *= fix;                                  // el original escala el X (si no, se estira)
+    vec2 st = uv;
+    st.x *= fix;                                  // el original escala el X (si no, se estira)
 
     int mcnt = int(floor(rdMap(u_rdmCnt, 1.0, 20.0)));
     if (mcnt < 1) mcnt = 1;
     float mite_scale = rdMap(u_rdmIteScale, 0.0, 10.0);
-    float mspeedx    = rdMap(u_rdmSpeedX, -0.2, 0.2);
-    float mspeedy    = rdMap(u_rdmSpeedY, -0.2, 0.2);
-    float mspeedrot  = rdMap(u_rdmSpeedRot, -0.01, 0.01);
-    float mspeedrdm  = u_rdmSpeedRnd;
+    float mspeedx    = rdMap(u_rdmSpeedX, -0.2, 0.2) * speedFactor;
+    float mspeedy    = rdMap(u_rdmSpeedY, -0.2, 0.2) * speedFactor;
+    float mspeedrot  = rdMap(u_rdmSpeedRot, -0.01, 0.01) * speedFactor;
+    float mspeedrdm  = u_rdmSpeedRnd * speedFactor;
     float tm = u_time;
 
     vec3 dib = vec3(1.0);
     for (int i = 1; i < 10; i++) {
         float fase = float(i) * pi * 2.0 / float(mcnt);
-        vec2 uv2 = uv;
+        vec2 uv2 = st;
         uv2.x += tm * mspeedx;
         uv2.y += tm * mspeedy;
 
         uv2 -= vec2(0.5); uv2 *= rdRotate2d(mspeedrot * tm); uv2 += vec2(0.5);
         uv2 -= vec2(0.5); uv2 *= rdScale2d(vec2(mite_scale * float(i))); uv2 += vec2(0.5);
 
-        float e = rdRandom(uv2 * mite_scale * float(i), tm * mspeedrdm + fase);
+        float e = rdRandom(uv2 * mite_scale * float(i), tm * mspeedrdm * 0.2 + fase);
         dib += vec3(e);
     }
     dib /= (float(mcnt) + 1.0);
@@ -207,15 +209,23 @@ vec3 rdmPattern(vec2 uv) {
     return dib * u_rdmForce;
 }
 
+vec3 rdmPattern(vec2 uv) {
+    return rdmPatternSlow(uv, 1.0);
+}
+
 // Fondo RDM teñido. Con u_palModo = 1 el patrón se PINTA con la paleta global:
 // el degradado va del acento primario (oscuro) al acento secundario (crestas), y
 // el brillo del patrón modula la mezcla. Con u_palModo = 0 queda el color del
 // panel (blanco por defecto = tal cual el shader rdmf).
-vec3 getRdmBg(vec2 uv) {
-    vec3 p = rdmPattern(uv);
+vec3 getRdmBgSlow(vec2 uv, float speedFactor) {
+    vec3 p = rdmPatternSlow(uv, speedFactor);
     float g = clamp(dot(p, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
     vec3 conPaleta = mix(u_palA * 0.45, u_palB, g) * (0.35 + 0.65 * g);
     return mix(p * u_rdmColor, conPaleta, clamp(u_palModo, 0.0, 1.0));
+}
+
+vec3 getRdmBg(vec2 uv) {
+    return getRdmBgSlow(uv, 1.0);
 }
 
 float poly(vec2 uv, vec2 p, float s, float dif, int N, float a){
@@ -312,8 +322,7 @@ struct HaikuBox {
     float presence;   // 0 en IDLE, sube en THINKING (escaneo), pleno en HAIKU
     vec2  size;       // semitamaño del marco en UV
     vec2  p;          // uv relativa al centro de pantalla
-    vec2  d;          // distancia por eje al borde (negativa = adentro)
-    float boxDist;    // distancia al contorno (0 = sobre el borde)
+    float sdf;        // distancia euclidiana continua exacta al borde en espacio corregido
     float inside;     // 1.0 adentro, 0.0 afuera
 };
 HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
@@ -327,15 +336,20 @@ HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
     b.size = targetSize * mix(0.70, 1.0, b.presence);
 
     b.p = uv - vec2(0.5, 0.5);
-    b.d = abs(b.p) - b.size;
-    b.boxDist = max(b.d.x * aspect, b.d.y);
-    b.inside = (b.d.x < 0.0 && b.d.y < 0.0) ? 1.0 : 0.0;
+
+    // Cálculo euclidiano exacto corregido por relación de aspecto de pantalla
+    vec2 p_sc = b.p * vec2(aspect, 1.0);
+    vec2 b_sc = b.size * vec2(aspect, 1.0);
+    vec2 d_sc = abs(p_sc) - b_sc;
+    b.sdf = length(max(d_sc, 0.0)) + min(max(d_sc.x, d_sc.y), 0.0);
+    b.inside = (abs(b.p.x) < b.size.x && abs(b.p.y) < b.size.y) ? 1.0 : 0.0;
     return b;
 }
 vec4 getHaikuContainer(vec2 uv, vec3 weights) {
     HaikuBox b = haikuBoxAt(uv, weights);
     if (b.presence < 0.005) return vec4(0.0);
-    if (b.boxDist > 0.08) return vec4(0.0);
+    // Sin corte abrupto: el aura decae a 0 antes de 0.12
+    if (b.sdf > 0.12) return vec4(0.0);
 
     float wThink = weights.y;
     float wHaiku = weights.z;
@@ -343,53 +357,49 @@ vec4 getHaikuContainer(vec2 uv, vec3 weights) {
 
     vec4 outColor = vec4(0.0);
 
-    // 1. Fondo interior del contenedor (vidrio ahumado silicio + matriz)
+    // 1. Fondo interior del contenedor (negro silicio obsidiana puro, cero marrón)
     if (b.inside > 0.5) {
-        // Rejilla de silicio holográfica interna
-        vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.04, 0.0));
-        float gridLine = (step(0.90, gridUv.x) + step(0.90, gridUv.y)) * 0.05;
+        // Rejilla de silicio interna hiper-sutil
+        vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.01, 0.0));
+        float gridLine = (step(0.96, gridUv.x) + step(0.96, gridUv.y)) * 0.008;
 
-        // Barras de escaneo horizontal sutil
-        float scan = sin(uv.y * 140.0 + u_time * 6.0) * 0.05 * (wThink + 0.2);
+        // Patrón RDM a velocidad lenta pero en escala monocromática carbón neutra (cero marrón)
+        vec3 p = rdmPatternSlow(uv, 0.08);
+        float pVal = clamp(dot(p, vec3(0.3333)), 0.0, 1.0);
+        // Textura carbón sutil: neutral monochromático sobre negro azabache
+        vec3 rdmCarbon = vec3(0.012, 0.012, 0.014) * smoothstep(0.30, 0.85, pVal);
 
-        // Relleno del contenedor: ruido FBM de alta frecuencia en vez de negro puro
-        // Fondo: RDM del panel MASTER RDM (u_rdmMix=1 lo tapa por completo).
-        vec3 bg = mix(getHighFreqNoiseBg(uv), getRdmBg(uv), u_rdmMix) + vec3(gridLine);
-    
-        // Viñeta interna: los bordes más apagados, el centro sostiene el texto
-        float bordeInt = min(min(b.size.x - abs(b.p.x), b.size.y - abs(b.p.y)) * 6.0, 1.0);
-        //bg *= mix(0.72, 1.0, bordeInt);
+        // Base negro profundo puro / obsidiana profunda (cero marrón)
+        vec3 baseNegro = vec3(0.001, 0.001, 0.002);
+        vec3 bg = baseNegro + rdmCarbon * clamp(u_rdmMix, 0.0, 1.0) + vec3(gridLine);
 
-        // SIN TRANSPARENCIA: el interior tapa el fondo por completo (el fondo ya
-        // no se ve en la zona del cuadrado). Sólo queda un fade corto al entrar.
+        // SIN TRANSPARENCIA en el cuerpo: el interior tapa el fondo de la cámara por completo
         float fillAlpha = smoothstep(0.02, 0.40, b.presence);
         outColor = vec4(bg, fillAlpha);
     }
 
-    // 2. Bordes y marcas tácticas del contenedor
-    float edgeGlow = exp(-abs(b.boxDist) * 220.0);          // marco principal
-    float innerLine = exp(-abs(b.boxDist + 0.014) * 260.0); // doble marco interior
-    // Aura EXTERIOR: sólo afuera del cuadrado (adentro valía 1.0 y "pintaba" todo el
-    // interior con el color del marco).
-    float outerAura = (b.boxDist > 0.0) ? exp(-b.boxDist * 34.0) * 1.10 : 0.0;
-    // Brillo INTERIOR: pegado al marco, decae hacia el centro.
-    float innerAura = exp(-max(0.0, -b.boxDist) * 30.0) * 0.55;
+    // 2. Borde hairline nítido y elegante (~1px, mucho menos ancho)
+    float edgeLine = smoothstep(0.0011, 0.0, abs(b.sdf));
 
-    // Soportes de esquina (brackets tácticos)
-    vec2 cornerOffset = abs(abs(b.p) - b.size);
-    float isCorner = (step(cornerOffset.x, 0.055) * step(cornerOffset.y, 0.055));
-    float cornerBoost = (isCorner > 0.0) ? 2.6 : 1.0;
+    // Resplandor exterior mínimo, CEÑIDO estrictamente al borde exterior (cero penetración interior)
+    float edgeGlow = (b.inside < 0.5) ? exp(-max(0.0, b.sdf) * 260.0) * 0.22 : 0.0;
 
-    // Marco y esquinas: línea ROJA CLARA. Aura/brillo: ROJO (siempre, en los 3
-    // estados — antes en thinking el marco pasaba a oro/naranja).
-    float lineaAlpha = (edgeGlow * 3.2 * cornerBoost + innerLine * 1.6 * cornerBoost) * b.presence;
-    float auraAlpha = (outerAura + innerAura) * b.presence;
+    // Brackets de esquina discretos y finos
+    vec2 p_sc = b.p * vec2(aspect, 1.0);
+    vec2 b_sc = b.size * vec2(aspect, 1.0);
+    vec2 cornerDist = max(vec2(0.0), b_sc - abs(p_sc));
+    float cornerWeight = smoothstep(0.035, 0.008, min(cornerDist.x, cornerDist.y));
 
-    // Línea y aura del contenedor: con la paleta activa salen de u_palB / u_palA.
-    vec3 lineaCol = mix(HAIKU_LINE_COL, u_palB, clamp(u_palModo, 0.0, 1.0));
-    vec3 auraCol  = mix(HAIKU_GLOW_COL, u_palA * 0.55, clamp(u_palModo, 0.0, 1.0));
+    float lineaAlpha = (edgeLine * 1.3 + edgeLine * cornerWeight * 0.4) * b.presence;
+    float auraAlpha = edgeGlow * b.presence;
 
-    outColor.rgb = mix(outColor.rgb, auraCol, clamp(auraAlpha, 0.0, 1.0));
+    // Línea del contenedor: acento nítido fino, aura neutra sutil (cero marrón)
+    vec3 lineaCol = mix(vec3(0.95, 0.95, 1.0), u_palB, clamp(u_palModo, 0.0, 1.0));
+    vec3 auraCol  = (u_palModo > 0.5) ? u_palB * 0.35 : vec3(0.2, 0.2, 0.25);
+
+    if (b.inside < 0.5) {
+        outColor.rgb = mix(outColor.rgb, auraCol, clamp(auraAlpha, 0.0, 1.0));
+    }
     outColor.rgb = mix(outColor.rgb, lineaCol, clamp(lineaAlpha, 0.0, 1.0));
     outColor.a = max(outColor.a, clamp(max(lineaAlpha, auraAlpha), 0.0, 1.0));
 
@@ -606,6 +616,20 @@ void main() {
     }
 
 
+    // 3) Silueta OpenPose monocroma (blanco puro)
+    vec3 opLayer = vec3(0.0);
+    if (u_hasOpenpose == 1) {
+        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
+        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
+        opLayer = vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    }
+
+    /* REQUERIMIENTO: cuando ya están elegidas las 3 palabras (u_openposeBehind > 0.5),
+       OpenPose se compone POR DETRÁS de las palabras y del contenedor del Haiku. */
+    if (u_openposeBehind > 0.5) {
+        fin += opLayer;
+    }
+
     // Capa D: Integración del contenedor del Haiku detrás de los textos
     fin = mix(fin, haikuBox.rgb, haikuBox.a);
 
@@ -629,22 +653,10 @@ void main() {
     // tinte iba modulado por una senoidal vertical que barria toda la pantalla).
     fin += vec3(0.04, 0.01, 0.02) * weights.z * (1.0 - maskTotal);
 
-
-    /* ============ OPENPOSE: SIEMPRE ARRIBA DE TODO (pedido usuario) ============
-       Se compone AL FINAL, despues de la silueta/camara, del contenedor del haiku
-       y de las cajas de las palabras: nada puede taparlo. Antes iba antes de esas
-       cajas y el interior NEGRO de las palabras lo tapaba. */
-    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
-    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
-    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
-    //     trackingConfig.boneWidth / pointRadius del overlay).
-    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
-    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
-    //     huesos de colores.
-    if (u_hasOpenpose == 1) {
-        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
-        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
-        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
+    /* Cuando aún se están buscando/eligiendo las palabras (idle / interact),
+       OpenPose se compone AL FINAL (por encima de todo para interactuar con las palabras) */
+    if (u_openposeBehind <= 0.5) {
+        fin += opLayer;
     }
 
     gl_FragColor = vec4(fin, 1.0);

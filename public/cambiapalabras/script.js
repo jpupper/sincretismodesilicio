@@ -1647,674 +1647,28 @@ class MasterOutputShader {
     `;
 
     let fsSource = null;
-    let fsOrigen = 'COPIA EMBEBIDA (dentro de script.js)';   // de dónde salió el shader
-    let fsError = '';
-    try {
-      const resp = await fetch(sbUrl('/shaders/master-output.frag?t=' + Date.now()));
-      if (resp.ok) { fsSource = await resp.text(); fsOrigen = 'public/shaders/master-output.frag (' + fsSource.length + ' bytes)'; }
-      else fsError = 'HTTP ' + resp.status;
-    } catch (e) { fsError = e.message || 'fetch falló'; }
-    console.log('[Master Shader] fuente del shader: ' + fsOrigen + (fsError ? '  <- ' + fsError : ''));
-    // AVISO EN PANTALLA (no hace falta abrir la consola): si el shader NO viene del
-    // .frag, cualquier edición a public/shaders/master-output.frag queda sin efecto.
+    let fsOrigen = 'public/shaders/master-output.frag';
+    const pathsToTry = [
+      sbUrl('/shaders/master-output.frag?t=' + Date.now()),
+      'shaders/master-output.frag?t=' + Date.now(),
+      '../shaders/master-output.frag?t=' + Date.now()
+    ];
+    for (const p of pathsToTry) {
+      try {
+        const resp = await fetch(p);
+        if (resp.ok) {
+          fsSource = await resp.text();
+          fsOrigen = p + ' (' + fsSource.length + ' bytes)';
+          break;
+        }
+      } catch (e) { }
+    }
+
     if (!fsSource) {
-      // Se llega acá si el fetch de /shaders/master-output.frag falla en silencio
-      // (file://, hosting sin /shaders, 404). Antes quedaba mudo: ahora avisa.
-      console.warn('[Master Shader] No se pudo leer public/shaders/master-output.frag -> se usa la COPIA EMBEBIDA (sincronizada).');
-      // ---------------------------------------------------------------------
-      // COPIA EMBEBIDA DEL SHADER MAESTRO.
-      // ⚠ DEBE SER IDÉNTICA a public/shaders/master-output.frag. Si editás uno,
-      //   editá el otro (es el respaldo cuando el fetch no puede leer el archivo).
-      // ---------------------------------------------------------------------
-      fsSource = `
-precision highp float;
-
-// ============================================================================
-// SHADER MAESTRO DE SALIDA (MASTER OUTPUT SHADER)
-// ============================================================================
-// 1) Render de la Cámara
-uniform sampler2D u_cameraTexture;
-uniform int u_hasCamera;
-
-// 2) Render del Depth Map / Segmentación
-uniform sampler2D u_depthTexture;
-uniform int u_hasDepth;
-
-// 3) Render de la Silueta / Overlay OpenPose
-uniform sampler2D u_openposeTexture;
-uniform int u_hasOpenpose;
-uniform float u_openposeOpacity;
-
-// 3b) Render de Vectores de Campo de Flujo (Flow Field)
-uniform sampler2D u_flowfieldTexture;
-uniform int u_hasFlowfield;
-uniform float u_flowfieldOpacity;
-
-// 4) Array con las posiciones normalizadas de las palabras en pantalla (UV: 0.0 a 1.0)
-#define MAX_WORDS 32
-uniform vec2 u_wordPositions[MAX_WORDS];
-// Ancho REAL de cada palabra en UV x (px/ancho de pantalla). 0 = sin dato:
-// en ese caso el marco usa el ancho fijo de WORD_BOX_X.
-uniform float u_wordWidths[MAX_WORDS];
-uniform float u_wordDwell[MAX_WORDS];
-uniform int u_wordCount;
-
-uniform sampler2D renderJPSHADER;
-
-// 5) Estados activos del sistema:
-//    u_activeState (0: IDLE, 1: PROCESSING/THINKING, 2: HIJACK/HAIKU)
-//    u_stateWeights (vec3 interpolado continuo: x=IDLE, y=THINKING, z=HAIKU)
-uniform int u_activeState;
-uniform vec3 u_stateWeights;
-
-
-// Uniforms de Control de GLITCH (Mismos parámetros que en LOG)
-uniform float glitchAmount;
-uniform float blockIntensity;
-uniform float blockSize;
-uniform float chromaIntensity;
-uniform float vhsNoiseIntensity;
-uniform float edgeTearingIntensity;
-
-// Uniforms de resolución y tiempo
-uniform vec2 u_resolution;
-uniform float u_time;
-
-// ---------------------------------------------------------------------------
-// PATRÓN RDM — FONDO DE LAS CAJAS DE PALABRAS Y DEL CONTENEDOR DEL HAIKU
-// ---------------------------------------------------------------------------
-// Port del shader "rdmf" de jpShadereditor (autor jpupper): un campo de RUIDO
-// ALEATORIO POR CAPAS. Del original se quitó el feedback (iChannel0) y el hue:
-// el patrón se calcula EN BLANCO y se tiñe con u_rdmColor.
-//
-// TODOS estos uniforms son manejables desde ARRIBA: los manda script.js en cada
-// frame desde el panel MASTER RDM del modal (tecla P) y desde MASTER_RDM_DEF
-// (arriba de todo en public/cambiapalabras/script.js). Llegan NORMALIZADOS a
-// 0..1 y acá se pasan a la escala física del shader original con rdMap().
-uniform float u_rdmCnt;        // CAPAS          (físico 1..20)
-uniform float u_rdmIteScale;   // ESCALA X CAPA  (físico 0..10)
-uniform float u_rdmSpeedX;     // deriva X       (físico -0.2..0.2)
-uniform float u_rdmSpeedY;     // deriva Y       (físico -0.2..0.2)
-uniform float u_rdmSpeedRot;   // rotación       (físico -0.01..0.01)
-uniform float u_rdmSpeedRnd;   // velocidad del random (0..1)
-uniform float u_rdmSm1;        // SMOOTH BAJO (umbral del smoothstep)
-uniform float u_rdmSm2;        // SMOOTH ALTO (dónde llega a blanco pleno)
-uniform float u_rdmForce;      // brillo final (e_force del original)
-uniform float u_rdmMix;        // PRESENCIA: 1 = tapa el fondo anterior
-uniform vec3  u_rdmColor;      // tinte del patrón
-
-// ---------------------------------------------------------------------------
-// PALETA UNIFICADA (la del GLOBALSTYLE: /globalstyle.html y global_style.json)
-// ---------------------------------------------------------------------------
-// u_palModo = 1 → el patrón RDM, los marcos de las palabras, el contenedor del
-// haiku y el tinte de la cámara usan la paleta. 0 → colores fijos de siempre.
-uniform vec3  u_palA;          // acento primario   (borde / acento)
-uniform vec3  u_palB;          // acento secundario (acento2)
-uniform float u_palModo;       // 1 = seguir la paleta global
-uniform float u_camPal;        // 0..1 cuánto se tiñe la cámara con la paleta
-// SILUETA (reemplazo de la cámara de color): la máscara de profundidad pintada con el
-// patrón RDM de la paleta y un borde blanco. u_camVis = 1 vuelve a la cámara original.
-uniform float u_camVis;        // 0..1 MEZCLA: 0 = depth+RDM puro · 1 = cámara pura
-uniform float u_silRdm;        // 0..1 pinta la silueta con el patrón RDM
-uniform float u_silEdge;       // 0..1 borde blanco de la silueta
-uniform float u_maskOn;        // 0..1 PRESENCIA de la mascarilla del cuerpo (0 = solo el esqueleto)
-uniform float u_silBlur;       // radio de BLUR del depth, en TEXELES del depth (no en px de pantalla:
-                               // el depth viene de 240x160 y se estira ~6,6x, asi que el blur tiene
-                               // que medirse en texeles o no alcanza a tapar el pixelado)
-uniform vec2  u_depthTexel;     // 1.0 / tamaño real del canvas de depth
-#define pi 3.14159265359
-
-// ---------------------------------------------------------------------------
-// AJUSTES RÁPIDOS (editá acá y apretá R para recompilar en vivo)
-// ---------------------------------------------------------------------------
-// ANCHO de los contenedores de las palabras:
-//   1.0 = cuadrado · 0.55 = 1.8x MÁS ANCHO · 0.40 = 2.5x MÁS ANCHO
-#define WORD_BOX_X        0.55
-
-// ADAPTACIÓN PANTALLA VERTICAL:
-// Comprime el alto en shader para palabras y reduce un poquito el ancho
-#define WORD_BOX_KY       1.75
-#define WORD_BOX_PAD      0.78
-#define WORD_BOX_FILL    0.0    // 0 = el fondo lo pone el NEGRO opaco; el color es solo la ENERGIA
-#define WORD_BOX_DARK    0.55   // opacidad del fondo oscuro de la caja (0 = caja invisible)   // relleno base CON COLOR de la caja de la palabra (0 = apagado)
-
-// Tamaño del contenedor del HAIKU (media medida, en UV)
-#define HAIKU_BOX_W       0.38
-#define HAIKU_BOX_H       0.22
-
-// VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
-// Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
-#define WORD_SPIN_SPEED   0.032
-#define HAIKU_BG_TOP      vec3(0.0, 0.0, 0.0)
-#define HAIKU_BG_BOT      vec3(0.0, 0.0, 0.0)
-#define HAIKU_LINE_COL    vec3(1.0, 1.0, 0.1)
-#define HAIKU_GLOW_COL    vec3(0.4, 0.4, 0.4)
-
-float rand(vec2 co){
-    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
-
-// Función de ruido suave 2D (Value Noise continuo con interpolación quintic)
-float noise2D(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-
-    float a = rand(i);
-    float b = rand(i + vec2(1.0, 0.0));
-    float c = rand(i + vec2(0.0, 1.0));
-    float d = rand(i + vec2(1.0, 1.0));
-
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-
-// Ruido FBM de muy alta frecuencia (5 octavas con rotación irracional)
-float fbmHighFreq(vec2 p) {
-    float val = 0.0;
-    float amp = 0.52;
-    mat2 rot = mat2(0.80, 0.60, -0.60, 0.80);
-    for (int i = 0; i < 5; i++) {
-        val += amp * noise2D(p);
-        p = rot * p * 2.07 + vec2(4.13, 7.37);
-        amp *= 0.50;
+      console.error('[Master Shader] Error crítico: No se pudo cargar public/shaders/master-output.frag desde ninguna ruta.');
+      return false;
     }
-    return val;
-}
-
-// Fondo de alta frecuencia para los contenedores de palabras y el contenedor del haiku:
-// Textura táctica densa con balance lumínico (no negro absoluto 0.0, ni blanco quemado)
-vec3 getHighFreqNoiseBg(vec2 uv) {
-    float aspect = u_resolution.x / u_resolution.y;
-    vec2 p = uv * vec2(280.0 * aspect, 280.0) + vec2(u_time * 0.35, u_time * 0.20);
-    float n = clamp(fbmHighFreq(p), 0.0, 1.0);
-    float lum = mix(0.08, 0.26, n);
-    return vec3(lum);
-}
-
-// ---------------------------------------------------------------------------
-// PATRÓN RDM (port de "rdmf"): se promedian u_rdmCnt capas de ruido aleatorio,
-// cada una con su fase, su rotación y su escala (ite_scale * i). El original
-// dividía por (cnt+1) y cerraba con un smoothstep: se respeta tal cual.
-// ---------------------------------------------------------------------------
-float rdMap(float v, float lo, float hi) { return lo + (hi - lo) * v; }
-mat2 rdRotate2d(float a) { return mat2(cos(a), -sin(a), sin(a), cos(a)); }
-mat2 rdScale2d(vec2 sc) { return mat2(sc.x, 0.0, 0.0, sc.y); }
-float rdRandom(vec2 st, float t) {
-    return fract(sin(dot(floor(st.xy), vec2(12.9898, 78.233))) * 43000.3 + t);
-}
-
-vec3 rdmPattern(vec2 uv) {
-    float fix = u_resolution.x / u_resolution.y;
-    uv.x *= fix;                                  // el original escala el X (si no, se estira)
-
-    int mcnt = int(floor(rdMap(u_rdmCnt, 1.0, 20.0)));
-    if (mcnt < 1) mcnt = 1;
-    float mite_scale = rdMap(u_rdmIteScale, 0.0, 10.0);
-    float mspeedx    = rdMap(u_rdmSpeedX, -0.2, 0.2);
-    float mspeedy    = rdMap(u_rdmSpeedY, -0.2, 0.2);
-    float mspeedrot  = rdMap(u_rdmSpeedRot, -0.01, 0.01);
-    float mspeedrdm  = u_rdmSpeedRnd;
-    float tm = u_time;
-
-    vec3 dib = vec3(1.0);
-    for (int i = 1; i < 10; i++) {
-        float fase = float(i) * pi * 2.0 / float(mcnt);
-        vec2 uv2 = uv;
-        uv2.x += tm * mspeedx;
-        uv2.y += tm * mspeedy;
-
-        uv2 -= vec2(0.5); uv2 *= rdRotate2d(mspeedrot * tm); uv2 += vec2(0.5);
-        uv2 -= vec2(0.5); uv2 *= rdScale2d(vec2(mite_scale * float(i))); uv2 += vec2(0.5);
-
-        float e = rdRandom(uv2 * mite_scale * float(i), tm * mspeedrdm + fase);
-        dib += vec3(e);
-    }
-    dib /= (float(mcnt) + 1.0);
-    dib = smoothstep(u_rdmSm1, max(u_rdmSm2, u_rdmSm1 + 0.001), dib);
-    return dib * u_rdmForce;
-}
-
-// Fondo RDM teñido. Con u_palModo = 1 el patrón se PINTA con la paleta global:
-// el degradado va del acento primario (oscuro) al acento secundario (crestas), y
-// el brillo del patrón modula la mezcla. Con u_palModo = 0 queda el color del
-// panel (blanco por defecto = tal cual el shader rdmf).
-vec3 getRdmBg(vec2 uv) {
-    vec3 p = rdmPattern(uv);
-    float g = clamp(dot(p, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
-    vec3 conPaleta = mix(u_palA * 0.45, u_palB, g) * (0.35 + 0.65 * g);
-    return mix(p * u_rdmColor, conPaleta, clamp(u_palModo, 0.0, 1.0));
-}
-
-float poly(vec2 uv, vec2 p, float s, float dif, int N, float a){
-    vec2 st = p - uv;
-    float a2 = atan(st.x, st.y) + a;
-    float r = pi * 2.0 / float(N);
-    float d = cos(floor(0.5 + a2 / r) * r - a2) * length(st);
-    float e = 1.0 - smoothstep(s, dif, d);
-    return e;
-}
-vec4 getWords(vec2 uv, float animPulse){
-    float t = u_time * (1.0 + animPulse * 1.5);
-    vec4 wordsEffect = vec4(0.0);
-    float fx = u_resolution.x / u_resolution.y;
-
-    for (int i = 0; i < MAX_WORDS; i++) {
-        if (i >= u_wordCount) break;
-        vec2 wPos = u_wordPositions[i];
-
-        vec2 uv2 = uv;
-        vec2 diff = (uv2 - wPos) * vec2(fx, 1.0);
-        float r = length(diff);
-
-        float s = mix(0.07, 0.12, animPulse);
-        float d = mix(0.07, 0.12, animPulse);
-
-        float e = 1.0 - smoothstep(s, s + d, r);
-        wordsEffect += e * 0.5;
-    }
-    return wordsEffect;
-}
-vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
-
-    float t = u_time * WORD_SPIN_SPEED * (1.0 + animPulse);
-    vec4 wordsEffect = vec4(0.0);
-    float fx = u_resolution.x / u_resolution.y;
-
-    for (int i = 0; i < MAX_WORDS; i++) {
-        if (i >= u_wordCount) break;
-        vec2 wPos = u_wordPositions[i];
-
-        float s = _s * (1.0 + animPulse * 0.35);
-        // grosor del trazo: nunca 0 (smoothstep con bordes iguales es indefinido
-        // y en algunos drivers el marco desaparecía por completo)
-        float d = max(_d, s * 0.10) * (1.0 + animPulse * 0.35);
-
-        // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
-        // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
-        float wAncho = u_wordWidths[i] * WORD_BOX_PAD * 0.5;
-        float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
-        float ky = WORD_BOX_KY;
-        // uv_m = uv con ejes adaptados para pantalla vertical (alto reducido)
-        vec2 uv_m = wPos + (uv - wPos) * vec2(kx, ky);
-
-        float rot = animPulse * sin(t + float(i));
-        float full = poly(uv_m, wPos, s, s + d, 4, rot);
-        float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
-        float border = max(0.0, full - inner);
-
-        // PEDIDO USUARIO (2026-10-06): el FONDO de la palabra SIEMPRE se dibuja CON COLOR
-        // (antes, sin dwell, quedaba solo la silueta del rombo y se veia el patron del fondo
-        // a traves) y mientras la mano/cursor la va llenando, el frente de llenado avanza
-        // de IZQUIERDA a DERECHA en espacio de pantalla.
-        float dwell = (i < MAX_WORDS) ? u_wordDwell[i] : 0.0;
-        float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
-        // Coordenada horizontal normalizada dentro del contenedor de la palabra
-        float normX = clamp((uv.x - (wPos.x - effAncho)) / (2.0 * effAncho), 0.0, 1.0);
-
-        // 1) RELLENO BASE CON COLOR: la caja nunca queda como un agujero negro.
-        vec3 baseCol = (u_palModo > 0.5) ? (mix(u_palA, u_palB, normX) * 0.85) : vec3(0.30, 0.62, 0.95);
-        wordsEffect.rgb += baseCol * full * WORD_BOX_FILL;
-
-        // 2) FRENTE DE LLENADO (dwell 0..1): lo que la mano ya cargo queda incandescente.
-        if (dwell > 0.001 && full > 0.01) {
-            // Frente de carga que se va llenando
-            float fillProgress = smoothstep(0.0, 0.02, dwell - normX);
-            // Filamento / chispa brillante en el frente activo de llenado
-            float sparkLine = exp(-abs(normX - dwell) * 45.0) * (1.3 + 0.6 * sin(uv.y * 140.0 + u_time * 30.0));
-            // Chisporroteo / calor de ignicion
-            float sizzle = 0.8 + 0.25 * sin(uv.x * 90.0 + u_time * 28.0) * cos(uv.y * 90.0 - u_time * 22.0);
-            // Color que se prende: cobre fundido a nucleo blanco-ambar incandescente
-            vec3 igniteCol = mix(vec3(1.0, 0.35, 0.08), vec3(1.0, 0.92, 0.55), normX);
-            if (u_palModo > 0.5) igniteCol = mix(u_palA * 1.3, u_palB * 1.8, normX);
-            float igniteIntensity = (fillProgress * 0.70 * sizzle + sparkLine * 1.6) * full;
-            wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
-        }
-
-        // Borde exterior eliminado según requerimiento de diseño
-        wordsEffect.a = max(wordsEffect.a, full);
-    }
-    return wordsEffect;
-}
-struct HaikuBox {
-    float presence;   // 0 en IDLE, sube en THINKING (escaneo), pleno en HAIKU
-    vec2  size;       // semitamaño del marco en UV
-    vec2  p;          // uv relativa al centro de pantalla
-    vec2  d;          // distancia por eje al borde (negativa = adentro)
-    float boxDist;    // distancia al contorno (0 = sobre el borde)
-    float inside;     // 1.0 adentro, 0.0 afuera
-};
-HaikuBox haikuBoxAt(vec2 uv, vec3 weights) {
-    HaikuBox b;
-    // SOLO cuando se está formando el haiku (estado HAIKU = weights.z). Antes de
-    // eso (THINKING: palabras girando y cambiando) el contenedor NO existe.
-    b.presence = clamp(weights.z, 0.0, 1.0);
-
-    float aspect = u_resolution.x / u_resolution.y;
-    vec2 targetSize = vec2(HAIKU_BOX_W, HAIKU_BOX_H);
-    b.size = targetSize * mix(0.70, 1.0, b.presence);
-
-    b.p = uv - vec2(0.5, 0.5);
-    b.d = abs(b.p) - b.size;
-    b.boxDist = max(b.d.x * aspect, b.d.y);
-    b.inside = (b.d.x < 0.0 && b.d.y < 0.0) ? 1.0 : 0.0;
-    return b;
-}
-vec4 getHaikuContainer(vec2 uv, vec3 weights) {
-    HaikuBox b = haikuBoxAt(uv, weights);
-    if (b.presence < 0.005) return vec4(0.0);
-    if (b.boxDist > 0.08) return vec4(0.0);
-
-    float wThink = weights.y;
-    float wHaiku = weights.z;
-    float aspect = u_resolution.x / u_resolution.y;
-
-    vec4 outColor = vec4(0.0);
-
-    // 1. Fondo interior del contenedor (vidrio ahumado silicio + matriz)
-    if (b.inside > 0.5) {
-        // Rejilla de silicio holográfica interna
-        vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.04, 0.0));
-        float gridLine = (step(0.90, gridUv.x) + step(0.90, gridUv.y)) * 0.05;
-
-        // Barras de escaneo horizontal sutil
-        float scan = sin(uv.y * 140.0 + u_time * 6.0) * 0.05 * (wThink + 0.2);
-
-        // Relleno del contenedor: ruido FBM de alta frecuencia en vez de negro puro
-        // Fondo: RDM del panel MASTER RDM (u_rdmMix=1 lo tapa por completo).
-        vec3 bg = mix(getHighFreqNoiseBg(uv), getRdmBg(uv), u_rdmMix) + vec3(gridLine);
-    
-        // Viñeta interna: los bordes más apagados, el centro sostiene el texto
-        float bordeInt = min(min(b.size.x - abs(b.p.x), b.size.y - abs(b.p.y)) * 6.0, 1.0);
-        //bg *= mix(0.72, 1.0, bordeInt);
-
-        // SIN TRANSPARENCIA: el interior tapa el fondo por completo (el fondo ya
-        // no se ve en la zona del cuadrado). Sólo queda un fade corto al entrar.
-        float fillAlpha = smoothstep(0.02, 0.40, b.presence);
-        outColor = vec4(bg, fillAlpha);
-    }
-
-    // 2. Bordes y marcas tácticas del contenedor
-    float edgeGlow = exp(-abs(b.boxDist) * 220.0);          // marco principal
-    float innerLine = exp(-abs(b.boxDist + 0.014) * 260.0); // doble marco interior
-    // Aura EXTERIOR: sólo afuera del cuadrado (adentro valía 1.0 y "pintaba" todo el
-    // interior con el color del marco).
-    float outerAura = (b.boxDist > 0.0) ? exp(-b.boxDist * 34.0) * 1.10 : 0.0;
-    // Brillo INTERIOR: pegado al marco, decae hacia el centro.
-    float innerAura = exp(-max(0.0, -b.boxDist) * 30.0) * 0.55;
-
-    // Soportes de esquina (brackets tácticos)
-    vec2 cornerOffset = abs(abs(b.p) - b.size);
-    float isCorner = (step(cornerOffset.x, 0.055) * step(cornerOffset.y, 0.055));
-    float cornerBoost = (isCorner > 0.0) ? 2.6 : 1.0;
-
-    // Marco y esquinas: línea ROJA CLARA. Aura/brillo: ROJO (siempre, en los 3
-    // estados — antes en thinking el marco pasaba a oro/naranja).
-    float lineaAlpha = (edgeGlow * 3.2 * cornerBoost + innerLine * 1.6 * cornerBoost) * b.presence;
-    float auraAlpha = (outerAura + innerAura) * b.presence;
-
-    // Línea y aura del contenedor: con la paleta activa salen de u_palB / u_palA.
-    vec3 lineaCol = mix(HAIKU_LINE_COL, u_palB, clamp(u_palModo, 0.0, 1.0));
-    vec3 auraCol  = mix(HAIKU_GLOW_COL, u_palA * 0.55, clamp(u_palModo, 0.0, 1.0));
-
-    outColor.rgb = mix(outColor.rgb, auraCol, clamp(auraAlpha, 0.0, 1.0));
-    outColor.rgb = mix(outColor.rgb, lineaCol, clamp(lineaAlpha, 0.0, 1.0));
-    outColor.a = max(outColor.a, clamp(max(lineaAlpha, auraAlpha), 0.0, 1.0));
-
-    return outColor;
-}
-void getGlitchCoords(vec2 uv, out vec2 uvR, out vec2 uvG, out vec2 uvB, out float scanline, out float vhsNoise) {
-    float t = floor(u_time * 15.0);
-
-    // 1. PATRÓN RANDOM (Alta densidad de filas y columnas)
-    float rows = (blockSize * 100.0);
-    float row = floor(uv.y * rows);
-
-    float baseCols = (blockSize * 100.0);
-    float colsPerRow = baseCols * (0.5 + 2.0 * rand(vec2(row, t)));
-
-    float colOffset = rand(vec2(row, t * 0.5)) * 100.0;
-    float col = floor(uv.x * colsPerRow + colOffset);
-
-    vec2 cellId = vec2(col, row);
-
-    float cellRandom = rand(cellId + t);
-    float glitchThreshold = 1.0 - (blockIntensity * glitchAmount);
-
-    vec2 displace = vec2(0.0);
-    bool isGlitching = (cellRandom > glitchThreshold) && (glitchAmount > 0.0);
-
-    if (isGlitching) {
-        float shiftX = (rand(cellId + t * 2.0) - 0.5) * 0.5 * glitchAmount;
-        float shiftY = (rand(cellId + t * 3.0) - 0.5) * 0.1 * glitchAmount;
-        displace = vec2(shiftX, shiftY);
-    }
-
-    vec2 p = uv + displace;
-
-    // 2. TEARING LATERAL
-    float effectiveEdge = edgeTearingIntensity * glitchAmount;
-    float edgeDist = abs(uv.x - 0.5) * 2.0;
-    if (effectiveEdge > 0.0 && edgeDist > (1.0 - effectiveEdge * 0.5)) {
-        float sideCell = floor(uv.y * rows * 1.5);
-        p.x += (rand(vec2(sideCell, t)) - 0.5) * 0.4 * effectiveEdge;
-    }
-
-    // 3. ABERRACIÓN CROMÁTICA
-    float effectiveChroma = chromaIntensity * glitchAmount * 0.05;
-    if (isGlitching) {
-        effectiveChroma *= 3.0; // Resalta en los cuadraditos rotos
-    }
-
-    uvR = p + vec2(effectiveChroma, 0.0);
-    uvG = p;
-    uvB = p - vec2(effectiveChroma, 0.0);
-
-    // 4. VHS NOISE Y SCANLINES
-    float effectiveVHS = vhsNoiseIntensity * glitchAmount;
-    scanline = sin(uv.y * u_resolution.y * 2.5) * 0.03 * effectiveVHS;
-    vhsNoise = (rand(uv * u_time) - 0.5) * 0.15 * effectiveVHS;
-}
-
-// Función auxiliar para leer la máscara de profundidad limpia (canal alpha prioritario o luminancia)
-float getDepthMask(vec2 p) {
-    if (u_hasDepth != 1) return 0.0;
-    // REQUERIMIENTO 3: Ensanchar la silueta fullscreen para que en pantalla vertical no se vea angosta/rara
-    float sx = (u_resolution.y > u_resolution.x) ? 0.72 : 0.85;
-    vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
-    if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
-    vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
-    return (d.a > 0.005) ? clamp(d.a, 0.0, 1.0) : 0.0;
-}
-
-void main() {
-    vec2 rawUv = gl_FragCoord.xy / u_resolution;
-
-    // Normalizar pesos de los 3 estados (fallback a u_activeState si u_stateWeights no se envió)
-    vec3 weights = u_stateWeights;
-    float sumW = weights.x + weights.y + weights.z;
-    if (sumW < 0.01) {
-        if (u_activeState == 1) weights = vec3(0.0, 1.0, 0.0);
-        else if (u_activeState == 2) weights = vec3(0.0, 0.0, 1.0);
-        else weights = vec3(1.0, 0.0, 0.0);
-    } else {
-        weights /= sumW;
-    }
-
-    vec2 uvR, uvG, uvB;
-    float scanline, vhsNoise;
-    getGlitchCoords(rawUv, uvR, uvG, uvB, scanline, vhsNoise);
-
-    vec2 uv = uvG;
-
-    // Espejado horizontal de la cámara web
-    vec2 camUvR = vec2(1.0 - uvR.x, 1.0 - uvR.y);
-    vec2 camUvG = vec2(1.0 - uvG.x, 1.0 - uvG.y);
-    vec2 camUvB = vec2(1.0 - uvB.x, 1.0 - uvB.y);
-
-    // 1) Render Cámara con aberración cromática glitcheada suave
-    vec3 camCol = vec3(0.0);
-    if (u_hasCamera == 1) {
-        camCol.r = texture2D(u_cameraTexture, camUvR).r;
-        camCol.g = texture2D(u_cameraTexture, camUvG).g;
-        camCol.b = texture2D(u_cameraTexture, camUvB).b;
-    }
-    // TINTE DE LA CÁMARA con la paleta unificada (u_camPal = 0 → imagen original).
-    if (u_hasCamera == 1 && u_camPal > 0.001) {
-        float camLum = dot(camCol, vec3(0.299, 0.587, 0.114));
-        vec3 camPalCol = mix(u_palA * 0.35, u_palB, clamp(camLum * 1.15, 0.0, 1.0));
-        camCol = mix(camCol, camPalCol, clamp(u_camPal * u_palModo, 0.0, 1.0));
-    }
-    vec3 invcamCol = vec3(1.0, 1.0, 1.0) - camCol.rgb;
-    vec4 depthCol = (u_hasDepth == 1) ? texture2D(u_depthTexture, vec2(uv.x, 1.0 - uv.y)) : vec4(0.0);
-
-    vec4 openposeCol = vec4(0.0);
-    if (u_hasOpenpose == 1) {
-        openposeCol = texture2D(u_openposeTexture, vec2(uv.x,1.-uv.y));
-        float opOpacity = (u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0;
-        openposeCol.rgb *= opOpacity;
-    }
-
-    // 3b) Render Flow Field (Campo de Flujo Vectorial Óptico)
-    vec4 flowfieldCol = vec4(0.0);
-    if (u_hasFlowfield == 1) {
-        flowfieldCol = texture2D(u_flowfieldTexture, uv);
-        float ffOpacity = (u_flowfieldOpacity > 0.0) ? u_flowfieldOpacity : 1.0;
-        flowfieldCol.rgb *= ffOpacity;
-    }
-
-    // 4) Render directo de JPShaderEditor Include
-    vec3 jpCol = texture2D(renderJPSHADER, uvR).rgb;
-
-    // 5) Efectos de palabras en pantalla (fondo de las palabras)
-    float animPulse = weights.y * 1.0 + weights.z * 0.3;
-    vec4 words = getWords(uv, animPulse);
-    vec4 wordsq = getQuadWords(rawUv, mix(0.03, 0.045, weights.y), 0.0, animPulse);
-
-    float cajaPresence = clamp(weights.z, 0.0, 1.0);   // = presencia del contenedor
-    wordsq *= (1.0 - smoothstep(0.03, 0.45, cajaPresence));
-
-    vec4 haikuBox = getHaikuContainer(rawUv, weights);
-
-
-
-
-    vec3 fin = vec3(0.0);
-    fin += jpCol * words.r;
-
-    /* ============ SILUETA DEL CUERPO (Depth Map Suavizado + RDM + Borde) ============
-       Pedido del usuario:
-       1) Borrar completamente puntos rojos de trackeo (ya no se dibujan en la textura).
-       2) Difuminado/blur amplio de alta resolución (17 taps concéntricos) para eliminar
-          el pixelado/serruchado del canvas y generar una silueta suave, orgánica y etérea.
-       3) Contorno blanco limpio derivado de la máscara ya difuminada, sin dientes de sierra. */
-    float silLum = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 1.9, 0.0, 1.0);
-    vec3  silRelleno = mix(u_palA, u_palB, 0.35) * (0.40 + 1.5 * silLum);
-    vec3  silCol = mix(camCol, silRelleno, clamp(u_silRdm, 0.0, 1.0));
-    vec3  cuerpoCol = mix(silCol, camCol, clamp(u_camVis, 0.0, 1.0));
-
-    /* BLUR DEL DEPTH DE ALTA CALIDAD (17 TAPS):
-       Elimina el serruchado de píxeles y genera una silueta orgánica, etérea y suave.
-       u_silBlur = radio de difusión. */
-    float silMask = 0.0;
-    float silBorde = 0.0;
-    if (u_hasDepth == 1) {
-        float bRadius = max(u_silBlur, 0.8) * 3.2;
-        vec2 bStep = bRadius * u_depthTexel;
-
-        // Muestreo gaussiano concéntrico de 17 taps
-        float acc = getDepthMask(uv) * 0.18;
-        float wsum = 0.18;
-
-        // Anillo 1 (radio 1.0): 8 muestras
-        float w1 = 0.07;
-        acc += getDepthMask(uv + vec2( bStep.x,  0.0)) * w1;
-        acc += getDepthMask(uv + vec2(-bStep.x,  0.0)) * w1;
-        acc += getDepthMask(uv + vec2( 0.0,  bStep.y)) * w1;
-        acc += getDepthMask(uv + vec2( 0.0, -bStep.y)) * w1;
-        acc += getDepthMask(uv + vec2( bStep.x * 0.7071,  bStep.y * 0.7071)) * w1;
-        acc += getDepthMask(uv + vec2(-bStep.x * 0.7071,  bStep.y * 0.7071)) * w1;
-        acc += getDepthMask(uv + vec2( bStep.x * 0.7071, -bStep.y * 0.7071)) * w1;
-        acc += getDepthMask(uv + vec2(-bStep.x * 0.7071, -bStep.y * 0.7071)) * w1;
-        wsum += 8.0 * w1;
-
-        // Anillo 2 (radio 2.0): 8 muestras a doble distancia
-        float w2 = 0.0325;
-        vec2 bStep2 = bStep * 2.0;
-        acc += getDepthMask(uv + vec2( bStep2.x,  0.0)) * w2;
-        acc += getDepthMask(uv + vec2(-bStep2.x,  0.0)) * w2;
-        acc += getDepthMask(uv + vec2( 0.0,  bStep2.y)) * w2;
-        acc += getDepthMask(uv + vec2( 0.0, -bStep2.y)) * w2;
-        acc += getDepthMask(uv + vec2( bStep2.x * 0.7071,  bStep2.y * 0.7071)) * w2;
-        acc += getDepthMask(uv + vec2(-bStep2.x * 0.7071,  bStep2.y * 0.7071)) * w2;
-        acc += getDepthMask(uv + vec2( bStep2.x * 0.7071, -bStep2.y * 0.7071)) * w2;
-        acc += getDepthMask(uv + vec2(-bStep2.x * 0.7071, -bStep2.y * 0.7071)) * w2;
-        wsum += 8.0 * w2;
-
-        silMask = clamp(acc / wsum, 0.0, 1.0);
-
-        // BORDE SUAVE DE LA SILUETA: contorno limpio derivado de la máscara ya difuminada
-        // Cero serruchado, antialiasing perfecto
-        if (u_silEdge > 0.001) {
-            float edgeBand = smoothstep(0.12, 0.42, silMask) * (1.0 - smoothstep(0.48, 0.88, silMask));
-            silBorde = clamp(edgeBand * 2.8, 0.0, 1.0) * clamp(u_silEdge, 0.0, 1.0);
-        }
-    }
-
-    /* PRESENCIA: la mascarilla del cuerpo aparece y desaparece con el ciclo
-       random de los monitores PiP. SOLO se dibuja si u_hasDepth == 1 y maskVis > 0.001 */
-    float maskVis = clamp(u_maskOn, 0.0, 1.0);
-    if (u_hasDepth == 1 && maskVis > 0.001) {
-        float cuerpoAlpha = smoothstep(0.18, 0.72, silMask) * maskVis;
-        fin = mix(fin, cuerpoCol, cuerpoAlpha);
-        fin = mix(fin, vec3(1.0), silBorde * maskVis);
-    }
-
-
-    // Capa D: Integración del contenedor del Haiku detrás de los textos
-    fin = mix(fin, haikuBox.rgb, haikuBox.a);
-
-    // CONTENEDOR DE LAS PALABRAS: SE DIBUJA SOLO ACA, EN EL SHADER (pedido usuario).
-    // Fondo NEGRO OPACO siempre (idle, enganchada arriba y en el MEDIO mientras se vacia:
-    // lo que se vacia es la ENERGIA, el fondo NO queda transparente, queda negro) y encima
-    // la energia (wordsq.rgb) que se LLENA con el puntero/mano y se VACIA en el medio.
-    float wordMask = clamp(wordsq.a, 0.0, 1.0);
-    fin = mix(fin, vec3(0.0), wordMask);
-    fin += wordsq.rgb * wordMask;
-
-    // Borde de las palabras: ELIMINADO según requerimiento (sin marco exterior)
-    // fin += wordsq.rgb * wordQuadCol;
-
-    // Tinte y efectos sutiles de estado (sólo fuera de cajas de haiku y palabras)
-    float maskTotal = max(haikuBox.a, wordMask);
-    fin += vec3(0.0, 0.02, 0.04) * weights.x * (1.0 - maskTotal);
-
-    // Estado 2 (HAIKU): tinte parejo, SIN onda. El usuario pidio que no aparezca el
-    // dibujo de ondas/grilla animada mientras se esta generando el haiku (antes el
-    // tinte iba modulado por una senoidal vertical que barria toda la pantalla).
-    fin += vec3(0.04, 0.01, 0.02) * weights.z * (1.0 - maskTotal);
-
-
-    /* ============ OPENPOSE: SIEMPRE ARRIBA DE TODO (pedido usuario) ============
-       Se compone AL FINAL, despues de la silueta/camara, del contenedor del haiku
-       y de las cajas de las palabras: nada puede taparlo. Antes iba antes de esas
-       cajas y el interior NEGRO de las palabras lo tapaba. */
-    // (a) SILUETA OPENPOSE MONOCROMA: SIEMPRE BLANCO PURO, en todos los estados.
-    //     Antes se mezclaba hacia el color invertido de la camara; el usuario pidio
-    //     que quede SOLO BLANCO (y con la linea mas finita: eso se ajusta en
-    //     trackingConfig.boneWidth / pointRadius del overlay).
-    //     Se usa la COBERTURA del trazo (alfa, con respaldo en el canal mas alto) en
-    //     vez del color del canvas: el resultado es blanco aunque el canvas pinte los
-    //     huesos de colores.
-    if (u_hasOpenpose == 1) {
-        float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
-        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
-        fin += vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
-    }
-
-    gl_FragColor = vec4(fin, 1.0);
-}
-    `;
-    }
+    console.log('[Master Shader] Shader maestro cargado exclusivamente desde: ' + fsOrigen);
 
     const vs = this.compileShader(gl.VERTEX_SHADER, vsSource);
     const fs = this.compileShader(gl.FRAGMENT_SHADER, fsSource);
@@ -2350,6 +1704,7 @@ void main() {
       openposeTexture: gl.getUniformLocation(this.program, 'u_openposeTexture'),
       hasOpenpose: gl.getUniformLocation(this.program, 'u_hasOpenpose'),
       openposeOpacity: gl.getUniformLocation(this.program, 'u_openposeOpacity'),
+      openposeBehind: gl.getUniformLocation(this.program, 'u_openposeBehind'),
       flowfieldTexture: gl.getUniformLocation(this.program, 'u_flowfieldTexture'),
       hasFlowfield: gl.getUniformLocation(this.program, 'u_hasFlowfield'),
       flowfieldOpacity: gl.getUniformLocation(this.program, 'u_flowfieldOpacity'),
@@ -2546,8 +1901,19 @@ void main() {
       if (this.uniforms.openposeOpacity) {
         gl.uniform1f(this.uniforms.openposeOpacity, layers.openposeOpacity !== undefined ? layers.openposeOpacity : 1.0);
       }
+      if (this.uniforms.openposeBehind) {
+        const wordsChosen = Boolean(
+          (appState.caughtWords && appState.caughtWords.length >= 3) ||
+          appState.currentState === STATES.PROCESSING ||
+          appState.currentState === STATES.HIJACK
+        );
+        gl.uniform1f(this.uniforms.openposeBehind, wordsChosen ? 1.0 : 0.0);
+      }
     } else {
       gl.uniform1i(this.uniforms.hasOpenpose, 0);
+      if (this.uniforms.openposeBehind) {
+        gl.uniform1f(this.uniforms.openposeBehind, 0.0);
+      }
     }
 
     // 3b) Flow Field (Texture 4) — solo subir textura cuando Flow Field se redibujó
@@ -2626,8 +1992,28 @@ void main() {
       posBuffer[i * 2] = px / winW;
       posBuffer[i * 2 + 1] = 1.0 - (py / winH);
       widthBuffer[i] = anchoPx ? (anchoPx / winW) : 0;
-      // ENERGIA por palabra (la dibuja el shader): llenado -> 100% -> vaciado en el medio.
-      dwellBuffer[i] = (w.energy !== undefined) ? w.energy : (w.isTargeted ? (w.dwellProgress || 0) : 0);
+      // REQUERIMIENTO: SOLAMENTE las 3 palabras seleccionadas que aparecen en el medio pueden tener el rombo seleccionado/energía.
+      const isSelectedWord = Boolean(appState.selectedWordObjects && appState.selectedWordObjects.indexOf(w) !== -1);
+      const isSequenceActive = Boolean(
+        (appState.caughtWords && appState.caughtWords.length >= 3) ||
+        appState.currentState === STATES.PROCESSING ||
+        appState.currentState === STATES.HIJACK ||
+        appState.currentState === STATES.RESET ||
+        appState.resigning
+      );
+
+      if (isSequenceActive) {
+        // En secuencia activa / haiku: EXCLUSIVAMENTE las palabras seleccionadas
+        dwellBuffer[i] = isSelectedWord ? (w.energy !== undefined ? w.energy : 1.0) : 0.0;
+      } else {
+        if (isSelectedWord) {
+          dwellBuffer[i] = (w.energy !== undefined) ? w.energy : 1.0;
+        } else if (w.isTargeted && w === appState.floatingWords[appState.targetedWordIndex] && appState.caughtWords.length < 3) {
+          dwellBuffer[i] = w.dwellProgress || 0;
+        } else {
+          dwellBuffer[i] = 0.0;
+        }
+      }
     }
     gl.uniform2fv(this.uniforms.wordPositions, posBuffer);
     if (this.uniforms.wordWidths) gl.uniform1fv(this.uniforms.wordWidths, widthBuffer);
@@ -4707,7 +4093,7 @@ function renderOpenPoseOverlay(landmarks) {
   const w = canvas.width;
   const h = canvas.height;
 
-  const minConf = Math.min(0.2, appState.trackingConfig.minConfidence ?? 0.2);
+  const minConf = Math.max(0.35, Number(appState.trackingConfig.minConfidence) || 0.45);
   const theme = appState.trackingConfig.colorTheme || 'cyberpunk';
   const boneWidth = Math.max(0.25, Number(appState.trackingConfig.boneWidth) || 0.5);
   const ptRadius = Math.max(0.5, Number(appState.trackingConfig.pointRadius) || 0.75);
@@ -4720,7 +4106,9 @@ function renderOpenPoseOverlay(landmarks) {
     : (landmarks && landmarks.length > 0 ? [{ id: 1, landmarks }] : []);
 
   for (let pi = 0; pi < playersToDraw.length; pi++) {
-    drawSingleSkeleton(ctx, playersToDraw[pi].landmarks, pi, w, h, theme, minConf, boneWidth, ptRadius, shouldDrawBones, shouldDrawLandmarks, now);
+    // REQUERIMIENTO: El Jugador 2 debe tener buena confianza comprobada para no dibujar esqueletos de ruido
+    const plConf = (pi === 1) ? Math.max(0.48, minConf) : minConf;
+    drawSingleSkeleton(ctx, playersToDraw[pi].landmarks, pi, w, h, theme, plConf, boneWidth, ptRadius, shouldDrawBones, shouldDrawLandmarks, now);
   }
   ctx.shadowBlur = 0;
 }
@@ -5460,16 +4848,18 @@ async function stepPoseInference() {
   const vh = DOM.video.videoHeight || 720;
   const { cropCanvasP1, cropCtxP1, cropCanvasP2, cropCtxP2 } = getCropCanvases();
 
-  // Multiplexado espacial ROI: alternar entre mitad izquierda (Jugador 1) y mitad derecha (Jugador 2)
+  // Multiplexado inteligente: Slot 0 = Fotograma COMPLETO (Jugador 1 + silueta íntegra sin cortes)
+  // Slot 1 = Recorte lateral para buscar o seguir al segundo jugador
   const isP1 = (poseInferenceCropIndex === 0);
   poseInferenceCropIndex = (poseInferenceCropIndex + 1) % 2;
 
   let activeCanvas = null;
   if (isP1) {
-    cropCtxP1.drawImage(DOM.video, 0, 0, vw * 0.62, vh, 0, 0, cropCanvasP1.width, cropCanvasP1.height);
-    activeCanvas = cropCanvasP1;
+    // Slot 0: Fotograma COMPLETO de la cámara (sin recorte arbitrario, sin siluetas cortadas)
+    activeCanvas = DOM.video;
     appState.currentInferenceSlot = 0;
   } else {
+    // Slot 1: Búsqueda / seguimiento de Jugador 2 en la mitad derecha
     cropCtxP2.drawImage(DOM.video, vw * 0.38, 0, vw * 0.62, vh, 0, 0, cropCanvasP2.width, cropCanvasP2.height);
     activeCanvas = cropCanvasP2;
     appState.currentInferenceSlot = 1;
@@ -5524,25 +4914,108 @@ function initMediaPipePose() {
   }
 }
 
-function checkHumanPresent(landmarks) {
-  if (!landmarks || landmarks.length === 0) return false;
-  // Landmark 0: nariz, 11: hombro izq, 12: hombro der, 23: cadera izq, 24: cadera der
-  const coreIndices = [0, 11, 12, 23, 24];
-  let visibleCore = 0;
-  for (let i = 0; i < coreIndices.length; i++) {
-    const lm = landmarks[coreIndices[i]];
-    if (lm && (lm.visibility === undefined || lm.visibility > 0.35)) {
-      visibleCore++;
+function getTorsoCenter(landmarks) {
+  if (!landmarks || landmarks.length === 0) return { x: 0.5, y: 0.5 };
+  let sumX = 0, sumY = 0, count = 0;
+  for (const idx of [11, 12, 23, 24, 0]) {
+    const lm = landmarks[idx];
+    if (lm && (lm.visibility === undefined || lm.visibility > 0.30)) {
+      sumX += lm.x;
+      sumY += lm.y;
+      count++;
     }
   }
-  let validCount = 0;
+  return count > 0 ? { x: sumX / count, y: sumY / count } : { x: landmarks[0]?.x ?? 0.5, y: landmarks[0]?.y ?? 0.5 };
+}
+
+function evaluateHumanPose(landmarks, isSecondPerson = false) {
+  if (!landmarks || landmarks.length < 25) {
+    return { isHuman: false, confidence: 0, reason: 'insufficient_landmarks' };
+  }
+
+  const nose = landmarks[0];
+  const sL = landmarks[11];
+  const sR = landmarks[12];
+  const hL = landmarks[23];
+  const hR = landmarks[24];
+
+  const vis = (lm) => (lm && lm.visibility !== undefined ? lm.visibility : 0);
+
+  const visSL = vis(sL);
+  const visSR = vis(sR);
+  const visHL = vis(hL);
+  const visHR = vis(hR);
+  const visNose = vis(nose);
+
+  const bothShoulders = (visSL >= 0.45 && visSR >= 0.45);
+  const oneShoulderAndNose = (Math.max(visSL, visSR) >= 0.55 && visNose >= 0.50);
+  const shoulderAndHip = (Math.max(visSL, visSR) >= 0.50 && Math.max(visHL, visHR) >= 0.45);
+
+  if (!bothShoulders && !oneShoulderAndNose && !shoulderAndHip) {
+    return { isHuman: false, confidence: 0.1, reason: 'torso_missing' };
+  }
+
+  // Comprobar plausibilidad geométrica: separación de hombros
+  if (sL && sR && visSL > 0.3 && visSR > 0.3) {
+    const shoulderSpan = Math.hypot(sL.x - sR.x, sL.y - sR.y);
+    if (shoulderSpan < 0.04 || shoulderSpan > 0.60) {
+      return { isHuman: false, confidence: 0.15, reason: 'invalid_shoulder_span' };
+    }
+  }
+
+  let minY = 1, maxY = 0, minX = 1, maxX = 0;
+  let validPts = 0;
+  let visSum = 0;
+  let highConfPts = 0;
+
   for (let i = 0; i < landmarks.length; i++) {
-    const lm = landmarks[i];
-    if (lm && (lm.visibility === undefined || lm.visibility > 0.25)) {
-      validCount++;
+    const l = landmarks[i];
+    const v = vis(l);
+    if (v >= 0.35) {
+      validPts++;
+      minY = Math.min(minY, l.y);
+      maxY = Math.max(maxY, l.y);
+      minX = Math.min(minX, l.x);
+      maxX = Math.max(maxX, l.x);
     }
+    if (v >= 0.55) {
+      highConfPts++;
+    }
+    visSum += v;
   }
-  return visibleCore >= 1 && validCount >= 5;
+
+  const bodyHeight = maxY - minY;
+  const bodyWidth = maxX - minX;
+
+  if (bodyHeight < 0.10 || bodyWidth < 0.04) {
+    return { isHuman: false, confidence: 0.2, reason: 'body_too_small' };
+  }
+
+  const shoulderScore = (visSL + visSR) * 0.5;
+  const torsoScore = Math.max(shoulderScore, (visSL + visNose) * 0.5, (visSR + visNose) * 0.5);
+  const compositeConfidence = torsoScore * 0.45 + (validPts / 33) * 0.30 + (highConfPts / 20) * 0.25;
+
+  if (isSecondPerson) {
+    // REQUERIMIENTO: La segunda persona debe tener BUENA CONFIANZA comprobada contra ruido de fondo
+    const hasSolidTorso = (bothShoulders && shoulderScore >= 0.52) || (torsoScore >= 0.62 && highConfPts >= 8);
+    const hasEnoughPoints = (validPts >= 9 && highConfPts >= 6);
+    const isPlausible = (bodyHeight >= 0.14 && bodyWidth >= 0.05);
+
+    if (hasSolidTorso && hasEnoughPoints && isPlausible && compositeConfidence >= 0.52) {
+      return { isHuman: true, confidence: compositeConfidence, reason: 'confirmed_person2' };
+    } else {
+      return { isHuman: false, confidence: compositeConfidence, reason: 'low_confidence_person2' };
+    }
+  } else {
+    // Jugador 1 (principal): umbral equilibrado
+    const isBasicHuman = (torsoScore >= 0.40 && validPts >= 6 && bodyHeight >= 0.10);
+    return { isHuman: isBasicHuman, confidence: compositeConfidence, reason: isBasicHuman ? 'ok' : 'low_conf' };
+  }
+}
+
+function checkHumanPresent(landmarks) {
+  const ev = evaluateHumanPose(landmarks, false);
+  return ev.isHuman;
 }
 
 function onPoseResults(results) {
@@ -5550,57 +5023,134 @@ function onPoseResults(results) {
   const slot = appState.currentInferenceSlot ?? 0;
   const now = performance.now();
 
+  if (!appState.slotSmoothedLandmarks) {
+    appState.slotSmoothedLandmarks = [null, null];
+  }
+  if (!appState.slotConfidence) {
+    appState.slotConfidence = [0, 0];
+  }
+  if (appState.p2ConfirmationStreak === undefined) {
+    appState.p2ConfirmationStreak = 0;
+  }
+
   let remapped = [];
   if (rawLandmarks.length > 0) {
-    if (slot === 0) {
-      remapped = rawLandmarks.map(l => ({
-        x: l.x * 0.62,
-        y: l.y,
-        z: l.z,
-        visibility: l.visibility
-      }));
-    } else {
-      remapped = rawLandmarks.map(l => ({
-        x: 0.38 + l.x * 0.62,
-        y: l.y,
-        z: l.z,
-        visibility: l.visibility
-      }));
+    const prevSmoothed = appState.slotSmoothedLandmarks[slot];
+    const prevValid = prevSmoothed && prevSmoothed.length === rawLandmarks.length && (now - (prevSmoothed.timestamp || 0) < 450);
+    const newSmoothed = [];
+    const cfgLerp = (appState.trackingConfig && appState.trackingConfig.smoothingFactor !== undefined)
+      ? Number(appState.trackingConfig.smoothingFactor)
+      : 0.45;
+
+    for (let i = 0; i < rawLandmarks.length; i++) {
+      const l = rawLandmarks[i];
+      const targetX = (slot === 0) ? l.x : (0.38 + l.x * 0.62);
+      const targetY = l.y;
+      const targetZ = l.z !== undefined ? l.z : 0;
+      const targetVis = l.visibility !== undefined ? l.visibility : 1;
+
+      if (!prevValid || !prevSmoothed[i]) {
+        newSmoothed[i] = { x: targetX, y: targetY, z: targetZ, visibility: targetVis };
+      } else {
+        const prevPt = prevSmoothed[i];
+        const dx = targetX - prevPt.x;
+        const dy = targetY - prevPt.y;
+        const dist = Math.hypot(dx, dy);
+
+        // Suavizado adaptativo para que las manos y la silueta no salten
+        const isHandOrArm = (i >= 13 && i <= 22);
+        let factor = isHandOrArm ? (cfgLerp * 0.85) : cfgLerp;
+
+        if (dist > 0.30) {
+          factor = 1.0;
+        } else if (dist < 0.015) {
+          factor = Math.max(0.18, factor * 0.55);
+        } else if (dist > 0.08) {
+          factor = Math.min(0.85, factor * 1.4);
+        }
+
+        const sx = prevPt.x + dx * factor;
+        const sy = prevPt.y + dy * factor;
+        const sz = prevPt.z + (targetZ - prevPt.z) * factor;
+        const sVis = prevPt.visibility + (targetVis - prevPt.visibility) * 0.35;
+
+        newSmoothed[i] = { x: sx, y: sy, z: sz, visibility: sVis };
+      }
     }
+
+    newSmoothed.timestamp = now;
+    appState.slotSmoothedLandmarks[slot] = newSmoothed;
+    remapped = newSmoothed;
   }
 
   if (!appState.playerSlots) appState.playerSlots = [null, null];
-  if (remapped.length > 0 && checkHumanPresent(remapped)) {
-    appState.playerSlots[slot] = {
-      landmarks: remapped,
-      timestamp: now
-    };
-  } else {
-    if (appState.playerSlots[slot] && (now - appState.playerSlots[slot].timestamp > 450)) {
-      appState.playerSlots[slot] = null;
+
+  const isSecondPersonSlot = (slot === 1);
+  const evalResult = evaluateHumanPose(remapped, isSecondPersonSlot);
+  appState.slotConfidence[slot] = evalResult.confidence;
+
+  // Verificación de duplicado: si la persona de Slot 0 también es vista en el solapamiento central de Slot 1
+  let isDuplicateOfSlot0 = false;
+  if (slot === 1 && evalResult.isHuman && appState.playerSlots[0]) {
+    const c0 = getTorsoCenter(appState.playerSlots[0].landmarks);
+    const c1 = getTorsoCenter(remapped);
+    const distTorso = Math.hypot(c0.x - c1.x, c0.y - c1.y);
+    if (distTorso < 0.22) {
+      isDuplicateOfSlot0 = true;
     }
+  }
+
+  // Acumulación temporal de confianza para el segundo jugador (evita flashes de ruido)
+  if (slot === 1) {
+    if (evalResult.isHuman && !isDuplicateOfSlot0) {
+      appState.p2ConfirmationStreak = Math.min(8, appState.p2ConfirmationStreak + 1);
+    } else {
+      appState.p2ConfirmationStreak = Math.max(0, appState.p2ConfirmationStreak - 1);
+    }
+  }
+
+  const slot1Confirmed = (appState.p2ConfirmationStreak >= 3);
+
+  if (remapped.length > 0) {
+    if (slot === 0 && evalResult.isHuman) {
+      appState.playerSlots[0] = {
+        landmarks: remapped,
+        timestamp: now,
+        confidence: evalResult.confidence
+      };
+    } else if (slot === 1 && evalResult.isHuman && !isDuplicateOfSlot0 && slot1Confirmed) {
+      appState.playerSlots[1] = {
+        landmarks: remapped,
+        timestamp: now,
+        confidence: evalResult.confidence
+      };
+    }
+  }
+
+  // Expiración de slots por timeout (gracia suave para movimientos rápidos)
+  if (appState.playerSlots[0] && (now - appState.playerSlots[0].timestamp > 450)) {
+    appState.playerSlots[0] = null;
+  }
+  if (appState.playerSlots[1] && (now - appState.playerSlots[1].timestamp > 450)) {
+    appState.playerSlots[1] = null;
+    appState.p2ConfirmationStreak = 0;
   }
 
   const s0 = appState.playerSlots[0];
   const s1 = appState.playerSlots[1];
-  const v0 = s0 && (now - s0.timestamp < 450);
-  const v1 = s1 && (now - s1.timestamp < 450);
+  const v0 = Boolean(s0 && (now - s0.timestamp < 450));
+  const v1 = Boolean(s1 && (now - s1.timestamp < 450) && slot1Confirmed);
 
   let activePlayers = [];
   if (v0 && v1) {
-    const headDist = Math.abs(s0.landmarks[0].x - s1.landmarks[0].x);
-    if (headDist < 0.14) {
-      activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0 }];
-    } else {
-      activePlayers = [
-        { id: 1, landmarks: s0.landmarks, slot: 0 },
-        { id: 2, landmarks: s1.landmarks, slot: 1 }
-      ];
-    }
+    activePlayers = [
+      { id: 1, landmarks: s0.landmarks, slot: 0, confidence: s0.confidence },
+      { id: 2, landmarks: s1.landmarks, slot: 1, confidence: s1.confidence }
+    ];
   } else if (v0) {
-    activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0 }];
+    activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0, confidence: s0.confidence }];
   } else if (v1) {
-    activePlayers = [{ id: 1, landmarks: s1.landmarks, slot: 1 }];
+    activePlayers = [{ id: 1, landmarks: s1.landmarks, slot: 1, confidence: s1.confidence }];
   }
 
   appState.players = activePlayers;
@@ -5615,31 +5165,27 @@ function onPoseResults(results) {
   const landmarks = activePlayers[0] ? activePlayers[0].landmarks : [];
   appState.lastLandmarks = landmarks;
 
-  // Composición sin parpadeo (flicker-free) de ambas máscaras en masterMaskCanvas
+  // Composición completa sin cortes de silueta en masterMaskCanvas
   if (results.segmentationMask) {
-    const { slotMaskCanvas0, slotMaskCtx0, slotMaskCanvas1, slotMaskCtx1, masterMaskCanvas, masterMaskCtx } = getCropCanvases();
+    const { slotMaskCanvas1, slotMaskCtx1, masterMaskCanvas, masterMaskCtx } = getCropCanvases();
     if (slot === 0) {
-      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
-      slotMaskCtx0.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
-    } else {
+      // Slot 0 es el fotograma COMPLETO de la cámara: cubre el 100% de la pantalla sin cortes ni bordes truncados
+      masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
+      masterMaskCtx.globalCompositeOperation = 'source-over';
+      masterMaskCtx.drawImage(results.segmentationMask, 0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
+    } else if (slot === 1 && slot1Confirmed && evalResult.isHuman && !isDuplicateOfSlot0) {
+      // Slot 1 sólo se fusiona si hay un SEGUNDO jugador confirmado con alta confianza
       slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
       slotMaskCtx1.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+
+      masterMaskCtx.globalCompositeOperation = 'lighten';
+      masterMaskCtx.drawImage(slotMaskCanvas1, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+      masterMaskCtx.globalCompositeOperation = 'source-over';
     }
 
-    const s0Active = Boolean(appState.playerSlots && appState.playerSlots[0] && (now - appState.playerSlots[0].timestamp < 600));
-    const s1Active = Boolean(appState.playerSlots && appState.playerSlots[1] && (now - appState.playerSlots[1].timestamp < 600));
-    if (!s0Active && !s1Active && (now - (appState.lastHumanSeenTimestamp || 0) > 600)) {
-      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
-      slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+    if (!appState.hasHuman && (now - (appState.lastHumanSeenTimestamp || 0) > 600)) {
+      masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
     }
-
-    // Fusión aditiva en la zona central: ni se cortan los cuerpos ni se apagan en alternancia
-    masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
-    masterMaskCtx.globalCompositeOperation = 'source-over';
-    masterMaskCtx.drawImage(slotMaskCanvas0, 0, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
-    masterMaskCtx.globalCompositeOperation = 'lighten';
-    masterMaskCtx.drawImage(slotMaskCanvas1, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
-    masterMaskCtx.globalCompositeOperation = 'source-over';
 
     results.segmentationMask = masterMaskCanvas;
   }
@@ -6029,10 +5575,10 @@ const MASTER_RDM_DEF = {
   speedX: 0.0,      // deriva horizontal (-0.2..0.2)
   speedY: 0.0,      // deriva vertical (-0.2..0.2)
   speedRot: 0.0,    // rotación de las capas (-0.02..0.02)
-  speedRnd: 0.5,    // velocidad del random stepped (0..1)
+  speedRnd: 0.18,   // velocidad del random stepped (más lenta y orgánica)
   sm1: 0.1,         // umbral bajo del smoothstep
   sm2: 0.86,        // umbral alto del smoothstep
-  force: 0.87,      // fuerza/brillo final (e_force)
+  force: 0.65,      // fuerza/brillo final (tiende más a negro en los valles)
   mix: 1.0,         // presencia: cuánto reemplaza al fondo anterior
   color: '#ffffff', // color del patrón cuando NO se sigue la paleta
   seguirPaleta: 1,  // 1 = patrón, marcos y contenedor usan la PALETA GLOBAL
@@ -7344,7 +6890,7 @@ class FloatingWord {
     this.isCaught = true;
     this.state = WORD_STATES.SLOTTED;
     this.slotIndex = stageIdx;
-    this.el.className = 'organic-word-item word-slotted word-charged';
+    this.el.className = 'organic-word-item word-slotted';
     // PEDIDO: la palabra llega ARRIBA con toda la energia del llenado (se vacia en el centro).
     this.energy = 1;
     if (this.lockBadge) this.lockBadge.style.display = 'none';
@@ -7357,7 +6903,7 @@ class FloatingWord {
   // Estado 2: las 3 bajan del borde superior al MEDIO y ahí se reescriben
   moveToCenter(stageIdx) {
     this.state = WORD_STATES.SCRAMBLING;
-    this.el.className = 'organic-word-item word-scrambling word-charged';
+    this.el.className = 'organic-word-item word-scrambling';
     this.empezarVaciadoEnergia();   // PEDIDO: en el medio se VACIA la energia
     const xs = [0.25, 0.5, 0.75];
     const x = window.innerWidth * xs[Math.max(0, Math.min(2, stageIdx))];
@@ -7421,7 +6967,7 @@ class FloatingWord {
           if (this.label) this.label.textContent = targetStr;
           if (this.state !== WORD_STATES.AUXILIARY) {
             this.state = WORD_STATES.TRANSFORMED;
-            this.el.className = 'organic-word-item word-transformed word-charged';
+            this.el.className = 'organic-word-item word-transformed';
             playSound('catch');
           } else {
             this.el.className = 'organic-word-item word-auxiliary';
@@ -7458,7 +7004,7 @@ class FloatingWord {
   moveToPhraseFlow(containerEl, beforeEl) {
     var eraAuxiliar = (this.state === WORD_STATES.AUXILIARY);
     this.state = WORD_STATES.PHRASE_MEMBER;
-    this.el.className = 'organic-word-item word-phrase-member' + (eraAuxiliar ? '' : ' word-charged');
+    this.el.className = 'organic-word-item word-phrase-member';
     if (this.label) this.label.textContent = this.targetText;
     this.el.style.transform = 'none';
     if (containerEl) {
@@ -7650,7 +7196,25 @@ function transitionTo(newState) {
   });
   appState.currentState = newState;
 
-  DOM.container.className = '';
+  const wordsChosen = Boolean(appState.caughtWords && appState.caughtWords.length >= 3);
+  document.body.classList.toggle('words-chosen', wordsChosen);
+  const isHaikuMode = (newState === STATES.HIJACK || newState === STATES.PROCESSING);
+  document.body.classList.toggle('mode-haiku', isHaikuMode);
+
+  let cName = '';
+  if (wordsChosen) cName += ' words-chosen';
+  if (isHaikuMode) cName += ' mode-haiku';
+  if (newState === STATES.PROCESSING || newState === STATES.HIJACK) cName += ' state-glitching';
+  DOM.container.className = cName.trim();
+
+  // REQUERIMIENTO: En modo haiku no se ven las ventanas de biometría facial, depth map ni manos
+  if (isHaikuMode) {
+    PIP_CYCLE_KEYS.forEach((which) => {
+      appState.pipCycleVisible[which] = false;
+      const el = pipElement(which);
+      if (el) el.classList.add('hidden');
+    });
+  }
 
   if (newState === STATES.IDLE) {
     DOM.hudStateText.textContent = 'ESTADO: OBSERVACIÓN (IDLE)';
@@ -7664,12 +7228,15 @@ function transitionTo(newState) {
     DOM.reticleLabel.textContent = 'ENGAGED';
   }
   else if (newState === STATES.PROCESSING) {
-    DOM.container.classList.add('state-glitching');
     DOM.hudStateText.textContent = 'ESTADO: RESIGNIFICACIÓN SEMÁNTICA';
     DOM.reticle.classList.remove('hidden');
     DOM.reticle.classList.remove('locking');
     DOM.reticleLabel.textContent = 'PROCESANDO';
     startResignificationSequence();
+  }
+  else if (newState === STATES.HIJACK) {
+    DOM.hudStateText.textContent = 'ESTADO: SECUESTRO POÉTICO (HAIKU)';
+    DOM.reticle.classList.add('hidden');
   }
   else if (newState === STATES.RESET) {
     DOM.hudStateText.textContent = 'ESTADO: REINICIO DEL SISTEMA';
@@ -7686,15 +7253,13 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
   const cp = appState.trackingConfig.collisionPoints || {};
   const collisionPointOn = (key, fallback = true) => (key in cp ? cp[key] !== false : fallback);
   const testPoints = [];
+  const currentRawPoints = new Map();
+
   if (collisionPointOn('mouse', true)) {
-    // PEDIDO: con el mouse alcanza con pasar por encima de la palabra para que se vaya
-    // llenando (antes habia que mantener apretado y el clic la seleccionaba de golpe).
-    // OJO: solo mientras el mouse se esta usando (lastUserActivity lo marca el mousemove).
-    // Si no, el puntero virtual se queda quieto en el CENTRO de la pantalla y llenaba
-    // palabras solo, disparando la secuencia sin que nadie toque nada.
     const movReciente = appState.mouseMovido && appState.lastUserActivity && (Date.now() - appState.lastUserActivity) < VENTANA_MOUSE_MS;
     if (movReciente) {
-      testPoints.push({ x: appState.cursorX, y: appState.cursorY, name: appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL' });
+      const name = appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL';
+      currentRawPoints.set(name, { x: appState.cursorX, y: appState.cursorY });
     }
   }
 
@@ -7719,51 +7284,110 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
       const lms = pl.landmarks;
       if (!lms || lms.length === 0) continue;
       const prefix = playerList.length > 1 ? `J${pl.id}_` : '';
+      // REQUERIMIENTO: El Jugador 2 sólo interactúa con extremidades si tienen alta confianza comprobada
+      const effConf = (pIdx === 1) ? Math.max(0.55, minConf) : minConf;
 
       for (const c of candidates) {
         if (!collisionPointOn(c.key, c.fallback)) continue;
         const lm = lms[c.idx];
-        if (lm && (lm.visibility === undefined || lm.visibility >= minConf)) {
-          testPoints.push({
+        if (lm && (lm.visibility === undefined || lm.visibility >= effConf)) {
+          const ptName = `${prefix}${c.name}`;
+          currentRawPoints.set(ptName, {
             x: (1.0 - lm.x) * window.innerWidth,
-            y: lm.y * window.innerHeight,
-            name: `${prefix}${c.name}`
+            y: lm.y * window.innerHeight
           });
         }
       }
     }
   }
 
+  // Suavizado e interpolación continua a 60 FPS para que los puntos táctiles no salten
+  const smPoints = appState.smoothedInteractionPoints || (appState.smoothedInteractionPoints = {});
+  const lerpBase = Math.max(0.15, Math.min(0.85, appState.trackingConfig.smoothingFactor || 0.45));
+
+  for (const [name, target] of currentRawPoints.entries()) {
+    let pRecord = smPoints[name];
+    if (!pRecord) {
+      pRecord = smPoints[name] = { x: target.x, y: target.y, lastSeen: currentTimestamp };
+    } else {
+      const dx = target.x - pRecord.x;
+      const dy = target.y - pRecord.y;
+      const dist = Math.hypot(dx, dy);
+      let factor = lerpBase;
+      if (dist > 180) {
+        factor = Math.min(0.85, lerpBase * 1.5);
+      } else if (dist < 15) {
+        factor = Math.max(0.18, lerpBase * 0.65);
+      }
+      pRecord.x += dx * factor;
+      pRecord.y += dy * factor;
+      pRecord.lastSeen = currentTimestamp;
+    }
+    testPoints.push({ x: pRecord.x, y: pRecord.y, name });
+  }
+
+  for (const k in smPoints) {
+    if (!currentRawPoints.has(k) && (currentTimestamp - smPoints[k].lastSeen > 350)) {
+      delete smPoints[k];
+    }
+  }
+
   appState.activeInteractionPoints = testPoints;
 
-  // Si está en procesamiento de haiku, secuestro o reseteo, los puntos se siguen moviendo pero no interactúan con palabras
+  // Si está en procesamiento de haiku, secuestro o reseteo, o si ya se atraparon 3 palabras,
+  // los puntos se siguen moviendo pero NO interactúan con palabras ni permiten llenar una 4ta palabra
   if (appState.currentState === STATES.PROCESSING ||
     appState.currentState === STATES.HIJACK ||
-    appState.currentState === STATES.RESET) {
+    appState.currentState === STATES.RESET ||
+    (appState.caughtWords && appState.caughtWords.length >= 3) ||
+    appState.resigning) {
+    if (appState.targetedWordIndex !== -1) {
+      if (appState.floatingWords[appState.targetedWordIndex]) {
+        appState.floatingWords[appState.targetedWordIndex].setTargeted(false, 0);
+      }
+      appState.targetedWordIndex = -1;
+      appState.dwellTimer = 0;
+    }
+    // Limpiar cualquier dwell o energía residual en palabras flotantes
+    for (let i = 0; i < appState.floatingWords.length; i++) {
+      const fw = appState.floatingWords[i];
+      if (fw.isTargeted || fw.dwellProgress > 0 || fw.energy > 0) {
+        fw.setTargeted(false, 0);
+        fw.dwellProgress = 0;
+        fw.energy = 0;
+      }
+    }
     return;
   }
 
   let foundTarget = false;
   let targetIndex = -1;
   let lockingPoint = null;
+  let minDistance = Infinity;
 
+  // REQUERIMIENTO: La palabra seleccionada debe ser SIEMPRE la MÁS CERCANA al punto de interacción
   for (let i = 0; i < appState.floatingWords.length; i++) {
     const word = appState.floatingWords[i];
     if (word.isCaught) continue;
 
+    const collisionRadius = (word.radius + 38) * RADIO_COLISION_MULT;
+
     for (const pt of testPoints) {
       const dx = word.x - pt.x;
       const dy = word.y - pt.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
 
-      if (dist <= (word.radius + 38) * RADIO_COLISION_MULT) {
-        foundTarget = true;
-        targetIndex = i;
-        lockingPoint = pt;
-        break;
+      if (dist <= collisionRadius) {
+        // Histeresis suave de 15px solo para evitar parpadeo si dos palabras están casi a la misma distancia mientras se llena
+        const effectiveDist = (i === appState.targetedWordIndex) ? Math.max(0, dist - 15) : dist;
+        if (effectiveDist < minDistance) {
+          minDistance = effectiveDist;
+          foundTarget = true;
+          targetIndex = i;
+          lockingPoint = pt;
+        }
       }
     }
-    if (foundTarget) break;
   }
 
   appState.lockingPointName = lockingPoint ? lockingPoint.name : null;
@@ -7845,6 +7469,18 @@ function catchWord(word, index) {
 
 
   if (appState.caughtWords.length >= 3) {
+    document.body.classList.add('words-chosen');
+    if (DOM.container) DOM.container.classList.add('words-chosen');
+
+    // REQUERIMIENTO: Limpiar de inmediato cualquier palabra flotante que se hubiera empezado a rellenar
+    appState.targetedWordIndex = -1;
+    appState.dwellTimer = 0;
+    appState.floatingWords.forEach(w => {
+      w.setTargeted(false, 0);
+      w.dwellProgress = 0;
+      w.energy = 0;
+    });
+
     setTimeout(() => {
       transitionTo(STATES.PROCESSING);
     }, 600);
@@ -8195,9 +7831,23 @@ async function startResignificationSequence() {
   // 1. Ocultar el cursor táctico y activar el fondo glitcheado suave
   DOM.reticle.classList.add('hidden');
   DOM.container.classList.add('state-glitching');
+  document.body.classList.add('mode-haiku');
+  if (DOM.container) DOM.container.classList.add('mode-haiku');
+  PIP_CYCLE_KEYS.forEach((which) => {
+    appState.pipCycleVisible[which] = false;
+    const el = pipElement(which);
+    if (el) el.classList.add('hidden');
+  });
 
-  // Fundido de salida para las palabras flotantes sobrantes
-  appState.floatingWords.forEach(w => w.fadeOut());
+  // Fundido de salida para las palabras flotantes sobrantes y reseteo estricto de energía
+  appState.targetedWordIndex = -1;
+  appState.dwellTimer = 0;
+  appState.floatingWords.forEach(w => {
+    w.setTargeted(false, 0);
+    w.dwellProgress = 0;
+    w.energy = 0;
+    w.fadeOut();
+  });
 
   const caught = [...appState.caughtWords];
   const selectedWords = [...appState.selectedWordObjects];
@@ -9174,10 +8824,19 @@ function handleStateReset() {
   DOM.finalTypewriterText.textContent = '';
 
   appState.caughtWords = [];
+  document.body.classList.remove('words-chosen');
+  document.body.classList.remove('mode-haiku');
+  if (DOM.container) {
+    DOM.container.classList.remove('words-chosen');
+    DOM.container.classList.remove('mode-haiku');
+  }
+  PIP_CYCLE_KEYS.forEach((which) => {
+    appState.pipCycleVisible[which] = false;
+    const el = pipElement(which);
+    if (el) el.classList.add('hidden');
+  });
 
   // SISTEMA UNIFICADO DE PALABRAS: destruir los objetos del ciclo anterior.
-  // Sin esto quedaban "palabras fantasma": los objetos seguían vivos en
-  // selectedWordObjects/auxiliaryWords y el shader maestro les dibujaba círculos.
   (appState.selectedWordObjects || []).forEach(w => { try { w.destroy(); } catch (e) { } });
   appState.selectedWordObjects = [];
   (appState.auxiliaryWords || []).forEach(w => { try { w.destroy(); } catch (e) { } });
@@ -9323,8 +8982,9 @@ function pipElement(which) {
 }
 
 function setPipVisible(which, visible, now) {
-  // Si no hay humano detectado, nunca activar monitor PiP
-  if (visible && !appState.hasHuman) {
+  // Si no hay humano detectado, o si estamos en modo haiku / procesamiento, nunca activar monitor PiP
+  const isHaikuMode = (appState.currentState === STATES.HIJACK || appState.currentState === STATES.PROCESSING || document.body.classList.contains('mode-haiku'));
+  if (visible && (!appState.hasHuman || isHaikuMode)) {
     visible = false;
   }
   // Si es monitor de mano, SOLO activar si la mano está trackeada en el jugador asignado
@@ -9376,15 +9036,15 @@ function setPipVisible(which, visible, now) {
 function updatePipAutoCycle(now) {
   if (appState.pipCycleDisabledByUser) return;
 
-  // Si la cámara no capta a ningún humano: asegurarse de que NINGÚN monitor PiP aparezca
-  if (!appState.hasHuman) {
+  const isHaikuMode = (appState.currentState === STATES.HIJACK || appState.currentState === STATES.PROCESSING || document.body.classList.contains('mode-haiku'));
+
+  // Si la cámara no capta a ningún humano O si estamos en modo haiku:
+  // asegurarse de que NINGÚN monitor PiP aparezca
+  if (!appState.hasHuman || isHaikuMode) {
     PIP_CYCLE_KEYS.forEach((which) => {
-      if (appState.pipCycleVisible[which]) {
-        setPipVisible(which, false, now);
-      } else {
-        const el = pipElement(which);
-        if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
-      }
+      appState.pipCycleVisible[which] = false;
+      const el = pipElement(which);
+      if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
     });
     return;
   }
