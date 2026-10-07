@@ -909,7 +909,7 @@ const appState = {
   // Dwell / Temporizador de Proximidad
   targetedWordIndex: -1,
   dwellTimer: 0,
-  dwellDuration: 3.0, // Segundos de proximidad para atrapar (Requerimiento 7: 3 segundos)
+  dwellDuration: 1.5, // Segundos de proximidad para atrapar (1.5 segundos)
 
   // Audio
   audioEnabled: true,

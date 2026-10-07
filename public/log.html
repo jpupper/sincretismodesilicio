@@ -71,17 +71,17 @@
   body.modo-armado .manifest-panel { flex: 0 0 50% !important; }
   body.modo-armado .thought-stream-container { display: flex !important; flex: 0 0 50% !important; }
 
-  /* FRANJA IDLE: los 5 haikus anteriores, 1 por linea y con letra mas chica,
-     para que entren completos en ese 25% (sin scroll). */
-  body:not(.modo-armado) #haiku-flow { font-size: 15px; line-height: 1.3; overflow: hidden; }
-  /* El terminal tiene 32px de padding arriba/abajo: en la franja idle se achica
+  /* FRANJA IDLE: los 5 haikus anteriores, 1 por linea y con letra destacada y grande,
+     para que se lean claramente en ese 25% (sin scroll ni recorte). */
+  body:not(.modo-armado) #haiku-flow { font-size: 26px; line-height: 1.35; overflow: hidden; }
+  /* El terminal tiene 32px de padding arriba/abajo: en la franja idle se ajusta
      para que los 5 haikus entren COMPLETOS en el 25% (sin scroll ni recorte). */
   body:not(.modo-armado) #thought-terminal { padding: 6px 48px; }
-  body:not(.modo-armado) #haiku-flow .ph-label { font-size: 11px; margin-bottom: 2px; }
+  body:not(.modo-armado) #haiku-flow .ph-label { font-size: 13px; margin-bottom: 4px; letter-spacing: .08em; }
   body:not(.modo-armado) #haiku-flow .ph-prev-item {
-    font-size: 15px;
-    line-height: 1.3;
-    margin-bottom: 3px;
+    font-size: 26px;
+    line-height: 1.35;
+    margin-bottom: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -492,8 +492,15 @@
   .pre-haiku { font-size: inherit; line-height: inherit; margin: 6px 0 2px; }
   .pre-haiku .ph-seccion { margin-bottom: 14px; }
   .pre-haiku .ph-label { color: inherit; opacity: .7; letter-spacing: .08em; margin-bottom: 4px; }
-  .pre-haiku .ph-prev { color: #ffe14d; }
-  .pre-haiku .ph-prev-item { margin-bottom: 10px; }
+  .pre-haiku .ph-prev { color: #ffe14d; font-size: 26px; line-height: 1.35; }
+  .pre-haiku .ph-prev-item {
+    margin-bottom: 6px;
+    font-size: 26px;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .pre-haiku .ph-words { color: #ff2a3c; font-weight: 700; letter-spacing: .04em; }
   .pre-haiku .ph-haiku { color: #ffffff; }
   .haiku-text, .haiku-text .kw { color: #ffffff; }
@@ -1197,8 +1204,11 @@
         if (!caja || !seccion) return;
         var html = '';
         previos.forEach(function (h) {
-          var versos = String(h.haiku || '').split('\n').map(escapeHtml);
-          html += '<div class="ph-prev-item">' + versos.join('<br>') + '</div>';
+          var versos = String(h.haiku || '').split('\n').map(function (v) {
+            var t = v.trim().replace(/[,;\/]+$/, '');
+            return escapeHtml(t);
+          }).filter(Boolean);
+          html += '<div class="ph-prev-item">' + versos.join(', ') + '</div>';
         });
         caja.innerHTML = html;
         seccion.style.display = 'block';
@@ -1243,8 +1253,11 @@
         if (!previos.length) { seccion.style.display = 'none'; return; }
         var html = '';
         previos.forEach(function (h) {
-          var versos = String(h.haiku || '').split('\n').map(function (v) { return escapeHtml(v.trim()); });
-          html += '<div class="ph-prev-item">' + versos.join(' / ') + '</div>';
+          var versos = String(h.haiku || '').split('\n').map(function (v) {
+            var t = v.trim().replace(/[,;\/]+$/, '');
+            return escapeHtml(t);
+          }).filter(Boolean);
+          html += '<div class="ph-prev-item">' + versos.join(', ') + '</div>';
         });
         caja.innerHTML = html;
         seccion.style.display = 'block';
@@ -2628,9 +2641,9 @@ Esas estadísticas rellenadas con la versión deforme de la humanidad.`;
         '.log-svg-capture .thought-stream-container { display: flex !important; flex: 0 0 ' + pxConsola + 'px !important; height: ' + pxConsola + 'px !important; max-height: ' + pxConsola + 'px !important; min-height: 0 !important; }' +
         (armadoAhora ? '' : (
           '.log-svg-capture #thought-terminal { padding: 6px 48px !important; }' +
-          '.log-svg-capture #haiku-flow { font-size: 15px !important; line-height: 1.3 !important; overflow: hidden !important; }' +
-          '.log-svg-capture #haiku-flow .ph-label { font-size: 11px !important; }' +
-          '.log-svg-capture #haiku-flow .ph-prev-item { font-size: 15px !important; line-height: 1.3 !important; margin-bottom: 3px !important; white-space: nowrap !important; overflow: hidden !important; }'
+          '.log-svg-capture #haiku-flow { font-size: 26px !important; line-height: 1.35 !important; overflow: hidden !important; }' +
+          '.log-svg-capture #haiku-flow .ph-label { font-size: 13px !important; margin-bottom: 4px !important; }' +
+          '.log-svg-capture #haiku-flow .ph-prev-item { font-size: 26px !important; line-height: 1.35 !important; margin-bottom: 4px !important; white-space: nowrap !important; overflow: hidden !important; }'
         ));
 
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
