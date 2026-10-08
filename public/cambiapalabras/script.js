@@ -2636,14 +2636,8 @@ class DepthMapShader {
         }
         vec2 uv = vec2(1.0 - v_uv.x, 1.0 - v_uv.y);
         vec4 m = texture(u_mask, uv);
-        float rawVal;
-        if (u_isVideo) {
-          float luma = dot(m.rgb, vec3(0.299, 0.587, 0.114));
-          rawVal = clamp(luma * u_contrast, 0.0, 1.0);
-        } else {
-          float v = max(m.r, m.a);
-          rawVal = clamp(v * u_contrast, 0.0, 1.0);
-        }
+        float v = max(m.r, m.a);
+        float rawVal = clamp(v * u_contrast, 0.0, 1.0);
         vec3 col = getColormap(rawVal, u_mode);
         // Canal alpha contiene rawVal limpio (0 fuera, 1 dentro) para uso directo en el shader maestro
         fragColor = vec4(col, rawVal);
@@ -2700,8 +2694,9 @@ class DepthMapShader {
     const gl = this.gl;
     if (!gl || !this.program) return;
 
-    // Si no hay humano detectado o no hay máscara, limpiar a negro transparente y salir
-    if (!maskSource || !appState.hasHuman) {
+    // Si no hay humano detectado, no hay máscara válida o por error se pasa un video:
+    // limpiar a negro transparente y salir inmediatamente para proteger el shader maestro
+    if (!maskSource || !appState.hasHuman || (typeof HTMLVideoElement !== 'undefined' && maskSource instanceof HTMLVideoElement)) {
       this.clear();
       return;
     }
@@ -3868,8 +3863,11 @@ function renderSilhouetteCutout(results) {
 function renderDepthMap(results, landmarks) {
   if (!DOM.depthCanvas || !DOM.depthPip) return;
 
-  // Si la cámara no capta a ningún humano: ocultar el panel depth map y limpiar la textura
-  if (!appState.hasHuman) {
+  const mask = (results && results.segmentationMask) ? results.segmentationMask : null;
+
+  // Si la cámara no capta a ningún humano o no hay máscara de segmentación:
+  // ocultar el panel depth map y limpiar la textura WebGL a transparente
+  if (!appState.hasHuman || !mask) {
     if (!DOM.depthPip.classList.contains('hidden')) {
       DOM.depthPip.classList.add('hidden');
     }
@@ -3878,20 +3876,12 @@ function renderDepthMap(results, landmarks) {
     }
     appState.depthFrameId = (appState.depthFrameId || 0) + 1;
     if (DOM.calibDepthStatus) {
-      DOM.calibDepthStatus.textContent = 'STANDBY (SIN HUMANO)';
+      DOM.calibDepthStatus.textContent = appState.hasHuman ? 'STANDBY (ESPERANDO MÁSCARA)' : 'STANDBY (SIN HUMANO)';
     }
     return;
   }
 
   appState.depthFrameId = (appState.depthFrameId || 0) + 1;
-
-  let mask = (results && results.segmentationMask) ? results.segmentationMask : null;
-  let isVideo = false;
-  // Solo usar fallback de video si realmente hay humano presente
-  if (!mask && appState.hasHuman && DOM.video && DOM.video.readyState >= 2) {
-    mask = DOM.video;
-    isVideo = true;
-  }
 
   const modeKey = appState.trackingConfig.depthMode || 'cyberpunk';
   const modeMap = { cyberpunk: 0, thermal: 1, monochrome: 2, viridis: 3 };
@@ -3903,11 +3893,11 @@ function renderDepthMap(results, landmarks) {
   }
 
   if (appState.depthShader) {
-    appState.depthShader.render(mask, contrast, mode, landmarks, isVideo);
+    appState.depthShader.render(mask, contrast, mode, landmarks, false);
   }
 
   if (DOM.calibDepthStatus) {
-    DOM.calibDepthStatus.textContent = mask ? (isVideo ? 'ACTIVA (GPU LUMA)' : 'ACTIVA (GPU SEG)') : 'STANDBY';
+    DOM.calibDepthStatus.textContent = 'ACTIVA (GPU SEG)';
   }
   if (DOM.depthFooterMode) {
     DOM.depthFooterMode.textContent = modeKey.toUpperCase();
@@ -4689,32 +4679,50 @@ function onPoseResults(results) {
   appState.lastLandmarks = landmarks;
 
   // Composición sin parpadeo (flicker-free) de ambas máscaras en masterMaskCanvas
+  const { slotMaskCanvas0, slotMaskCtx0, slotMaskCanvas1, slotMaskCtx1, masterMaskCanvas, masterMaskCtx } = getCropCanvases();
+
   if (results.segmentationMask) {
-    const { slotMaskCanvas0, slotMaskCtx0, slotMaskCanvas1, slotMaskCtx1, masterMaskCanvas, masterMaskCtx } = getCropCanvases();
     if (slot === 0) {
       slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
       slotMaskCtx0.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+      appState.slotMask0Timestamp = now;
     } else {
       slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
       slotMaskCtx1.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+      appState.slotMask1Timestamp = now;
     }
+  }
 
-    const s0Active = Boolean(appState.playerSlots && appState.playerSlots[0] && (now - appState.playerSlots[0].timestamp < 600));
-    const s1Active = Boolean(appState.playerSlots && appState.playerSlots[1] && (now - appState.playerSlots[1].timestamp < 600));
-    if (!s0Active && !s1Active && (now - (appState.lastHumanSeenTimestamp || 0) > 600)) {
-      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
-      slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
-    }
+  const s0Active = Boolean(appState.slotMask0Timestamp && (now - appState.slotMask0Timestamp < 600)) ||
+                   Boolean(appState.playerSlots && appState.playerSlots[0] && (now - appState.playerSlots[0].timestamp < 600));
+  const s1Active = Boolean(appState.slotMask1Timestamp && (now - appState.slotMask1Timestamp < 600)) ||
+                   Boolean(appState.playerSlots && appState.playerSlots[1] && (now - appState.playerSlots[1].timestamp < 600));
 
+  if (!s0Active) {
+    slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+  }
+  if (!s1Active) {
+    slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+  }
+
+  if (s0Active || s1Active || appState.hasHuman) {
     // Fusión aditiva en la zona central: ni se cortan los cuerpos ni se apagan en alternancia
     masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
     masterMaskCtx.globalCompositeOperation = 'source-over';
-    masterMaskCtx.drawImage(slotMaskCanvas0, 0, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
-    masterMaskCtx.globalCompositeOperation = 'lighten';
-    masterMaskCtx.drawImage(slotMaskCanvas1, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
-    masterMaskCtx.globalCompositeOperation = 'source-over';
-
+    if (s0Active) {
+      masterMaskCtx.drawImage(slotMaskCanvas0, 0, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+    }
+    if (s1Active) {
+      masterMaskCtx.globalCompositeOperation = s0Active ? 'lighten' : 'source-over';
+      masterMaskCtx.drawImage(slotMaskCanvas1, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+      masterMaskCtx.globalCompositeOperation = 'source-over';
+    }
     results.segmentationMask = masterMaskCanvas;
+  } else {
+    slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+    slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+    masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
+    results.segmentationMask = null;
   }
 
   // 1. Estadísticas de Inferencia y Telemetría en Vivo

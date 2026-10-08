@@ -463,14 +463,12 @@ float getDepthMask(vec2 p) {
     // REQUERIMIENTO 3: Ensanchar la silueta fullscreen para que en pantalla vertical no se vea angosta/rara
     float sx = (u_resolution.y > u_resolution.x) ? 0.72 : 0.85;
     vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
-    if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
+    if (pWide.x < 0.0 || pWide.x > 1.0 || pWide.y < 0.0 || pWide.y > 1.0) return 0.0;
     vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
     /* El canal ALFA del canvas de depth ES la máscara limpia 0..1 (lo dice el propio
        DepthMapShader: "Canal alpha contiene rawVal limpio (0 fuera, 1 dentro) para uso
-       directo en el shader maestro"). El fallback a max(r,g,b) que había acá tomaba
-       los colores del COLORMAP (que sí están fuera del cuerpo) y metía ruido/parpadeo
-       en el contorno: se removió (ya se había arreglado así el 2026-10-06). */
-    return (d.a > 0.005) ? clamp(d.a, 0.0, 1.0) : 0.0;
+       directo en el shader maestro"). */
+    return (d.a > 0.02) ? clamp(d.a, 0.0, 1.0) : 0.0;
 }
 
 void main() {
