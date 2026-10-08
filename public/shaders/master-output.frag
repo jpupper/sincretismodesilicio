@@ -674,9 +674,11 @@ void main() {
     /* ======================================================================
        BARRA DE PROCESAMIENTO (la dibuja el master output, pedido del artista)
        ----------------------------------------------------------------------
-       Fondo NEGRO y lo que se va llenando muestra el PATRÓN RDM. Se llena MUY
-       lentamente: 0 -> 90% en 40 s (u_barFill lo lleva el JS) y el 10% restante
-       cuando el haiku ya está listo para mostrarse. Encima va el texto
+       Fondo NEGRO que se va llenando con un FLUJO DE ENERGÍA, todo acá en el
+       shader: patrón RDM + vetas que VIAJAN por la barra, núcleo brillante en el
+       medio vertical, FRENTE DE AVANCE luminoso con estela y HALO exterior que
+       respira. Se llena MUY lentamente: 0 -> 90% en 40 s (u_barFill lo lleva el
+       JS) y el 10% restante cuando el haiku ya está listo. Encima el texto
        "PROCESANDO INPUT HUMANO" (textura u_barTexto, blanco con contorno negro).
        ====================================================================== */
     if (u_barOn > 0.5) {
@@ -685,28 +687,55 @@ void main() {
         vec2  bC     = vec2(0.5, 0.135);        // centro: abajo y centrada
         float halfW  = bAncho * 0.5;
         float halfH  = bAlto  * 0.5;
-        float dx = abs(rawUv.x - bC.x) - halfW; // < 0 = adentro
-        float dy = abs(rawUv.y - bC.y) - halfH;
-        if (dx < 0.0 && dy < 0.0) {
-            // Distancia al borde en PÍXELES reales (para un marco fino parejo)
-            float ePx = max(dx * u_resolution.x, dy * u_resolution.y);
-            float t = (rawUv.x - (bC.x - halfW)) / bAncho;         // 0..1 a lo ancho
-            float lleno = step(t, clamp(u_barFill, 0.0, 1.0));
 
-            // Base NEGRA + la parte llena con el patrón RDM (el mismo del fondo)
-            vec3 patron = getRdmBgSlow(rawUv, 1.0) * 1.25;
-            vec3 colBar = mix(vec3(0.0), patron, lleno);
+        // Distancia (en PÍXELES) a los bordes: NEGATIVA adentro de la barra
+        float dRect = max((abs(rawUv.x - bC.x) - halfW) * u_resolution.x,
+                          (abs(rawUv.y - bC.y) - halfH) * u_resolution.y);
+        float dentro = 1.0 - step(0.0, dRect);
+        float t  = (rawUv.x - (bC.x - halfW)) / bAncho;      // 0..1 a lo ancho
+        float vv = (rawUv.y - (bC.y - halfH)) / bAlto;       // 0..1 de abajo hacia arriba
+        float lleno = step(t, clamp(u_barFill, 0.0, 1.0));
 
-            // Marco fino del color de la paleta global
-            float marco = smoothstep(-2.0, 0.0, ePx) * (1.0 - step(0.0, ePx));
+        if (dentro > 0.5) {
+            /* --- FLUJO DE ENERGÍA ---
+               1) patrón RDM de base (pedido: negro + RDM mientras se llena)
+               2) VETAS que viajan por la barra (dos frecuencias + el tiempo)
+               3) NÚCLEO brillante: la energía pega más fuerte en el medio vertical
+               4) FRENTE de avance + ESTELA: marcan hasta dónde llegó la energía */
+            vec3  patron = getRdmBgSlow(rawUv, 1.0) * 1.25;
+            float vetaA  = 0.5 + 0.5 * sin((t * 22.0 - u_time * 1.35) * 6.2831853);
+            float vetaB  = 0.5 + 0.5 * sin((t *  7.0 + u_time * 0.55) * 6.2831853);
+            float flujo  = clamp(vetaA * 0.65 + vetaB * 0.35, 0.0, 1.0);
+            float nucleo = clamp(1.0 - abs(vv - 0.5) * 2.0, 0.0, 1.0);
+
+            vec3  ener  = mix(u_palA, u_palB, flujo);                     // paleta global
+            vec3  rell  = patron * (0.45 + 0.85 * flujo);                 // RDM con el flujo
+            rell += ener * (0.25 + 0.60 * nucleo) * (0.30 + 0.70 * flujo);
+            rell += vec3(1.0) * nucleo * nucleo * 0.12;                   // veta blanca central
+
+            float frente = exp(-abs(t - u_barFill) * 95.0) * lleno;        // borde de avance
+            float estela = exp(-max(u_barFill - t, 0.0) * 9.0) * lleno;    // estela detrás
+            rell += (u_palB * 1.5 + vec3(0.35)) * frente;
+            rell += ener * estela * 0.45;
+
+            rell *= 0.86 + 0.14 * sin(u_time * 2.2);                       // respiración
+
+            vec3 colBar = mix(vec3(0.0), rell, lleno);                     // lo no lleno: negro
+
+            // Marco fino del color de la paleta (1.6 px)
+            float marco = step(-1.6, dRect) * (1.0 - step(0.0, dRect));
             colBar = mix(colBar, u_palB, marco * 0.9);
 
             // Texto (textura): blanco con contorno negro, centrado en la barra
-            vec4 tex = texture2D(u_barTexto, vec2(t, (rawUv.y - (bC.y - halfH)) / bAlto));
+            vec4 tex = texture2D(u_barTexto, vec2(t, vv));
             colBar = mix(colBar, tex.rgb, tex.a);
 
-            fin = colBar;
+            fin = mix(fin, colBar, dentro);
         }
+
+        // HALO: glow exterior alrededor de toda la barra (respira con el tiempo)
+        float halo = exp(-max(dRect, 0.0) / 10.0) * step(0.0, dRect);
+        fin += u_palB * halo * (0.16 + 0.05 * sin(u_time * 2.2));
     }
 
     gl_FragColor = vec4(fin, 1.0);
