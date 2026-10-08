@@ -3535,7 +3535,8 @@ textarea {
    texto quedaba blanco sobre blanco (ilegible). Fondo negro, letra blanca,
    letra más grande.
    ========================================================================== */
-#silueta-conf {
+#silueta-conf,
+.silueta-conf-chip {
   position: fixed;
   left: 0;
   top: 0;
@@ -3554,6 +3555,7 @@ textarea {
   text-shadow: none !important;
 }
 
-#silueta-conf.visible {
+#silueta-conf.visible,
+.silueta-conf-chip.visible {
   display: block;
 }

@@ -938,6 +938,8 @@ const appState = {
     pointRadius: 0.75,
     minConfidence: 0.5,
     pointerConfidence: 0.2,   // umbral propio de los CUADRADOS de las manos (slider pestaña SILUETA)
+    silhouetteMinConfidence: 0.3, // umbral mínimo para que una silueta sea visible (slider pestaña SILUETA)
+    dwellDuration: 1.5,       // tiempo (segundos) que el puntero debe estar sobre la palabra para llenarse
     colorTheme: 'cyberpunk', // 'classic' | 'cyberpunk' | 'phosphor' | 'thermal'
     bodyCollision: true, // REQUERIMIENTO 6: Colisión multi-articular de OpenPose con palabras
     // Modo selector de colisión: qué puntos SÍ capturan palabras y cuáles NO.
@@ -1291,6 +1293,10 @@ const DOM = {
   cfgSilCamVis: document.getElementById('cfg-sil-cam-vis'),
   cfgPunteroConf: document.getElementById('cfg-puntero-conf'),
   valPunteroConf: document.getElementById('val-puntero-conf'),
+  cfgSilMinConf: document.getElementById('cfg-sil-min-conf'),
+  valSilMinConf: document.getElementById('val-sil-min-conf'),
+  cfgDwellDuration: document.getElementById('cfg-dwell-duration'),
+  valDwellDuration: document.getElementById('val-dwell-duration'),
   valSilCamVis: document.getElementById('val-sil-cam-vis'),
   cfgTrackOpenpose: document.getElementById('cfg-track-openpose'),
   cfgTrackBones: document.getElementById('cfg-track-bones'),
@@ -3699,7 +3705,54 @@ function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, b
 // string chiquito con la CONFIANZA media de los puntos clave del cuerpo: cuánto cree
 // el sistema que eso que está capturando es una silueta humana.
 // ============================================================================ */
-function drawSilhouetteBox(ctx, landmarks, w, h, minConf) {
+function getSilhouetteConfidence(landmarks) {
+  if (!landmarks || !landmarks.length) return 0;
+  const CLAVES = [0, 11, 12, 13, 14, 15, 16, 23, 24];
+  let suma = 0, nClave = 0;
+  for (let i = 0; i < landmarks.length; i++) {
+    const l = landmarks[i];
+    if (!l) continue;
+    if (CLAVES.indexOf(i) !== -1) {
+      const vis = (l.visibility !== undefined ? l.visibility : 1);
+      suma += vis;
+      nClave++;
+    }
+  }
+  return nClave > 0 ? (suma / nClave) : 0;
+}
+
+function getOrCreateSilhouetteChip(index) {
+  if (index === 0) {
+    let chip0 = document.getElementById('silueta-conf');
+    if (!chip0) {
+      chip0 = document.createElement('div');
+      chip0.id = 'silueta-conf';
+      chip0.className = 'silueta-conf-chip';
+      document.body.appendChild(chip0);
+    }
+    return chip0;
+  }
+  const id = 'silueta-conf-' + index;
+  let chip = document.getElementById(id);
+  if (!chip) {
+    chip = document.createElement('div');
+    chip.id = id;
+    chip.className = 'silueta-conf-chip';
+    document.body.appendChild(chip);
+  }
+  return chip;
+}
+
+function hideAllSilhouetteChips() {
+  const chips = document.querySelectorAll('.silueta-conf-chip');
+  for (let i = 0; i < chips.length; i++) {
+    chips[i].classList.remove('visible');
+  }
+  const chip0 = document.getElementById('silueta-conf');
+  if (chip0) chip0.classList.remove('visible');
+}
+
+function drawSilhouetteBox(ctx, landmarks, w, h, minConf, chipIndex = 0, calculatedConf = null) {
   if (!landmarks || !landmarks.length) return;
   const CLAVES = [0, 11, 12, 13, 14, 15, 16, 23, 24];
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, n = 0, suma = 0, nClave = 0;
@@ -3724,7 +3777,7 @@ function drawSilhouetteBox(ctx, landmarks, w, h, minConf) {
   const lado = Math.max(maxX - minX, maxY - minY) * 1.12 + 40;
   const x0 = cx - lado / 2;
   const y0 = cy - lado / 2;
-  const conf = Math.round((nClave ? suma / nClave : 0) * 100);
+  const conf = calculatedConf !== null ? Math.round(calculatedConf * 100) : Math.round((nClave ? suma / nClave : 0) * 100);
   const col = coloresPunteros().base;   // color de la PALETA global (el mismo de los punteros)
 
   // REBORDE MUY FINITO (0.8 px) y del color de la paleta
@@ -3738,8 +3791,8 @@ function drawSilhouetteBox(ctx, landmarks, w, h, minConf) {
   /* STRING con el valor de confianza: chip del DOM (no canvas). El canvas del OpenPose
      se compone en el master output con blending aditivo: ahí el negro desaparece y el
      texto quedaba BLANCO SOBRE BLANCO. En el DOM el fondo negro es negro de verdad, y la
-     letra es más grande. */
-  const chip = document.getElementById('silueta-conf');
+     letra es más grande. Se muestra un chip por cada silueta detectada. */
+  const chip = getOrCreateSilhouetteChip(chipIndex);
   if (chip) {
     chip.textContent = 'SILUETA ' + conf + '%';
     chip.style.left = Math.round(x0) + 'px';
@@ -3751,10 +3804,9 @@ function drawSilhouetteBox(ctx, landmarks, w, h, minConf) {
 function renderOpenPoseOverlay(landmarks) {
   const canvas = DOM.openposeCanvas;
   if (!canvas) return;
-  // El chip de la confianza se esconde al empezar el frame; drawSilhouetteBox lo vuelve a
-  // mostrar si hay silueta detectada (así no queda un string colgado cuando no hay nadie).
-  const chipSilueta = document.getElementById('silueta-conf');
-  if (chipSilueta) chipSilueta.classList.remove('visible');
+  // Los chips de la confianza se esconden al empezar el frame; drawSilhouetteBox los vuelve a
+  // mostrar por cada silueta detectada (así no quedan strings colgados cuando no hay nadie).
+  hideAllSilhouetteChips();
   const isEnabled = FORZAR_CAMARA_SILUETA_OPENPOSE || appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose;
   if (!isEnabled) {
     if (canvas.style.display !== 'none') canvas.style.display = 'none';
@@ -3782,16 +3834,30 @@ function renderOpenPoseOverlay(landmarks) {
   const shouldDrawLandmarks = appState.trackingConfig.drawLandmarks !== false;
   const now = performance.now();
 
-  const playersToDraw = (appState.players && appState.players.length > 0)
+  const minSilThreshold = (appState.trackingConfig.silhouetteMinConfidence !== undefined
+    ? appState.trackingConfig.silhouetteMinConfidence
+    : 0.3);
+
+  const rawPlayers = (appState.players && appState.players.length > 0)
     ? appState.players
     : (landmarks && landmarks.length > 0 ? [{ id: 1, landmarks }] : []);
+
+  // Filtrar siluetas por el umbral mínimo de confianza configurable
+  const playersToDraw = [];
+  for (let pi = 0; pi < rawPlayers.length; pi++) {
+    const pl = rawPlayers[pi];
+    const cVal = pl.confidence !== undefined ? pl.confidence : getSilhouetteConfidence(pl.landmarks);
+    if (cVal >= minSilThreshold) {
+      playersToDraw.push({ ...pl, calculatedConf: cVal });
+    }
+  }
 
   for (let pi = 0; pi < playersToDraw.length; pi++) {
     drawSingleSkeleton(ctx, playersToDraw[pi].landmarks, pi, w, h, theme, minConf, boneWidth, ptRadius, shouldDrawBones, shouldDrawLandmarks, now);
   }
-  // CUADRADO QUE RECUBRE LA SILUETA + string con su confianza (pedido del artista)
+  // CUADRADO QUE RECUBRE CADA SILUETA + chip individual de confianza por cada silueta
   for (let pi = 0; pi < playersToDraw.length; pi++) {
-    drawSilhouetteBox(ctx, playersToDraw[pi].landmarks, w, h, minConf);
+    drawSilhouetteBox(ctx, playersToDraw[pi].landmarks, w, h, minConf, pi, playersToDraw[pi].calculatedConf);
   }
   ctx.shadowBlur = 0;
 }
@@ -4632,12 +4698,24 @@ function onPoseResults(results) {
     }
   }
 
+  const minSilThreshold = (appState.trackingConfig.silhouetteMinConfidence !== undefined
+    ? appState.trackingConfig.silhouetteMinConfidence
+    : 0.3);
+
   if (!appState.playerSlots) appState.playerSlots = [null, null];
   if (remapped.length > 0 && checkHumanPresent(remapped)) {
-    appState.playerSlots[slot] = {
-      landmarks: remapped,
-      timestamp: now
-    };
+    const silConf = getSilhouetteConfidence(remapped);
+    if (silConf >= minSilThreshold) {
+      appState.playerSlots[slot] = {
+        landmarks: remapped,
+        confidence: silConf,
+        timestamp: now
+      };
+    } else {
+      if (appState.playerSlots[slot] && (now - appState.playerSlots[slot].timestamp > 250)) {
+        appState.playerSlots[slot] = null;
+      }
+    }
   } else {
     if (appState.playerSlots[slot] && (now - appState.playerSlots[slot].timestamp > 450)) {
       appState.playerSlots[slot] = null;
@@ -4646,24 +4724,26 @@ function onPoseResults(results) {
 
   const s0 = appState.playerSlots[0];
   const s1 = appState.playerSlots[1];
-  const v0 = s0 && (now - s0.timestamp < 450);
-  const v1 = s1 && (now - s1.timestamp < 450);
+  const s0Conf = s0 ? (s0.confidence !== undefined ? s0.confidence : getSilhouetteConfidence(s0.landmarks)) : 0;
+  const s1Conf = s1 ? (s1.confidence !== undefined ? s1.confidence : getSilhouetteConfidence(s1.landmarks)) : 0;
+  const v0 = Boolean(s0 && (now - s0.timestamp < 450) && (s0Conf >= minSilThreshold));
+  const v1 = Boolean(s1 && (now - s1.timestamp < 450) && (s1Conf >= minSilThreshold));
 
   let activePlayers = [];
   if (v0 && v1) {
     const headDist = Math.abs(s0.landmarks[0].x - s1.landmarks[0].x);
     if (headDist < 0.14) {
-      activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0 }];
+      activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0, confidence: s0Conf }];
     } else {
       activePlayers = [
-        { id: 1, landmarks: s0.landmarks, slot: 0 },
-        { id: 2, landmarks: s1.landmarks, slot: 1 }
+        { id: 1, landmarks: s0.landmarks, slot: 0, confidence: s0Conf },
+        { id: 2, landmarks: s1.landmarks, slot: 1, confidence: s1Conf }
       ];
     }
   } else if (v0) {
-    activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0 }];
+    activePlayers = [{ id: 1, landmarks: s0.landmarks, slot: 0, confidence: s0Conf }];
   } else if (v1) {
-    activePlayers = [{ id: 1, landmarks: s1.landmarks, slot: 1 }];
+    activePlayers = [{ id: 1, landmarks: s1.landmarks, slot: 1, confidence: s1Conf }];
   }
 
   appState.players = activePlayers;
@@ -4683,20 +4763,26 @@ function onPoseResults(results) {
 
   if (results.segmentationMask) {
     if (slot === 0) {
-      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
-      slotMaskCtx0.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
-      appState.slotMask0Timestamp = now;
+      if (v0) {
+        slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+        slotMaskCtx0.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+        appState.slotMask0Timestamp = now;
+      } else {
+        slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+      }
     } else {
-      slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
-      slotMaskCtx1.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
-      appState.slotMask1Timestamp = now;
+      if (v1) {
+        slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+        slotMaskCtx1.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+        appState.slotMask1Timestamp = now;
+      } else {
+        slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
+      }
     }
   }
 
-  const s0Active = Boolean(appState.slotMask0Timestamp && (now - appState.slotMask0Timestamp < 600)) ||
-                   Boolean(appState.playerSlots && appState.playerSlots[0] && (now - appState.playerSlots[0].timestamp < 600));
-  const s1Active = Boolean(appState.slotMask1Timestamp && (now - appState.slotMask1Timestamp < 600)) ||
-                   Boolean(appState.playerSlots && appState.playerSlots[1] && (now - appState.playerSlots[1].timestamp < 600));
+  const s0Active = v0 && Boolean(appState.slotMask0Timestamp && (now - appState.slotMask0Timestamp < 600));
+  const s1Active = v1 && Boolean(appState.slotMask1Timestamp && (now - appState.slotMask1Timestamp < 600));
 
   if (!s0Active) {
     slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
@@ -4705,7 +4791,7 @@ function onPoseResults(results) {
     slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
   }
 
-  if (s0Active || s1Active || appState.hasHuman) {
+  if (s0Active || s1Active) {
     // Fusión aditiva en la zona central: ni se cortan los cuerpos ni se apagan en alternancia
     masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
     masterMaskCtx.globalCompositeOperation = 'source-over';
@@ -4827,6 +4913,14 @@ function loadTrackingConfigFromStorage() {
       if (Number(parsed.boneWidth) > 5) parsed.boneWidth = Math.max(0.25, Number(parsed.boneWidth) * 0.25);
       if (Number(parsed.pointRadius) > 7) parsed.pointRadius = Math.max(0.5, Number(parsed.pointRadius) * 0.25);
       appState.trackingConfig = { ...appState.trackingConfig, ...parsed };
+      if (appState.trackingConfig.silhouetteMinConfidence === undefined) {
+        appState.trackingConfig.silhouetteMinConfidence = 0.3;
+      }
+      if (parsed.dwellDuration !== undefined) {
+        appState.dwellDuration = Number(parsed.dwellDuration);
+      } else if (appState.trackingConfig.dwellDuration !== undefined) {
+        appState.dwellDuration = Number(appState.trackingConfig.dwellDuration);
+      }
       // Merge profundo del selector de puntos: un JSON viejo/parcial no debe
       // borrar los defaults (mouse + manos).
       appState.trackingConfig.collisionPoints = {
@@ -4847,6 +4941,9 @@ function saveTrackingConfigToStorage() {
 
 function syncTrackingConfigToInputs() {
   const c = appState.trackingConfig;
+  const dwellVal = (appState.dwellDuration !== undefined ? appState.dwellDuration : (c.dwellDuration !== undefined ? c.dwellDuration : 1.5));
+  if (DOM.cfgDwellDuration) DOM.cfgDwellDuration.value = dwellVal;
+  if (DOM.valDwellDuration) DOM.valDwellDuration.textContent = Number(dwellVal).toFixed(1) + 's';
   if (DOM.cfgTrackPointLerp) DOM.cfgTrackPointLerp.value = c.pointLerpFactor !== undefined ? c.pointLerpFactor : 0.75;
   if (DOM.valTrackPointLerp) DOM.valTrackPointLerp.textContent = (c.pointLerpFactor !== undefined ? c.pointLerpFactor : 0.75).toFixed(2);
   const hBrillo = c.haikuRdmBrillo !== undefined ? c.haikuRdmBrillo : (masterRdmState().haikuRdmBrillo !== undefined ? masterRdmState().haikuRdmBrillo : 1.0);
@@ -4862,6 +4959,8 @@ function syncTrackingConfigToInputs() {
   if (DOM.cfgSilCamVis) DOM.cfgSilCamVis.value = rdmSt.camVis ?? 50;
   if (DOM.cfgPunteroConf) DOM.cfgPunteroConf.value = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100);
   if (DOM.valPunteroConf) DOM.valPunteroConf.textContent = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100) + '%';
+  if (DOM.cfgSilMinConf) DOM.cfgSilMinConf.value = Math.round((appState.trackingConfig.silhouetteMinConfidence !== undefined ? appState.trackingConfig.silhouetteMinConfidence : 0.3) * 100);
+  if (DOM.valSilMinConf) DOM.valSilMinConf.textContent = Math.round((appState.trackingConfig.silhouetteMinConfidence !== undefined ? appState.trackingConfig.silhouetteMinConfidence : 0.3) * 100) + '%';
   if (DOM.valSilCamVis) DOM.valSilCamVis.textContent = Math.round(rdmSt.camVis ?? 50);
   if (DOM.cfgTrackOpenpose) DOM.cfgTrackOpenpose.checked = c.showOpenPose;
   if (DOM.cfgTrackBones) DOM.cfgTrackBones.checked = c.drawBones;
@@ -5281,6 +5380,8 @@ function syncMasterRdmInputs() {
   if (DOM.cfgSilCamVis) DOM.cfgSilCamVis.value = st.camVis ?? 50;
   if (DOM.cfgPunteroConf) DOM.cfgPunteroConf.value = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100);
   if (DOM.valPunteroConf) DOM.valPunteroConf.textContent = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100) + '%';
+  if (DOM.cfgSilMinConf) DOM.cfgSilMinConf.value = Math.round((appState.trackingConfig.silhouetteMinConfidence !== undefined ? appState.trackingConfig.silhouetteMinConfidence : 0.3) * 100);
+  if (DOM.valSilMinConf) DOM.valSilMinConf.textContent = Math.round((appState.trackingConfig.silhouetteMinConfidence !== undefined ? appState.trackingConfig.silhouetteMinConfidence : 0.3) * 100) + '%';
   if (DOM.valSilCamVis) DOM.valSilCamVis.textContent = Math.round(st.camVis ?? 50);
   _pipTinteUltimo = '';
 }
@@ -6078,7 +6179,10 @@ function renderUnifiedPointers() {
 
   const points = appState.activeInteractionPoints || [];
   const lockingIdx = appState.targetedWordIndex;
-  const progress = lockingIdx !== -1 ? Math.min(1.0, appState.dwellTimer / appState.dwellDuration) : 0;
+  const dwellDur = Math.max(0.001, appState.dwellDuration !== undefined ? appState.dwellDuration : 1.5);
+  const progress = lockingIdx !== -1
+    ? ((appState.dwellDuration !== undefined && appState.dwellDuration <= 0.001) ? 1.0 : Math.min(1.0, appState.dwellTimer / dwellDur))
+    : 0;
 
   for (let i = 0; i < points.length; i++) {
     const pt = points[i];
@@ -6937,7 +7041,10 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
 
     const currentWord = appState.floatingWords[targetIndex];
     appState.dwellTimer += dt;
-    const progress = Math.min(1.0, appState.dwellTimer / appState.dwellDuration);
+    const dwellDur = Math.max(0.001, appState.dwellDuration !== undefined ? appState.dwellDuration : 1.5);
+    const progress = (appState.dwellDuration !== undefined && appState.dwellDuration <= 0.001)
+      ? 1.0
+      : Math.min(1.0, appState.dwellTimer / dwellDur);
 
     currentWord.setTargeted(true, progress);
     transitionTo(STATES.INTERACT);
@@ -8865,8 +8972,9 @@ function mainLoop(currentTimestamp) {
   DOM.reticle.style.top = `${appState.cursorY}px`;
   /* RELLENO DEL PUNTERO: avance 0..1 del anclaje sobre la palabra (dwell). El CSS
      lo usa para escalar el disco de energía de adentro hacia afuera. */
+  const dwellDur = Math.max(0.001, appState.dwellDuration !== undefined ? appState.dwellDuration : 1.5);
   const lockFill = (appState.targetedWordIndex !== -1)
-    ? Math.min(1, appState.dwellTimer / (appState.dwellDuration || 1.5))
+    ? ((appState.dwellDuration !== undefined && appState.dwellDuration <= 0.001) ? 1.0 : Math.min(1, appState.dwellTimer / dwellDur))
     : 0;
   DOM.reticle.style.setProperty('--lock-fill', lockFill.toFixed(3));
   DOM.reticle.classList.toggle('locking', lockFill > 0.001);
@@ -9460,6 +9568,25 @@ function setupEventListeners() {
       const val = parseInt(e.target.value, 10);
       appState.trackingConfig.pointerConfidence = val / 100;
       if (DOM.valPunteroConf) DOM.valPunteroConf.textContent = val + '%';
+      saveTrackingConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgSilMinConf) {
+    DOM.cfgSilMinConf.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      appState.trackingConfig.silhouetteMinConfidence = val / 100;
+      if (DOM.valSilMinConf) DOM.valSilMinConf.textContent = val + '%';
+      saveTrackingConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgDwellDuration) {
+    DOM.cfgDwellDuration.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      appState.dwellDuration = val;
+      appState.trackingConfig.dwellDuration = val;
+      if (DOM.valDwellDuration) DOM.valDwellDuration.textContent = val.toFixed(1) + 's';
       saveTrackingConfigToStorage();
     });
   }
@@ -10348,6 +10475,8 @@ function setupEventListeners() {
         pointRadius: 0.75,
         minConfidence: 0.5,
     pointerConfidence: 0.2,   // umbral propio de los CUADRADOS de las manos (slider pestaña SILUETA)
+    silhouetteMinConfidence: 0.3, // umbral mínimo para que una silueta sea visible (slider pestaña SILUETA)
+    dwellDuration: 1.5,
         colorTheme: 'cyberpunk',
         bodyCollision: true,
         collisionPoints: { mouse: true, manoIzq: true, manoDer: true, dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false },
@@ -10369,6 +10498,7 @@ function setupEventListeners() {
         trackingAnchor: 'nose',
         smoothingFactor: 0.55
       };
+      appState.dwellDuration = 1.5;
       saveTrackingConfigToStorage();
       syncTrackingConfigToInputs();
       showToast('↺ Calibración restablecida a valores predeterminados', 'info');

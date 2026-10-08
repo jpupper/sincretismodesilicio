@@ -17,7 +17,7 @@
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="stylesheet" href="css/fonts-local.css?v=1">
-  <link rel="stylesheet" href="style.css?v=3.77">
+  <link rel="stylesheet" href="style.css?v=3.82">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="vendor/mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -94,7 +94,7 @@
     <!-- STRING con la CONFIABILIDAD de la silueta: chip DOM (negro + letra blanca) porque
          el canvas del OpenPose se compone con blending aditivo en el shader y ahí el negro
          desaparece (se veía blanco sobre blanco). -->
-    <div id="silueta-conf">SILUETA 0%</div>
+    <div id="silueta-conf" class="silueta-conf-chip">SILUETA 0%</div>
 
     <!-- Capa 1.8b: Superposición de Campo de Flujo Vectorial (Flow Field) -->
     <canvas id="flowfield-overlay-canvas"></canvas>
@@ -639,13 +639,22 @@
                   </label>
                   <input type="range" id="cfg-track-smoothing" min="0.1" max="0.9" step="0.05" value="0.55">
                 </div>
+
+                <div class="calib-item">
+                  <label for="cfg-dwell-duration">
+                    <strong>Tiempo para Llenar Palabra:</strong> <span id="val-dwell-duration">1.5s</span>
+                  </label>
+                  <input type="range" id="cfg-dwell-duration" min="0" max="8" step="0.1" value="1.5">
+                  <small class="item-desc">Tiempo que el puntero debe estar sobre la palabra para llenarse y capturarse (0s = instantáneo, 8s = máximo).</small>
+                </div>
               </div>
 
               <!-- Telemetría en Vivo -->
               <div class="calib-telemetry-box">
                 <div class="telemetry-stat">
                   <span class="stat-lbl">SENSOR CAM:</span>
-                  <span class="stat-val" id="calib-cam-status" style="cursor: pointer;" title="Clic para reconectar cámara">STANDBY</span>
+                  <span class="stat-val" id="calib-cam-status" style="cursor: pointer;"
+                    title="Clic para reconectar cámara">STANDBY</span>
                 </div>
                 <div class="telemetry-stat">
                   <span class="stat-lbl">NODOS DETECTADOS:</span>
@@ -666,13 +675,15 @@
                 <label for="cfg-camera-select">
                   <strong>Dispositivo de Cámara Web:</strong>
                 </label>
-                <select id="cfg-camera-select" class="config-input-select" style="width: 100%; padding: 7px 10px; background: rgba(5,15,25,0.85); color: #00f0ff; border: 1px solid rgba(0,240,255,0.4); border-radius: 4px; font-family: monospace; font-size: 13px;">
+                <select id="cfg-camera-select" class="config-input-select"
+                  style="width: 100%; padding: 7px 10px; background: rgba(5,15,25,0.85); color: #00f0ff; border: 1px solid rgba(0,240,255,0.4); border-radius: 4px; font-family: monospace; font-size: 13px;">
                   <option value="">(Autoselección Inteligente / Predeterminada)</option>
                 </select>
               </div>
 
               <div class="calib-actions-row">
-                <button type="button" class="btn-calib-action" id="btn-reconnect-cam" style="border-color: #00f0ff; color: #00f0ff;">
+                <button type="button" class="btn-calib-action" id="btn-reconnect-cam"
+                  style="border-color: #00f0ff; color: #00f0ff;">
                   📷 Reconectar Cámara
                 </button>
                 <button type="button" class="btn-calib-action" id="btn-center-calibration">
@@ -873,6 +884,14 @@
                   </label>
                   <input type="range" id="cfg-puntero-conf" min="5" max="95" step="5" value="20">
                   <small class="item-desc">Visibilidad mínima de la muñeca (OpenPose) para dibujar el CUADRADO de selección sobre la mano. Bajo = los cuadrados aparecen siempre aunque la pose venga con poca confianza; alto = solo con manos bien detectadas.</small>
+                </div>
+                <!-- UMBRAL MÍNIMO DE SILUETA VISIBLE -->
+                <div class="calib-item">
+                  <label for="cfg-sil-min-conf">
+                    <strong>Umbral Mínimo de Silueta Visible:</strong> <span id="val-sil-min-conf">30%</span>
+                  </label>
+                  <input type="range" id="cfg-sil-min-conf" min="5" max="95" step="5" value="30">
+                  <small class="item-desc">Confianza mínima que debe tener una silueta para ser visible y dibujarse en pantalla. Si la detección está por debajo de este umbral, se oculta.</small>
                 </div>
               </div>
             </div>
@@ -1643,7 +1662,7 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=3.77"></script>
+  <script src="script.js?v=3.82"></script>
 </body>
 
 </html>
