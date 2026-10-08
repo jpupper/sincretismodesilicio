@@ -74,6 +74,9 @@ uniform float u_rdmSm2;        // SMOOTH ALTO (dónde llega a blanco pleno)
 uniform float u_rdmForce;      // brillo final (e_force del original)
 uniform float u_rdmMix;        // PRESENCIA: 1 = tapa el fondo anterior
 uniform vec3  u_rdmColor;      // tinte del patrón
+uniform float u_barOn;         // 1 = se dibuja la BARRA DE PROCESAMIENTO (la controla el JS)
+uniform float u_barFill;       // 0..1: llenado de la barra (40 s al 90%, el 10% final cuando el haiku está listo)
+uniform sampler2D u_barTexto;  // textura con el texto "PROCESANDO INPUT HUMANO"
 uniform float u_haikuRdmBrillo; // brillo del patrón RDM detrás del haiku (default 1.0)
 
 // ---------------------------------------------------------------------------
@@ -666,6 +669,44 @@ void main() {
        OpenPose se compone AL FINAL (por encima de todo para interactuar con las palabras) */
     if (u_openposeBehind <= 0.5) {
         fin += opLayer;
+    }
+
+    /* ======================================================================
+       BARRA DE PROCESAMIENTO (la dibuja el master output, pedido del artista)
+       ----------------------------------------------------------------------
+       Fondo NEGRO y lo que se va llenando muestra el PATRÓN RDM. Se llena MUY
+       lentamente: 0 -> 90% en 40 s (u_barFill lo lleva el JS) y el 10% restante
+       cuando el haiku ya está listo para mostrarse. Encima va el texto
+       "PROCESANDO INPUT HUMANO" (textura u_barTexto, blanco con contorno negro).
+       ====================================================================== */
+    if (u_barOn > 0.5) {
+        float bAncho = 0.62;                    // ancho de la barra (fracción del ancho)
+        float bAlto  = 0.052;                   // alto
+        vec2  bC     = vec2(0.5, 0.135);        // centro: abajo y centrada
+        float halfW  = bAncho * 0.5;
+        float halfH  = bAlto  * 0.5;
+        float dx = abs(rawUv.x - bC.x) - halfW; // < 0 = adentro
+        float dy = abs(rawUv.y - bC.y) - halfH;
+        if (dx < 0.0 && dy < 0.0) {
+            // Distancia al borde en PÍXELES reales (para un marco fino parejo)
+            float ePx = max(dx * u_resolution.x, dy * u_resolution.y);
+            float t = (rawUv.x - (bC.x - halfW)) / bAncho;         // 0..1 a lo ancho
+            float lleno = step(t, clamp(u_barFill, 0.0, 1.0));
+
+            // Base NEGRA + la parte llena con el patrón RDM (el mismo del fondo)
+            vec3 patron = getRdmBgSlow(rawUv, 1.0) * 1.25;
+            vec3 colBar = mix(vec3(0.0), patron, lleno);
+
+            // Marco fino del color de la paleta global
+            float marco = smoothstep(-2.0, 0.0, ePx) * (1.0 - step(0.0, ePx));
+            colBar = mix(colBar, u_palB, marco * 0.9);
+
+            // Texto (textura): blanco con contorno negro, centrado en la barra
+            vec4 tex = texture2D(u_barTexto, vec2(t, (rawUv.y - (bC.y - halfH)) / bAlto));
+            colBar = mix(colBar, tex.rgb, tex.a);
+
+            fin = colBar;
+        }
     }
 
     gl_FragColor = vec4(fin, 1.0);

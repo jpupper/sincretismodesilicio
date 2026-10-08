@@ -1711,6 +1711,10 @@ class MasterOutputShader {
       rdmMix: gl.getUniformLocation(this.program, 'u_rdmMix'),
       rdmColor: gl.getUniformLocation(this.program, 'u_rdmColor'),
       haikuRdmBrillo: gl.getUniformLocation(this.program, 'u_haikuRdmBrillo'),
+      // Barra de procesamiento (la dibuja el frag) + su textura de texto
+      barOn: gl.getUniformLocation(this.program, 'u_barOn'),
+      barFill: gl.getUniformLocation(this.program, 'u_barFill'),
+      barTexto: gl.getUniformLocation(this.program, 'u_barTexto'),
       // Paleta unificada (GLOBALSTYLE) + tinte de la cámara
       palA: gl.getUniformLocation(this.program, 'u_palA'),
       palB: gl.getUniformLocation(this.program, 'u_palB'),
@@ -2100,6 +2104,40 @@ class MasterOutputShader {
       const hb = Number(rdm.haikuRdmBrillo !== undefined ? rdm.haikuRdmBrillo : (appState.trackingConfig.haikuRdmBrillo !== undefined ? appState.trackingConfig.haikuRdmBrillo : 1.0));
       gl.uniform1f(this.uniforms.haikuRdmBrillo, Math.max(0, isFinite(hb) ? hb : 1.0));
     }
+
+    /* BARRA DE PROCESAMIENTO: el dibujo (negra + relleno con patrón RDM) está en el
+       fragment shader; acá se le pasa el estado y la textura con el texto. El llenado
+       lo calcula actualizarBarraProcesando(): 0 -> 90% en 40 s y el 10% final cuando el
+       haiku ya está listo. */
+    actualizarBarraProcesando();
+    const bp = appState.barraProc || {};
+    if (this.uniforms.barOn) gl.uniform1f(this.uniforms.barOn, bp.activa ? 1.0 : 0.0);
+    if (this.uniforms.barFill) gl.uniform1f(this.uniforms.barFill, isFinite(bp.lleno) ? bp.lleno : 0.0);
+    if (!this.barTextTexture) {
+      this.barTextTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this.barTextTexture);
+      try {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, crearTexturaTextoBarra());
+      } catch (e) { }
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      // Si la tipografía termina de cargar DESPUÉS, se rehace la textura UNA sola vez.
+      // (Sin este candado el .then se reenganchaba en cada frame y la textura se
+      // recreaba permanentemente quedando en null.)
+      if (!this._barTextFontHooked) {
+        this._barTextFontHooked = true;
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(() => { this.barTextTexture = null; }).catch(() => { });
+        }
+      }
+    }
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D, this.barTextTexture);
+    if (this.uniforms.barTexto) gl.uniform1i(this.uniforms.barTexto, 5);
 
     /* PALETA UNIFICADA (GLOBALSTYLE): se manda TODOS los frames. Con
        SEGUIR PALETA activo, el patrón RDM, los marcos de las palabras, el
@@ -6983,6 +7021,70 @@ function catchWord(word, index) {
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+/* ============================================================================
+// BARRA DE PROCESAMIENTO DEL HAIKU (la dibuja el master output)
+// ----------------------------------------------------------------------------
+// Fondo negro que se va llenando MUY LENTAMENTE con el patrón RDM: tarda 40 s en
+// llegar al 90% y el 10% restante se completa recién cuando el haiku ya está listo
+// para mostrarse. Mientras tanto la barra dice "PROCESANDO INPUT HUMANO".
+// ============================================================================ */
+const BARRA_PROC_SEG_A_90 = 40;     // segundos para llegar al 90%
+const BARRA_PROC_SEG_FINAL = 1.4;   // segundos del 10% final (haiku listo)
+
+function iniciarBarraProcesando() {
+  if (appState.barraProc && appState.barraProc.activa) return;   // ya está corriendo
+  appState.barraProc = { activa: true, t0: performance.now(), lleno: 0, listo: false, listoEn: 0 };
+}
+
+function actualizarBarraProcesando() {
+  const b = appState.barraProc;
+  if (!b || !b.activa) return;
+  const ahora = performance.now();
+  if (!b.listo) {
+    // 0 -> 0.9 en BARRA_PROC_SEG_A_90 segundos (si el modelo tarda más, queda en 0.9)
+    b.lleno = Math.min(0.9, ((ahora - b.t0) / 1000 / BARRA_PROC_SEG_A_90) * 0.9);
+  } else {
+    // El 10% final, cuando el haiku está listo
+    const avance = Math.max(0, (ahora - b.listoEn) / 1000 / BARRA_PROC_SEG_FINAL);
+    b.lleno = Math.min(1, 0.9 + 0.1 * avance);
+  }
+}
+
+async function completarBarraProcesando() {
+  const b = appState.barraProc;
+  if (!b || !b.activa) return;
+  b.listo = true;
+  b.listoEn = performance.now();
+  await wait(BARRA_PROC_SEG_FINAL * 1000 + 150);   // deja que se llene el 10% final
+  ocultarBarraProcesando();
+}
+
+function ocultarBarraProcesando() {
+  if (appState.barraProc) {
+    appState.barraProc.activa = false;
+    appState.barraProc.lleno = 0;
+  }
+}
+
+/* Textura con el texto de la barra: blanco con contorno negro para que se lea
+   tanto sobre el negro como sobre el patrón RDM. */
+function crearTexturaTextoBarra() {
+  const cv = document.createElement('canvas');
+  cv.width = 1024;
+  cv.height = 48;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = '30px "Share Tech Mono", monospace';
+  g.lineWidth = 6;
+  g.strokeStyle = '#000000';
+  g.strokeText('PROCESANDO INPUT HUMANO', cv.width / 2, cv.height / 2);
+  g.fillStyle = '#ffffff';
+  g.fillText('PROCESANDO INPUT HUMANO', cv.width / 2, cv.height / 2);
+  return cv;
+}
+
 const COLD_AI_SYNONYMS = {
   // 30 conceptos humanos iniciales
   'amor': 'TRABAJADOR',
@@ -7311,6 +7413,8 @@ async function startResignificationSequence() {
   // anterior todavía está esperando la respuesta de Ollama).
   if (appState.resigning) return;
   appState.resigning = true;
+  // Arranca la BARRA DE PROCESAMIENTO (40 s al 90%; el 10% final cuando el haiku esté listo)
+  iniciarBarraProcesando();
   // Arranca limpio: si un ciclo anterior quedó a medias (p. ej. un reset en el
   // medio de la espera de Ollama), sus auxiliares se destruyen acá para que no
   // se acumulen palabras fantasma en la frase siguiente.
@@ -7492,6 +7596,9 @@ async function startResignificationSequence() {
 
   // REORGANIZACIÓN DINÁMICA: Componer la frase completa con las 3 palabras transformadas en el medio y las auxiliares
   if (stale()) return;   // hubo un reset mientras esperábamos la IA: descartar
+  // BARRA: completa el 10% que faltaba y recién después aparece el haiku.
+  await completarBarraProcesando();
+  if (stale()) return;
   // El HAIKU empieza a formarse ACÁ: recién en este momento el shader maestro
   // enciende el contenedor (estado HAIKU = weights.z). Antes, en PROCESSING, se ve
   // la animación de las palabras cambiando, sin caja.
@@ -8455,6 +8562,8 @@ function generateEmergencyHijack(words) {
 // ESTADO: RESET (Restauración de Pantalla y Vuelta a IDLE)
 // ============================================================================
 function handleStateReset() {
+  // La barra de procesamiento se apaga en cualquier reset (no puede quedar colgada)
+  ocultarBarraProcesando();
   // Invalida cualquier secuencia en vuelo: si estaba esperando a Ollama, al
   // volver va a ver el token viejo y no va a componer una frase fantasma.
   appState.resigning = false;
