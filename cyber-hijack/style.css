@@ -779,21 +779,27 @@ body {
 }
 
 /* ==========================================================================
-   CURSOR TÁCTICO / RETÍCULO DE FIJACIÓN (ESTILO MIRA STEAMPUNK)
+   CURSOR TÁCTICO / PUNTERO (CÍRCULO NEGRO + REBORDE COBRE + ENERGÍA RADIAL)
+   --------------------------------------------------------------------------
+   Sin cruz, sin muescas y sin anillos de mira: un círculo NEGRO con el reborde
+   del color de la paleta (cobre) que, mientras fija una palabra, se RELLENA DE
+   ADENTRO HACIA AFUERA con el color de ENERGÍA. Los colores se leen EN VIVO del
+   GLOBALSTYLE (--gs-puntero / --gs-puntero-fijo) y el avance del relleno lo
+   escribe el main loop en --lock-fill (0..1).
    ========================================================================== */
 #cursor-reticle {
   position: fixed;
   top: 0;
   left: 0;
-  width: 58px;
-  height: 58px;
+  width: 52px;
+  height: 52px;
   transform: translate(-50%, -50%);
   z-index: 25;
   pointer-events: none;
-  /* Fondo negro óptico de mira / lente steampunk */
-  background: radial-gradient(circle, rgba(12, 9, 6, 0.94) 0%, rgba(18, 14, 9, 0.96) 65%, rgba(4, 3, 2, 0.99) 92%, #000 100%);
+  /* Disco NEGRO */
+  background: #000;
   border-radius: 50%;
-  box-shadow: 0 0 16px rgba(0, 0, 0, 0.95), inset 0 0 10px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.95);
   transition: width 0.2s ease, height 0.2s ease, opacity 0.3s ease;
 }
 
@@ -801,81 +807,58 @@ body {
   opacity: 0;
 }
 
+/* RELLENO DE ENERGÍA: nace en el centro y crece hacia el borde (scale sobre el
+   disco), con núcleo caliente → energía → cobre. */
+.reticle-fill {
+  position: absolute;
+  inset: 1.5px;
+  border-radius: 50%;
+  transform: scale(var(--lock-fill, 0));
+  background: radial-gradient(circle,
+      var(--gs-cluster-pelotita, #ffe2c8) 0%,
+      var(--gs-puntero-fijo, #dca876) 45%,
+      var(--gs-puntero, #d46238) 100%);
+  box-shadow: 0 0 14px var(--gs-puntero-fijo, #dca876);
+  opacity: 0;
+  transition: opacity 0.12s linear;
+  will-change: transform;
+}
+
+#cursor-reticle.locking .reticle-fill {
+  opacity: 1;
+}
+
+/* REBORDE COBRE (paleta global) */
 .reticle-ring {
   position: absolute;
-  inset: 2px;
-  border: 2px solid #c28b3a;
+  inset: 0;
+  border: 2.6px solid var(--gs-puntero, #d46238);
   border-radius: 50%;
-  animation: rotateClockwise 12s linear infinite;
-  box-shadow: inset 0 0 8px rgba(194, 139, 58, 0.3), 0 0 10px rgba(194, 139, 58, 0.4);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
 }
 
-.reticle-core {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  transform: translate(-50%, -50%);
-  background-color: #dfa857;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #dfa857;
-}
-
-.reticle-crosshair {
-  position: absolute;
-  background: #c28b3a;
-}
-
-.reticle-crosshair.ch-x {
-  top: 50%;
-  left: 2px;
-  right: 2px;
-  height: 1px;
-  transform: translateY(-50%);
-}
-
-.reticle-crosshair.ch-y {
-  left: 50%;
-  top: 2px;
-  bottom: 2px;
-  width: 1px;
-  transform: translateX(-50%);
+#cursor-reticle.locking .reticle-ring {
+  box-shadow: 0 0 14px var(--gs-puntero, #d46238);
 }
 
 .reticle-label {
   position: absolute;
-  top: 62px;
+  top: 58px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 8.5px;
   letter-spacing: 0.8px;
-  color: #dfa857;
-  background: rgba(14, 10, 6, 0.94);
+  color: var(--gs-puntero, #d46238);
+  background: rgba(0, 0, 0, 0.85);
   padding: 1px 6px;
-  border: 1px solid #c28b3a;
+  border: 1px solid var(--gs-puntero, #d46238);
   border-radius: 2px;
   white-space: nowrap;
 }
 
-#cursor-reticle.locking .reticle-ring {
-  border-color: #ff5722;
-  box-shadow: inset 0 0 12px rgba(255, 87, 34, 0.45), 0 0 20px rgba(255, 87, 34, 0.6);
-  animation-duration: 2.5s;
-}
-
-#cursor-reticle.locking .reticle-core {
-  background-color: #ff3b30;
-  box-shadow: 0 0 12px #ff3b30;
-}
-
-#cursor-reticle.locking .reticle-crosshair {
-  background: #ff5722;
-}
-
 #cursor-reticle.locking .reticle-label {
-  color: #ff9800;
-  border-color: #ff5722;
+  color: var(--gs-puntero-fijo, #dca876);
+  border-color: var(--gs-puntero-fijo, #dca876);
 }
 
 /* ==========================================================================
@@ -1513,13 +1496,6 @@ body {
   height: 440px;
 }
 
-.ascii-row-stacked {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 6px;
-}
-
 .form-group {
   display: flex;
   flex-direction: column;
@@ -1890,7 +1866,7 @@ textarea:focus {
 
 /* REGLA DEL MASTER OUTPUT: es la ÚLTIMA etapa de la imagen.
    Ninguna capa de POSTPROCESAMIENTO DOM (ruido procedural, VHS, scanlines,
-   viñeta, framediff/ascii) puede quedar por encima: si no, ensucian -entre otras
+   viñeta, framediff) puede quedar por encima: si no, ensucian -entre otras
    cosas- la zona del contenedor del haiku, que el shader mantiene inmune.
    Con master-output activo el canvas sube por encima de esas capas (z 2-3) y
    por debajo quedan sólo las capas de ENTRADA (que el maestro muestrea como
@@ -1912,7 +1888,6 @@ html.solo-master {
    partículas / HUD por encima. */
 html.master-output-active #webcam-video,
 html.master-output-active #cutout-camera-canvas,
-html.master-output-active #ascii-camera-canvas,
 html.master-output-active #framediff-camera-canvas,
 html.master-output-active #openpose-overlay-canvas,
 html.master-output-active #flowfield-overlay-canvas {
@@ -1941,18 +1916,6 @@ html.master-output-active #flowfield-overlay-canvas {
   font-weight: 900 !important;
   border-color: #ff000d !important;
   box-shadow: 0 0 14px rgba(255, 0, 13, 0.7);
-}
-
-#ascii-camera-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 2;
-  pointer-events: none;
-  opacity: 0.92;
-  mix-blend-mode: screen;
-  transition: opacity 0.4s ease;
 }
 
 #framediff-camera-canvas {
@@ -2383,10 +2346,8 @@ input[type="color"]:hover {
   transform: scale(1.12);
 }
 
-/* Los canvases de ASCII y FrameDiff conservan su opacidad calibrada sin forzar cambios */
-#installation-container.state-processing #ascii-camera-canvas,
+/* El canvas de FrameDiff conserva su opacidad calibrada sin forzar cambios */
 #installation-container.state-processing #framediff-camera-canvas,
-#installation-container.state-hijack #ascii-camera-canvas,
 #installation-container.state-hijack #framediff-camera-canvas {
   /* Mantener valores de opacidad definidos por el usuario */
 }

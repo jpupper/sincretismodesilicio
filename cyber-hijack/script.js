@@ -1,7 +1,7 @@
 /**
  * SINCRETISMO DE SILICIO - SECUESTRO CIBERNÉTICO
  * Instalación Artística Interactiva Full Stack
- * MediaPipe Pose + Trackeo Mouse Prioritario + Shader ASCII WebGL + Detección Dinámica Ollama
+ * MediaPipe Pose + Trackeo Mouse Prioritario + Detección Dinámica Ollama
  */
 
 // ============================================================================
@@ -521,12 +521,14 @@ const DEFAULT_CONFIG = {
 let HUMAN_WORDS_POOL = [...DEFAULT_WORDS_POOL];
 
 // ============================================================================
-// CALL TO ACTION POR INACTIVIDAD
-// Si nadie toca la instalación durante IDLE_CTA_DELAY_MS aparece abajo el
-// cartel que invita a elegir la primera palabra. Se esconde al primer
-// estímulo (mouse, clic, touch, tecla o movimiento real en cámara).
+// CARTEL DEL OBJETIVO (INACTIVIDAD DE CAPTURA)
+// Por defecto está OCULTO. Si nadie AGARRA una palabra durante IDLE_CTA_DELAY_MS
+// aparece la leyenda del objetivo, y se queda en pantalla hasta que alguien
+// captura una palabra (o hasta que la app sale de IDLE: secuencia, mutación o
+// modal). El simple movimiento —mouse O cámara— NO lo esconde: lo que cuenta es
+// la CAPTURA (ver catchWord()).
 // ============================================================================
-const IDLE_CTA_DELAY_MS = 12000;        // 12 s sin tocar nada
+const IDLE_CTA_DELAY_MS = 15000;        // 15 s sin que nadie agarre una palabra
 const IDLE_CTA_CAMERA_MOVE_PX = 26;     // movimiento mínimo para contar en cámara
 
 // MONITORES PiP (biometría facial + depth map): no se quedan fijos en pantalla.
@@ -845,23 +847,6 @@ const appState = {
   currentInferenceSlot: 0,
   pipPlayerAssign: { face: 0, leftHand: 0, rightHand: 1 }, // Asignación dinámica de monitores a Jugador 1 o 2
 
-  // Shader ASCII
-  asciiShader: null,
-  asciiConfig: {
-    enabled: true,
-    charSize: 11,
-    glyphScale: 0.9,
-    fontMode: 0,
-    drawBg: true,
-    autoTint: true,
-    baseColor: '#26f2e6',
-    processingColor: '#ff1a59',
-    hijackColor: '#1aff4d',
-    silhouetteColor: '#39ff14',
-    bgColor: '#05070a',
-    bgAlpha: 0.0
-  },
-
   // Colores globales de la interfaz (Pestaña COLORES)
   uiColors: { ...UI_COLORS },
   // Paleta global activa ('custom' = el usuario editó colores a mano)
@@ -917,6 +902,9 @@ const appState = {
 
   // Call to action por inactividad
   lastUserActivity: Date.now(),
+  // Reloj del cartel del OBJETIVO: marca la ÚLTIMA palabra capturada (y el
+  // arranque de cada ciclo). Si pasa IDLE_CTA_DELAY_MS sin capturas, aparece.
+  lastCatchAt: Date.now(),
   idleCtaVisible: false,
 
   // Timers
@@ -939,6 +927,8 @@ const appState = {
 
   // Configuración de Tracking y Calibración
   trackingConfig: {
+    pointLerpFactor: 0.75, // Factor de interpolación vectorial (lerp) para suavizado de articulaciones/manos
+    haikuRdmBrillo: 1.0,    // Brillo del patrón RDM detrás del contenedor del haiku (0.0..3.0)
     showOpenPose: false,
     drawBones: true,
     drawLandmarks: true,
@@ -963,8 +953,6 @@ const appState = {
     showDepthMap: false,
     depthMode: 'cyberpunk', // 'cyberpunk' | 'thermal' | 'monochrome'
     depthContrast: 1.5,
-    depthInShader: true, // REQUERIMIENTO 3: Máscara depth en shader ASCII sobre la silueta
-    bodyColor: 'neon-green', // REQUERIMIENTO 3: Color de letras en silueta corporal
     showFaceCamera: false,
     faceZoom: 1.8,
     faceReticle: true,
@@ -1011,8 +999,6 @@ const appState = {
   renderConfig: {
     cameraEnabled: true,
     cameraOpacity: 1.0,
-    asciiEnabled: true,
-    asciiOpacity: 0.92,
     frameDiffEnabled: false,
     frameDiffOpacity: 0.88,
     openposeEnabled: true,
@@ -1072,7 +1058,6 @@ const DOM = {
   btnOpenJPShader: document.getElementById('btn-open-jpshader'),
   video: document.getElementById('webcam-video'),
   cutoutCanvas: document.getElementById('cutout-camera-canvas'),
-  asciiCanvas: document.getElementById('ascii-camera-canvas'),
   framediffCanvas: document.getElementById('framediff-camera-canvas'),
   openposeCanvas: document.getElementById('openpose-overlay-canvas'),
   flowfieldCanvas: document.getElementById('flowfield-overlay-canvas'),
@@ -1091,10 +1076,6 @@ const DOM = {
   cfgRenderCameraToggle: document.getElementById('cfg-render-camera-toggle'),
   cfgRenderCameraOpacity: document.getElementById('cfg-render-camera-opacity'),
   valRenderCameraOpacity: document.getElementById('val-render-camera-opacity'),
-
-  cfgRenderAsciiToggle: document.getElementById('cfg-render-ascii-toggle'),
-  cfgRenderAsciiOpacity: document.getElementById('cfg-render-ascii-opacity'),
-  valRenderAsciiOpacity: document.getElementById('val-render-ascii-opacity'),
 
   cfgRenderFrameDiffToggle: document.getElementById('cfg-render-framediff-toggle'),
   cfgRenderFrameDiffOpacity: document.getElementById('cfg-render-framediff-opacity'),
@@ -1215,21 +1196,6 @@ const DOM = {
   btnRefreshModels: document.getElementById('btn-refresh-models'),
   cfgModelName: document.getElementById('cfg-model-name'),
   cfgSystemPrompt: document.getElementById('cfg-system-prompt'),
-  cfgAsciiEnabled: document.getElementById('cfg-ascii-enabled'),
-  cfgAsciiSize: document.getElementById('cfg-ascii-size'),
-  valAsciiSize: document.getElementById('val-ascii-size'),
-  cfgAsciiGlyphScale: document.getElementById('cfg-ascii-glyph-scale'),
-  valAsciiGlyphScale: document.getElementById('val-ascii-glyph-scale'),
-  cfgAsciiAutoTint: document.getElementById('cfg-ascii-auto-tint'),
-  cfgAsciiBaseColor: document.getElementById('cfg-ascii-base-color'),
-  cfgAsciiProcessingColor: document.getElementById('cfg-ascii-processing-color'),
-  cfgAsciiHijackColor: document.getElementById('cfg-ascii-hijack-color'),
-  cfgAsciiBodyColor: document.getElementById('cfg-ascii-body-color'),
-  cfgAsciiBgColor: document.getElementById('cfg-ascii-bg-color'),
-  cfgAsciiBgAlpha: document.getElementById('cfg-ascii-bg-alpha'),
-  valAsciiBgAlpha: document.getElementById('val-ascii-bg-alpha'),
-  cfgAsciiSilhouette: document.getElementById('cfg-ascii-silhouette'),
-  cfgAsciiDrawBg: document.getElementById('cfg-ascii-draw-bg'),
   // Pestaña COLORES
   cfgUiCyan: document.getElementById('cfg-ui-cyan'),
   cfgUiGreen: document.getElementById('cfg-ui-green'),
@@ -1304,7 +1270,19 @@ const DOM = {
   btnReplaceWords: document.getElementById('btn-replace-words'),
   btnDefaultWords: document.getElementById('btn-default-words'),
   wordsChipsContainer: document.getElementById('words-chips-container'),
-  // Pestaña Tracking & Calibración
+  // Pestaña Silhouette & Tracking Calibración
+  cfgTrackPointLerp: document.getElementById('cfg-track-point-lerp'),
+  valTrackPointLerp: document.getElementById('val-track-point-lerp'),
+  cfgHaikuRdmBrillo: document.getElementById('cfg-haiku-rdm-brillo'),
+  valHaikuRdmBrillo: document.getElementById('val-haiku-rdm-brillo'),
+  cfgSilBlur: document.getElementById('cfg-sil-blur'),
+  valSilBlur: document.getElementById('val-sil-blur'),
+  cfgSilEdge: document.getElementById('cfg-sil-edge'),
+  valSilEdge: document.getElementById('val-sil-edge'),
+  cfgSilRdm: document.getElementById('cfg-sil-rdm'),
+  valSilRdm: document.getElementById('val-sil-rdm'),
+  cfgSilCamVis: document.getElementById('cfg-sil-cam-vis'),
+  valSilCamVis: document.getElementById('val-sil-cam-vis'),
   cfgTrackOpenpose: document.getElementById('cfg-track-openpose'),
   cfgTrackBones: document.getElementById('cfg-track-bones'),
   cfgTrackBoneWidth: document.getElementById('cfg-track-bone-width'),
@@ -1324,8 +1302,6 @@ const DOM = {
   cfgColPointCodoIzq: document.getElementById('cfg-col-point-codo-izq'),
   cfgColPointCodoDer: document.getElementById('cfg-col-point-codo-der'),
   cfgColPointCentroFacial: document.getElementById('cfg-col-point-centro-facial'), cfgTrackDepth: document.getElementById('cfg-track-depth'),
-  cfgTrackDepthShader: document.getElementById('cfg-track-depth-shader'),
-  cfgTrackBodyColor: document.getElementById('cfg-track-body-color'),
   cfgTrackDepthMode: document.getElementById('cfg-track-depth-mode'),
   cfgTrackDepthContrast: document.getElementById('cfg-track-depth-contrast'),
   valTrackDepthContrast: document.getElementById('val-track-depth-contrast'),
@@ -1458,15 +1434,6 @@ function playSound(type, param = 0) {
     }
   } catch (e) { }
 }
-
-// Generador de tablas y colores para Silueta Corporal en Shader ASCII
-const BODY_TINT_COLORS = {
-  'neon-green': [0.22, 1.0, 0.08],
-  'gold': [1.0, 0.8, 0.0],
-  'magenta': [1.0, 0.0, 0.35],
-  'cyan': [0.0, 0.94, 1.0],
-  'white': [1.0, 1.0, 1.0]
-};
 
 // Convierte un color hex (#rrggbb o #rgb) a componentes normalizados 0..1 para WebGL
 function hexToRgb01(hex, fallback = [0.0, 0.0, 0.0]) {
@@ -1615,7 +1582,7 @@ class MasterOutputShader {
   }
 
   // Mientras el shader maestro esté activo, las capas que ahora son ENTRADAS
-  // (video, cutout, ascii, framediff, overlay openpose) dejan de verse: la
+  // (video, cutout, framediff, overlay openpose) dejan de verse: la
   // salida visible es este canvas, con las palabras y partículas por encima.
   setActive(on) {
     this.active = !!on;
@@ -1704,6 +1671,7 @@ class MasterOutputShader {
       openposeTexture: gl.getUniformLocation(this.program, 'u_openposeTexture'),
       hasOpenpose: gl.getUniformLocation(this.program, 'u_hasOpenpose'),
       openposeOpacity: gl.getUniformLocation(this.program, 'u_openposeOpacity'),
+      openposeBehind: gl.getUniformLocation(this.program, 'u_openposeBehind'),
       flowfieldTexture: gl.getUniformLocation(this.program, 'u_flowfieldTexture'),
       hasFlowfield: gl.getUniformLocation(this.program, 'u_hasFlowfield'),
       flowfieldOpacity: gl.getUniformLocation(this.program, 'u_flowfieldOpacity'),
@@ -1733,6 +1701,7 @@ class MasterOutputShader {
       rdmForce: gl.getUniformLocation(this.program, 'u_rdmForce'),
       rdmMix: gl.getUniformLocation(this.program, 'u_rdmMix'),
       rdmColor: gl.getUniformLocation(this.program, 'u_rdmColor'),
+      haikuRdmBrillo: gl.getUniformLocation(this.program, 'u_haikuRdmBrillo'),
       // Paleta unificada (GLOBALSTYLE) + tinte de la cámara
       palA: gl.getUniformLocation(this.program, 'u_palA'),
       palB: gl.getUniformLocation(this.program, 'u_palB'),
@@ -1866,7 +1835,7 @@ class MasterOutputShader {
     }
 
     // 2) Depth Map (Texture 1) — SOLO subir textura si hay humano captado
-    const depthCanvas = DOM.depthCanvas || (appState.asciiShader && appState.asciiShader.lastMaskSource);
+    const depthCanvas = DOM.depthCanvas;
     const hasDepthActual = Boolean(depthCanvas && appState.hasHuman && (FORZAR_CAMARA_SILUETA_OPENPOSE || layers.cutoutEnabled !== false));
     if (hasDepthActual) {
       gl.activeTexture(gl.TEXTURE1);
@@ -1900,8 +1869,19 @@ class MasterOutputShader {
       if (this.uniforms.openposeOpacity) {
         gl.uniform1f(this.uniforms.openposeOpacity, layers.openposeOpacity !== undefined ? layers.openposeOpacity : 1.0);
       }
+      if (this.uniforms.openposeBehind) {
+        const wordsChosen = Boolean(
+          (appState.caughtWords && appState.caughtWords.length >= 3) ||
+          appState.currentState === STATES.PROCESSING ||
+          appState.currentState === STATES.HIJACK
+        );
+        gl.uniform1f(this.uniforms.openposeBehind, wordsChosen ? 1.0 : 0.0);
+      }
     } else {
       gl.uniform1i(this.uniforms.hasOpenpose, 0);
+      if (this.uniforms.openposeBehind) {
+        gl.uniform1f(this.uniforms.openposeBehind, 0.0);
+      }
     }
 
     // 3b) Flow Field (Texture 4) — solo subir textura cuando Flow Field se redibujó
@@ -1980,8 +1960,28 @@ class MasterOutputShader {
       posBuffer[i * 2] = px / winW;
       posBuffer[i * 2 + 1] = 1.0 - (py / winH);
       widthBuffer[i] = anchoPx ? (anchoPx / winW) : 0;
-      // ENERGIA por palabra (la dibuja el shader): llenado -> 100% -> vaciado en el medio.
-      dwellBuffer[i] = (w.energy !== undefined) ? w.energy : (w.isTargeted ? (w.dwellProgress || 0) : 0);
+      // REQUERIMIENTO: SOLAMENTE las 3 palabras seleccionadas que aparecen en el medio pueden tener el rombo seleccionado/energía.
+      const isSelectedWord = Boolean(appState.selectedWordObjects && appState.selectedWordObjects.indexOf(w) !== -1);
+      const isSequenceActive = Boolean(
+        (appState.caughtWords && appState.caughtWords.length >= 3) ||
+        appState.currentState === STATES.PROCESSING ||
+        appState.currentState === STATES.HIJACK ||
+        appState.currentState === STATES.RESET ||
+        appState.resigning
+      );
+
+      if (isSequenceActive) {
+        // En secuencia activa / haiku: EXCLUSIVAMENTE las palabras seleccionadas
+        dwellBuffer[i] = isSelectedWord ? (w.energy !== undefined ? w.energy : 1.0) : 0.0;
+      } else {
+        if (isSelectedWord) {
+          dwellBuffer[i] = (w.energy !== undefined) ? w.energy : 1.0;
+        } else if (w.isTargeted && w === appState.floatingWords[appState.targetedWordIndex] && appState.caughtWords.length < 3) {
+          dwellBuffer[i] = w.dwellProgress || 0;
+        } else {
+          dwellBuffer[i] = 0.0;
+        }
+      }
     }
     gl.uniform2fv(this.uniforms.wordPositions, posBuffer);
     if (this.uniforms.wordWidths) gl.uniform1fv(this.uniforms.wordWidths, widthBuffer);
@@ -2074,7 +2074,7 @@ class MasterOutputShader {
     if (this.uniforms.rdmCnt) {
       const rdm = masterRdmState();
       gl.uniform1f(this.uniforms.rdmCnt, rdNorm(rdm.cnt, 1.0, 20.0));
-      gl.uniform1f(this.uniforms.rdmIteScale, rdNorm(rdm.iteScale, 0.0, 10.0));
+      gl.uniform1f(this.uniforms.rdmIteScale, rdNorm(rdm.iteScale, 0.0, 1.0));
       gl.uniform1f(this.uniforms.rdmSpeedX, rdNorm(rdm.speedX, -0.2, 0.2));
       gl.uniform1f(this.uniforms.rdmSpeedY, rdNorm(rdm.speedY, -0.2, 0.2));
       gl.uniform1f(this.uniforms.rdmSpeedRot, rdNorm(rdm.speedRot, -0.02, 0.02));
@@ -2085,6 +2085,11 @@ class MasterOutputShader {
       gl.uniform1f(this.uniforms.rdmMix, rdm.mix);
       const rc = hexToRgb01(rdm.color, [1.0, 1.0, 1.0]);
       gl.uniform3f(this.uniforms.rdmColor, rc[0], rc[1], rc[2]);
+    }
+    if (this.uniforms.haikuRdmBrillo) {
+      const rdm = masterRdmState();
+      const hb = Number(rdm.haikuRdmBrillo !== undefined ? rdm.haikuRdmBrillo : (appState.trackingConfig.haikuRdmBrillo !== undefined ? appState.trackingConfig.haikuRdmBrillo : 1.0));
+      gl.uniform1f(this.uniforms.haikuRdmBrillo, Math.max(0, isFinite(hb) ? hb : 1.0));
     }
 
     /* PALETA UNIFICADA (GLOBALSTYLE): se manda TODOS los frames. Con
@@ -2190,418 +2195,6 @@ class MasterOutputShader {
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }
-}
-
-// ============================================================================
-// SHADER ASCII SOBRE CÁMARA (WebGL2 / WebGL)
-// ============================================================================
-class AsciiCameraShader {
-  constructor(canvas, videoElement) {
-    this.canvas = canvas;
-    this.video = videoElement;
-    this.gl = null;
-    this.program = null;
-    this.texture = null;
-    this.depthTexture = null;
-    this.hasDepthMask = false;
-    this.lastMaskSource = null;
-    this.positionBuffer = null;
-    this.uniforms = {};
-    // Fuente externa del fragment shader (hot-reload con tecla R)
-    this.fsUrl = sbUrl('/shaders/ascii-live.frag');
-    this.vsSource = null;
-    this.fsSource = null;
-    this.initWebGL();
-  }
-
-  setDepthMask(maskSource) {
-    if (!maskSource) return;
-    if (this.lastMaskSource !== maskSource) {
-      this.lastMaskSource = maskSource;
-      this.maskDirty = true;
-    }
-    this.hasDepthMask = true;
-  }
-
-  initWebGL() {
-    if (!this.canvas) return;
-    this.gl = this.canvas.getContext('webgl2', { alpha: true, antialias: false }) ||
-      this.canvas.getContext('webgl', { alpha: true, antialias: false });
-
-    if (!this.gl) {
-      console.warn('[ASCII Shader] WebGL no soportado para el shader ASCII.');
-      return;
-    }
-
-    const gl = this.gl;
-    this.resize();
-
-    // Shaders (guardados como campos para hot-reload con [R])
-    this.vsSource = `#version 300 es
-      in vec2 a_position;
-      out vec2 v_uv;
-      void main() {
-        v_uv = (a_position + 1.0) * 0.5;
-        gl_Position = vec4(a_position, 0.0, 1.0);
-      }
-    `;
-
-    // Fragment Shader adaptado de ascii.frag con bitmasks 5x5 auténticas y máscara depth de silueta
-    this.fsSource = `#version 300 es
-      precision highp float;
-      in vec2 v_uv;
-      out vec4 fragColor;
-
-      uniform vec2 u_resolution;
-      uniform sampler2D u_cameraTexture;
-      uniform sampler2D u_depthMaskTexture;
-      uniform bool u_hasDepthMask;
-      uniform bool u_useDepthMask;
-      uniform vec3 u_bodyTintColor;
-      uniform vec3 u_shaderBgColor;
-      uniform float u_shaderBgAlpha;
-      uniform float u_charSize;
-      uniform float u_maskThreshold;
-      uniform float u_glyphScale;
-      uniform bool u_drawBgGlyphs;
-      uniform vec3 u_bodyGlyphTint;
-      uniform float u_opacity;
-      uniform int u_fontMode;
-      uniform vec3 u_tintColor;
-      uniform bool u_hasCamera;
-      uniform float u_time;
-
-      float character(int n, vec2 p) {
-        p = floor(p);
-        if (p.x >= 0.0 && p.x <= 4.0 && p.y >= 0.0 && p.y <= 4.0) {
-          int a = int(p.x) + 5 * int(p.y);
-          if (((n >> a) & 1) == 1) return 1.0;
-        }
-        return 0.0;
-      }
-
-      int getCharBitmask(float gray) {
-        int idx = int(clamp(gray * 31.0, 0.0, 31.0));
-
-        // Modo 1: Binary (0 y 1 para intercepción)
-        if (u_fontMode == 1) {
-          if (idx < 2) return 0;
-          if (idx < 17) return 15255086; // 0
-          return 32641183; // 1
-        }
-
-        // Modo 2: Matrix Hex (0-9, A-F para secuestro)
-        if (u_fontMode == 2) {
-          int hexChars[16];
-          hexChars[0]  = 15255086; hexChars[1]  = 32641183; hexChars[2]  = 32540703; hexChars[3]  = 32540687;
-          hexChars[4]  = 18415121; hexChars[5]  = 32603679; hexChars[6]  = 32603695; hexChars[7]  = 32514081;
-          hexChars[8]  = 32554031; hexChars[9]  = 32554015; hexChars[10] = 18415150; hexChars[11] = 16301619;
-          hexChars[12] = 31491102; hexChars[13] = 7652647;  hexChars[14] = 32554047; hexChars[15] = 1096767;
-          if (idx < 2) return 0;
-          return hexChars[int(clamp(gray * 15.0, 0.0, 15.0))];
-        }
-
-        // Modo 0 (Standard 32 caracteres ASCII 5x5)
-        int chars[32];
-        chars[0]=0; chars[1]=4096; chars[2]=131072; chars[3]=65600; chars[4]=67648; chars[5]=32641183;
-        chars[6]=4329631; chars[7]=32539681; chars[8]=147584; chars[9]=332772; chars[10]=31491102; chars[11]=1096767;
-        chars[12]=16267294; chars[13]=4539953; chars[14]=1097255; chars[15]=32554047; chars[16]=18415150; chars[17]=7652647;
-        chars[18]=18415153; chars[19]=18128177; chars[20]=18437745; chars[21]=18136623; chars[22]=15255086; chars[23]=15255089;
-        chars[24]=18157905; chars[25]=32575775; chars[26]=16301619; chars[27]=32044094; chars[28]=18142766; chars[29]=18405233;
-        chars[30]=18732593; chars[31]=11512810;
-        return chars[idx];
-      }
-
-      void main() {
-        vec2 pix = gl_FragCoord.xy;
-        float charSize = max(4.0, u_charSize);
-
-        vec2 cellCoord = floor(pix / charSize);
-        vec2 cellCenter = (cellCoord + 0.5) * charSize;
-        vec2 cellUV = cellCenter / u_resolution.xy;
-
-        float gray = 0.0;
-        vec3 baseColor = u_drawBgGlyphs ? u_tintColor : u_bodyGlyphTint;
-        bool insideSil = false;
-
-        if (u_hasCamera) {
-          // Espejamos X horizontalmente para coincidir con la cámara en espejo, e invertimos Y para corregir coordenadas WebGL/video
-          vec2 camUV = vec2(1.0 - cellUV.x, 1.0 - cellUV.y);
-          vec4 cam = texture(u_cameraTexture, camUV);
-          gray = dot(cam.rgb, vec3(0.299, 0.587, 0.114));
-          // Mejorar contraste
-          gray = clamp((gray - 0.15) * 1.35, 0.0, 1.0);
-
-          // REQUERIMIENTO 3: Máscara depth/silueta RGB para colorear las letras de tu cuerpo
-          if (u_hasDepthMask && u_useDepthMask) {
-            vec4 maskVal = texture(u_depthMaskTexture, camUV);
-            float silhouette = max(maskVal.r, maskVal.a);
-            if (silhouette > u_maskThreshold) {
-              insideSil = true;
-              baseColor = u_bodyGlyphTint;
-              gray = clamp(gray * 1.25 + 0.05, 0.0, 1.0);
-            }
-          }
-        } else {
-          // Generador procedural de vigilancia si la cámara no está activa
-          float noise = sin(cellCoord.x * 0.12 + u_time * 1.5) * cos(cellCoord.y * 0.12 - u_time * 1.2);
-          float ring = sin(length(cellCoord - (u_resolution / charSize) * 0.5) * 0.2 - u_time * 2.0);
-          gray = clamp(0.35 + 0.35 * noise + 0.3 * ring, 0.0, 1.0);
-        }
-
-        // Color de fondo configurable del shader (donde NO hay glifo dibujado)
-        vec4 bgOut = vec4(u_shaderBgColor * u_shaderBgAlpha, u_shaderBgAlpha);
-
-        // Toggle letras de fondo: apagado, solo se dibujan glifos DENTRO de la silueta
-        if (!u_drawBgGlyphs && !insideSil) {
-          gray = 0.0;
-        }
-
-        int n = getCharBitmask(gray);
-        if (n == 0) {
-          fragColor = bgOut;
-          return;
-        }
-
-        vec2 localUV = mod(pix, charSize) / charSize;
-        float scale = max(0.1, u_glyphScale);
-        vec2 p = (localUV - 0.5) / scale + 0.5;
-        p *= 5.0;
-        p.y = 4.0 - p.y;
-
-        float charMask = character(n, p);
-        if (charMask <= 0.01) {
-          fragColor = bgOut;
-          return;
-        }
-
-        // El glifo se compone (over) sobre el color de fondo del shader
-        float coverage = charMask * u_opacity;
-        vec3 outColor = mix(u_shaderBgColor, baseColor, coverage);
-        float outAlpha = mix(u_shaderBgAlpha, 1.0, coverage);
-        fragColor = vec4(outColor * outAlpha, outAlpha);
-      }
-    `;
-
-    this.buildProgram();
-  }
-
-  // Compila y linkea el programa actual. Si falla, conserva el programa anterior.
-  async buildProgram() {
-    const gl = this.gl;
-    if (!gl || !this.vsSource || !this.fsSource) return false;
-
-    // Intenta usar el fragment externo (editable en vivo); si no existe, usa el embebido
-    let fsSource = this.fsSource;
-    try {
-      const res = await fetch(this.fsUrl + '?t=' + Date.now(), { cache: 'no-store' });
-      if (res.ok) {
-        const external = await res.text();
-        if (external && external.includes('fragColor')) {
-          fsSource = external;
-          this.fsSource = external;
-        }
-      }
-    } catch (e) { /* archivo no presente: seguir con el embebido */ }
-
-    const vs = this.compileShader(gl.VERTEX_SHADER, this.vsSource);
-    const fs = this.compileShader(gl.FRAGMENT_SHADER, fsSource);
-    if (!vs || !fs) return false;
-
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('[ASCII Shader] Error en link:', gl.getProgramInfoLog(program));
-      return false;
-    }
-
-    if (this.program) gl.deleteProgram(this.program);
-    this.program = program;
-    this.cacheUniforms();
-    console.log('[ASCII LIVE] ✅ Shader recompilado y aplicado en caliente.');
-    return true;
-  }
-
-  // Hot-reload del fragment shader desde /shaders/ascii-live.frag (tecla R)
-  async reloadShader() {
-    if (!this.gl) return false;
-    const ok = await this.buildProgram();
-    if (!ok) console.warn('[ASCII LIVE] ⚠️ Recarga cancelada: el shader anterior sigue activo.');
-    return ok;
-  }
-
-  cacheUniforms() {
-    const gl = this.gl;
-    if (!gl || !this.program) return;
-    // Cache uniforms
-    this.uniforms = {
-      resolution: gl.getUniformLocation(this.program, 'u_resolution'),
-      cameraTexture: gl.getUniformLocation(this.program, 'u_cameraTexture'),
-      depthMaskTexture: gl.getUniformLocation(this.program, 'u_depthMaskTexture'),
-      hasDepthMask: gl.getUniformLocation(this.program, 'u_hasDepthMask'),
-      useDepthMask: gl.getUniformLocation(this.program, 'u_useDepthMask'),
-      bodyTintColor: gl.getUniformLocation(this.program, 'u_bodyTintColor'),
-      shaderBgColor: gl.getUniformLocation(this.program, 'u_shaderBgColor'),
-      shaderBgAlpha: gl.getUniformLocation(this.program, 'u_shaderBgAlpha'),
-      maskThreshold: gl.getUniformLocation(this.program, 'u_maskThreshold'),
-      charSize: gl.getUniformLocation(this.program, 'u_charSize'),
-      glyphScale: gl.getUniformLocation(this.program, 'u_glyphScale'),
-      drawBgGlyphs: gl.getUniformLocation(this.program, 'u_drawBgGlyphs'),
-      bodyGlyphTint: gl.getUniformLocation(this.program, 'u_bodyGlyphTint'),
-      opacity: gl.getUniformLocation(this.program, 'u_opacity'),
-      fontMode: gl.getUniformLocation(this.program, 'u_fontMode'),
-      tintColor: gl.getUniformLocation(this.program, 'u_tintColor'),
-      hasCamera: gl.getUniformLocation(this.program, 'u_hasCamera'),
-      time: gl.getUniformLocation(this.program, 'u_time')
-    };
-
-    // Quad geometry [-1, 1]
-    const quad = new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]);
-    this.positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-
-    // Texture 0: Camera Feed
-    this.texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, this.texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    // Texture 1: Depth Mask
-    this.depthTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, this.depthTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    this.lastVideoTime = -1;
-    this.maskDirty = true;
-    console.log('[ASCII Shader] WebGL inicializado con éxito con soporte Depth Mask.');
-  }
-
-  compileShader(type, source) {
-    const gl = this.gl;
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      console.error('[ASCII Shader] Error compilando:', gl.getShaderInfoLog(shader));
-      gl.deleteShader(shader);
-      return null;
-    }
-    return shader;
-  }
-
-  resize() {
-    if (!this.canvas) return;
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    if (this.gl) {
-      this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    }
-  }
-
-  render(timeNow) {
-    if (!this.gl || !this.program || !appState.asciiConfig.enabled) {
-      if (this.canvas) this.canvas.style.display = 'none';
-      return;
-    }
-    this.canvas.style.display = 'block';
-
-    const gl = this.gl;
-    gl.useProgram(this.program);
-
-    const hasCamera = Boolean(this.video && this.video.readyState >= 2);
-    if (hasCamera) {
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, this.texture);
-      if (this.video.currentTime !== this.lastVideoTime) {
-        this.lastVideoTime = this.video.currentTime;
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.video);
-      }
-      gl.uniform1i(this.uniforms.cameraTexture, 0);
-    }
-
-    if (this.hasDepthMask && this.depthTexture && this.lastMaskSource && appState.hasHuman) {
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, this.depthTexture);
-      if (this.maskDirty) {
-        this.maskDirty = false;
-        try {
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.lastMaskSource);
-        } catch (e) { }
-      }
-      gl.uniform1i(this.uniforms.depthMaskTexture, 1);
-      gl.uniform1i(this.uniforms.hasDepthMask, 1);
-      gl.uniform1i(this.uniforms.useDepthMask, appState.trackingConfig.depthInShader ? 1 : 0);
-
-      // Color de la SILUETA: prioriza el selector de la pestaña SHADER, si no el de TRACKING
-      const silHex = appState.asciiConfig.silhouetteColor;
-      const colorKey = appState.trackingConfig.bodyColor || 'neon-green';
-      const bodyRgb = (silHex && /^#?[0-9a-f]{3,6}$/i.test(silHex))
-        ? hexToRgb01(silHex, BODY_TINT_COLORS[colorKey] || [0.22, 1.0, 0.08])
-        : (BODY_TINT_COLORS[colorKey] || [0.22, 1.0, 0.08]);
-      gl.uniform3f(this.uniforms.bodyTintColor, bodyRgb[0], bodyRgb[1], bodyRgb[2]);
-    } else {
-      gl.uniform1i(this.uniforms.hasDepthMask, 0);
-      gl.uniform1i(this.uniforms.useDepthMask, 0);
-    }
-
-    // Color de tinte según estado (o personalizado por el usuario)
-    let tint = hexToRgb01(appState.asciiConfig.baseColor, [0.15, 0.95, 0.9]); // Cyan CCTV normal (REC)
-    let fontMode = 0;
-    if (appState.currentState === STATES.PROCESSING) {
-      // Letras del fondo en DESPROCESANDO / RESIGNIFICACIÓN (controlable en SHADER ASCII)
-      tint = hexToRgb01(appState.asciiConfig.processingColor, [1.0, 0.08, 0.35]);
-      fontMode = 1; // Binario
-    } else if (appState.currentState === STATES.HIJACK) {
-      // Letras del fondo en SECUESTRO (controlable en SHADER ASCII)
-      tint = hexToRgb01(appState.asciiConfig.hijackColor, [0.1, 1.0, 0.3]);
-      fontMode = 2; // Matrix Hex
-    }
-    if (appState.asciiConfig.autoTint === false) {
-      tint = hexToRgb01(appState.asciiConfig.baseColor, tint);
-    }
-
-    // Color de fondo del shader (0 = totalmente transparente sobre el video)
-    const bgRgb = hexToRgb01(appState.asciiConfig.bgColor, [0.02, 0.03, 0.04]);
-    const bgAlpha = Math.max(0, Math.min(1, Number(appState.asciiConfig.bgAlpha) || 0));
-    if (this.canvas) {
-      this.canvas.style.mixBlendMode = bgAlpha > 0.01 ? 'normal' : 'screen';
-    }
-
-    gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
-    gl.uniform1f(this.uniforms.charSize, appState.asciiConfig.charSize);
-    gl.uniform1f(this.uniforms.glyphScale, appState.asciiConfig.glyphScale);
-    // Toggle: dibujar o no las letras del fondo (sin cámara activa, quedan glifos tenues de silueta)
-    const drawBgGlyphs = appState.asciiConfig.drawBg !== false;
-    const bodyGlyphTint = hexToRgb01(appState.asciiConfig.silhouetteColor, [0.22, 1.0, 0.08]);
-    gl.uniform1i(this.uniforms.drawBgGlyphs, drawBgGlyphs ? 1 : 0);
-    gl.uniform3f(this.uniforms.bodyGlyphTint, bodyGlyphTint[0], bodyGlyphTint[1], bodyGlyphTint[2]);
-    gl.uniform3f(this.uniforms.shaderBgColor, bgRgb[0], bgRgb[1], bgRgb[2]);
-    gl.uniform1f(this.uniforms.shaderBgAlpha, bgAlpha);
-    gl.uniform1f(this.uniforms.maskThreshold, Number(appState.renderConfig.cutoutThreshold) || 0.28);
-    gl.uniform1f(this.uniforms.opacity, 0.92);
-    gl.uniform1i(this.uniforms.fontMode, fontMode);
-    gl.uniform3f(this.uniforms.tintColor, tint[0], tint[1], tint[2]);
-    gl.uniform1i(this.uniforms.hasCamera, hasCamera ? 1 : 0);
-    gl.uniform1f(this.uniforms.time, timeNow * 0.001);
-
-    const aPos = gl.getAttribLocation(this.program, 'a_position');
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-
-    gl.clearColor(0.0, 0.0, 0.0, 0.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }
@@ -3838,7 +3431,7 @@ function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, b
   }
   const smObj = appState.playerSmoothing[pKey];
 
-  const OPENPOSE_SUAVIZADO = 0.35;
+  const OPENPOSE_SUAVIZADO = Math.max(0.05, Math.min(1.0, appState.trackingConfig.pointLerpFactor !== undefined ? Number(appState.trackingConfig.pointLerpFactor) : 0.75));
   if (!smObj.suave || smObj.suave.length !== landmarks.length) {
     smObj.suave = landmarks.map((l) => ({
       x: l.x, y: l.y, visibility: (l.visibility !== undefined ? l.visibility : 1)
@@ -4163,10 +3756,9 @@ function renderDepthMap(results, landmarks) {
 
   appState.depthFrameId = (appState.depthFrameId || 0) + 1;
 
-  const { masterMaskCanvas } = getCropCanvases();
-  let mask = (results && results.segmentationMask) ? results.segmentationMask : (masterMaskCanvas || null);
+  let mask = (results && results.segmentationMask) ? results.segmentationMask : null;
   let isVideo = false;
-  // Solo usar fallback de video si realmente hay humano y no hay máscara de segmentación disponible
+  // Solo usar fallback de video si realmente hay humano presente
   if (!mask && appState.hasHuman && DOM.video && DOM.video.readyState >= 2) {
     mask = DOM.video;
     isVideo = true;
@@ -4701,12 +4293,10 @@ function isTrackingNeeded() {
 let poseSegmentationEnabled = false;
 
 function needsSegmentation() {
-  const asciiNeedsDepth = Boolean(appState.asciiConfig && appState.asciiConfig.enabled && appState.trackingConfig.depthInShader !== false);
   return Boolean(
     FORZAR_CAMARA_SILUETA_OPENPOSE ||
     (appState.masterOutputShader && appState.masterOutputShader.active) ||
     appState.renderConfig.cutoutEnabled ||
-    asciiNeedsDepth ||
     appState.renderConfig.depthEnabled ||
     appState.trackingConfig.showDepthMap
   );
@@ -4814,14 +4404,14 @@ async function stepPoseInference() {
   const vh = DOM.video.videoHeight || 720;
   const { cropCanvasP1, cropCtxP1, cropCanvasP2, cropCtxP2 } = getCropCanvases();
 
-  // Multiplexado: Slot 0 = Fotograma COMPLETO (sin recortes, silueta íntegra)
-  // Slot 1 = Recorte lateral para buscar o seguir al segundo jugador
+  // Multiplexado espacial ROI: alternar entre mitad izquierda (Jugador 1) y mitad derecha (Jugador 2)
   const isP1 = (poseInferenceCropIndex === 0);
   poseInferenceCropIndex = (poseInferenceCropIndex + 1) % 2;
 
   let activeCanvas = null;
   if (isP1) {
-    activeCanvas = DOM.video;
+    cropCtxP1.drawImage(DOM.video, 0, 0, vw * 0.62, vh, 0, 0, cropCanvasP1.width, cropCanvasP1.height);
+    activeCanvas = cropCanvasP1;
     appState.currentInferenceSlot = 0;
   } else {
     cropCtxP2.drawImage(DOM.video, vw * 0.38, 0, vw * 0.62, vh, 0, 0, cropCanvasP2.width, cropCanvasP2.height);
@@ -4908,7 +4498,7 @@ function onPoseResults(results) {
   if (rawLandmarks.length > 0) {
     if (slot === 0) {
       remapped = rawLandmarks.map(l => ({
-        x: l.x,
+        x: l.x * 0.62,
         y: l.y,
         z: l.z,
         visibility: l.visibility
@@ -4969,25 +4559,31 @@ function onPoseResults(results) {
   const landmarks = activePlayers[0] ? activePlayers[0].landmarks : [];
   appState.lastLandmarks = landmarks;
 
-  // Composición completa sin cortes de silueta en masterMaskCanvas
+  // Composición sin parpadeo (flicker-free) de ambas máscaras en masterMaskCanvas
   if (results.segmentationMask) {
-    const { slotMaskCanvas1, slotMaskCtx1, masterMaskCanvas, masterMaskCtx } = getCropCanvases();
+    const { slotMaskCanvas0, slotMaskCtx0, slotMaskCanvas1, slotMaskCtx1, masterMaskCanvas, masterMaskCtx } = getCropCanvases();
     if (slot === 0) {
-      masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
-      masterMaskCtx.globalCompositeOperation = 'source-over';
-      masterMaskCtx.drawImage(results.segmentationMask, 0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
-    } else if (slot === 1 && v1) {
+      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+      slotMaskCtx0.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+    } else {
       slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
       slotMaskCtx1.drawImage(results.segmentationMask, 0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
-
-      masterMaskCtx.globalCompositeOperation = 'lighten';
-      masterMaskCtx.drawImage(slotMaskCanvas1, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
-      masterMaskCtx.globalCompositeOperation = 'source-over';
     }
 
-    if (!appState.hasHuman && (now - (appState.lastHumanSeenTimestamp || 0) > 600)) {
-      masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
+    const s0Active = Boolean(appState.playerSlots && appState.playerSlots[0] && (now - appState.playerSlots[0].timestamp < 600));
+    const s1Active = Boolean(appState.playerSlots && appState.playerSlots[1] && (now - appState.playerSlots[1].timestamp < 600));
+    if (!s0Active && !s1Active && (now - (appState.lastHumanSeenTimestamp || 0) > 600)) {
+      slotMaskCtx0.clearRect(0, 0, slotMaskCanvas0.width, slotMaskCanvas0.height);
+      slotMaskCtx1.clearRect(0, 0, slotMaskCanvas1.width, slotMaskCanvas1.height);
     }
+
+    // Fusión aditiva en la zona central: ni se cortan los cuerpos ni se apagan en alternancia
+    masterMaskCtx.clearRect(0, 0, masterMaskCanvas.width, masterMaskCanvas.height);
+    masterMaskCtx.globalCompositeOperation = 'source-over';
+    masterMaskCtx.drawImage(slotMaskCanvas0, 0, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+    masterMaskCtx.globalCompositeOperation = 'lighten';
+    masterMaskCtx.drawImage(slotMaskCanvas1, masterMaskCanvas.width * 0.38, 0, masterMaskCanvas.width * 0.62, masterMaskCanvas.height);
+    masterMaskCtx.globalCompositeOperation = 'source-over';
 
     results.segmentationMask = masterMaskCanvas;
   }
@@ -5000,11 +4596,6 @@ function onPoseResults(results) {
   }
   appState.trackingStats.detectedPoints = landmarks.length;
   appState.trackingStats.hasSegmentation = Boolean(results.segmentationMask);
-
-  // Pasar máscara depth al shader ASCII si estuviera disponible
-  if (results.segmentationMask && appState.asciiShader) {
-    appState.asciiShader.setDepthMask(results.segmentationMask);
-  }
 
   // Recorte de silueta (Depth Cutout) sobre la capa de fondo de la cámara
   renderSilhouetteCutout(results);
@@ -5119,6 +4710,20 @@ function saveTrackingConfigToStorage() {
 
 function syncTrackingConfigToInputs() {
   const c = appState.trackingConfig;
+  if (DOM.cfgTrackPointLerp) DOM.cfgTrackPointLerp.value = c.pointLerpFactor !== undefined ? c.pointLerpFactor : 0.75;
+  if (DOM.valTrackPointLerp) DOM.valTrackPointLerp.textContent = (c.pointLerpFactor !== undefined ? c.pointLerpFactor : 0.75).toFixed(2);
+  const hBrillo = c.haikuRdmBrillo !== undefined ? c.haikuRdmBrillo : (masterRdmState().haikuRdmBrillo !== undefined ? masterRdmState().haikuRdmBrillo : 1.0);
+  if (DOM.cfgHaikuRdmBrillo) DOM.cfgHaikuRdmBrillo.value = hBrillo;
+  if (DOM.valHaikuRdmBrillo) DOM.valHaikuRdmBrillo.textContent = Number(hBrillo).toFixed(2);
+  const rdmSt = masterRdmState();
+  if (DOM.cfgSilBlur) DOM.cfgSilBlur.value = rdmSt.silBlur ?? 1.5;
+  if (DOM.valSilBlur) DOM.valSilBlur.textContent = Number(rdmSt.silBlur ?? 1.5).toFixed(1);
+  if (DOM.cfgSilEdge) DOM.cfgSilEdge.value = rdmSt.silEdge ?? 100;
+  if (DOM.valSilEdge) DOM.valSilEdge.textContent = Math.round(rdmSt.silEdge ?? 100);
+  if (DOM.cfgSilRdm) DOM.cfgSilRdm.value = rdmSt.silRdm ?? 100;
+  if (DOM.valSilRdm) DOM.valSilRdm.textContent = Math.round(rdmSt.silRdm ?? 100);
+  if (DOM.cfgSilCamVis) DOM.cfgSilCamVis.value = rdmSt.camVis ?? 50;
+  if (DOM.valSilCamVis) DOM.valSilCamVis.textContent = Math.round(rdmSt.camVis ?? 50);
   if (DOM.cfgTrackOpenpose) DOM.cfgTrackOpenpose.checked = c.showOpenPose;
   if (DOM.cfgTrackBones) DOM.cfgTrackBones.checked = c.drawBones;
   if (DOM.cfgTrackBoneWidth) DOM.cfgTrackBoneWidth.value = c.boneWidth;
@@ -5139,8 +4744,6 @@ function syncTrackingConfigToInputs() {
   if (DOM.cfgColPointCodoIzq) DOM.cfgColPointCodoIzq.checked = cp.codoIzq === true;
   if (DOM.cfgColPointCodoDer) DOM.cfgColPointCodoDer.checked = cp.codoDer === true;
   if (DOM.cfgColPointCentroFacial) DOM.cfgColPointCentroFacial.checked = cp.centroFacial === true; if (DOM.cfgTrackDepth) DOM.cfgTrackDepth.checked = c.showDepthMap;
-  if (DOM.cfgTrackDepthShader) DOM.cfgTrackDepthShader.checked = c.depthInShader !== false;
-  if (DOM.cfgTrackBodyColor) DOM.cfgTrackBodyColor.value = c.bodyColor || 'neon-green';
   if (DOM.cfgTrackDepthMode) DOM.cfgTrackDepthMode.value = c.depthMode;
   if (DOM.cfgTrackDepthContrast) DOM.cfgTrackDepthContrast.value = c.depthContrast;
   if (DOM.valTrackDepthContrast) DOM.valTrackDepthContrast.textContent = c.depthContrast;
@@ -5329,7 +4932,7 @@ function updateCpGlitchButtonsUI(activeState) {
 }
 
 // ============================================================================
-// MOTOR DE PARTÍCULAS & SHADER VISUAL (PESTAÑA PARTÍCULAS / SHADER ASCII)
+// MOTOR DE PARTÍCULAS & SHADER VISUAL (PESTAÑA PARTÍCULAS)
 // ============================================================================
 const PARTICLE_FONT_FAMILIES = {
   organic: "var(--font-organic)",
@@ -5343,7 +4946,7 @@ const PARTICLE_FONT_FAMILIES = {
 // usuario. Sin esto, cualquier apply*() intermedio durante el arranque (por ej.
 // loadConfigFromServer -> applyUiColors) guardaba los DEFAULTS encima de lo que
 // había en localStorage, y al leer después ya estaba todo pisado: ninguna
-// preferencia de PARTÍCULAS / SHADER ASCII / COLORES sobrevivía al recargar.
+// preferencia de PARTÍCULAS / COLORES sobrevivía al recargar.
 var visualConfigReady = false;
 
 // ============================================================================
@@ -5373,7 +4976,7 @@ function paletaGlobal() {
 
 const MASTER_RDM_DEF = {
   cnt: 11,          // capas (1..20)
-  iteScale: 0.5,    // escala por capa (0..10)
+  iteScale: 0.5,    // escala por capa (0..1)
   speedX: 0.0,      // deriva horizontal (-0.2..0.2)
   speedY: 0.0,      // deriva vertical (-0.2..0.2)
   speedRot: 0.0,    // rotación de las capas (-0.02..0.02)
@@ -5382,6 +4985,7 @@ const MASTER_RDM_DEF = {
   sm2: 0.86,        // umbral alto del smoothstep
   force: 0.87,      // fuerza/brillo final (e_force)
   mix: 1.0,         // presencia: cuánto reemplaza al fondo anterior
+  haikuRdmBrillo: 1.0, // brillo del patrón RDM detrás del contenedor del haiku (0..3)
   color: '#ffffff', // color del patrón cuando NO se sigue la paleta
   seguirPaleta: 1,  // 1 = patrón, marcos y contenedor usan la PALETA GLOBAL
   camTinte: 0,      // % de tinte de la cámara con la paleta (shader, 0 = original)
@@ -5402,7 +5006,7 @@ const MASTER_RDM_DEF = {
 
 const MASTER_RDM_PARAMS = [
   { key: 'cnt', etq: 'CAPAS', unid: 'cnt', min: 1, max: 20, step: 1, dec: 0, desc: 'Cuántas capas de ruido aleatorio se promedian. Más capas = más fino.' },
-  { key: 'iteScale', etq: 'ESCALA POR CAPA', unid: 'ite_scale', min: 0, max: 10, step: 0.05, dec: 2, desc: 'Cuánto se agranda el UV en cada capa sucesiva.' },
+  { key: 'iteScale', etq: 'ESCALA POR CAPA', unid: 'ite_scale', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Cuánto se agranda el UV en cada capa sucesiva (0..1).' },
   { key: 'speedX', etq: 'VELOCIDAD HORIZONTAL', unid: 'speedx', min: -0.2, max: 0.2, step: 0.005, dec: 3, desc: 'Deriva del patrón hacia los costados.' },
   { key: 'speedY', etq: 'VELOCIDAD VERTICAL', unid: 'speedy', min: -0.2, max: 0.2, step: 0.005, dec: 3, desc: 'Deriva del patrón hacia arriba/abajo.' },
   { key: 'speedRot', etq: 'ROTACIÓN', unid: 'speedrot', min: -0.02, max: 0.02, step: 0.0005, dec: 4, desc: 'Giro de cada capa con el tiempo.' },
@@ -5410,6 +5014,7 @@ const MASTER_RDM_PARAMS = [
   { key: 'sm1', etq: 'SMOOTH BAJO', unid: 'sm1', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Umbral inferior del smoothstep: dónde empieza a aparecer el patrón.' },
   { key: 'sm2', etq: 'SMOOTH ALTO', unid: 'sm2', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Umbral superior: dónde llega a blanco pleno. Muy cerca de sm1 = bordes duros.' },
   { key: 'force', etq: 'FUERZA', unid: 'e_force', min: 0, max: 1, step: 0.01, dec: 2, desc: 'Brillo total del patrón. 0 = fondo negro.' },
+  { key: 'haikuRdmBrillo', etq: 'BRILLO RDM HAIKU', unid: 'u_haikuRdmBrillo', min: 0, max: 3, step: 0.05, dec: 2, desc: 'Brillo e intensidad del patrón RDM detrás del contenedor del haiku (1.0 = normal).' },
   { key: 'mix', etq: 'PRESENCIA', unid: 'u_rdmMix', min: 0, max: 1, step: 0.01, dec: 2, desc: '1 = el patrón tapa por completo el fondo anterior (palabras Y contenedor del haiku).' },
   { key: 'camTinte', etq: 'TINTE DE LA CÁMARA', unid: 'u_camPal', min: 0, max: 100, step: 1, dec: 0, desc: 'Cuánto se pinta la imagen de la cámara con la PALETA GLOBAL (0 = cámara original).' },
   { key: 'pipTinte', etq: 'TINTE DE LOS MONITORES', unid: 'pip (CSS)', min: 0, max: 100, step: 1, dec: 0, desc: 'Cuánto se pintan con la PALETA GLOBAL los monitores PiP: DEPTH MAP y BIOMETRÍA FACIAL.' },
@@ -5526,6 +5131,16 @@ function syncMasterRdmInputs() {
   if (c) c.value = st.color || '#ffffff';
   const p = document.getElementById('cfg-rdm-paleta');
   if (p) p.checked = !(st.seguirPaleta === 0 || st.seguirPaleta === false);
+  if (DOM.cfgHaikuRdmBrillo) DOM.cfgHaikuRdmBrillo.value = st.haikuRdmBrillo ?? 1.0;
+  if (DOM.valHaikuRdmBrillo) DOM.valHaikuRdmBrillo.textContent = Number(st.haikuRdmBrillo ?? 1.0).toFixed(2);
+  if (DOM.cfgSilBlur) DOM.cfgSilBlur.value = st.silBlur ?? 1.5;
+  if (DOM.valSilBlur) DOM.valSilBlur.textContent = Number(st.silBlur ?? 1.5).toFixed(1);
+  if (DOM.cfgSilEdge) DOM.cfgSilEdge.value = st.silEdge ?? 100;
+  if (DOM.valSilEdge) DOM.valSilEdge.textContent = Math.round(st.silEdge ?? 100);
+  if (DOM.cfgSilRdm) DOM.cfgSilRdm.value = st.silRdm ?? 100;
+  if (DOM.valSilRdm) DOM.valSilRdm.textContent = Math.round(st.silRdm ?? 100);
+  if (DOM.cfgSilCamVis) DOM.cfgSilCamVis.value = st.camVis ?? 50;
+  if (DOM.valSilCamVis) DOM.valSilCamVis.textContent = Math.round(st.camVis ?? 50);
   _pipTinteUltimo = '';
 }
 
@@ -5534,7 +5149,6 @@ function saveVisualConfigToStorage() {
   try {
     localStorage.setItem('sincretismo_visual_config', JSON.stringify({
       particlesRev: PARTICLES_REV,
-      ascii: appState.asciiConfig,
       particles: appState.particlesConfig,
       physics: appState.physicsConfig,
       masterRdm: appState.masterRdm,
@@ -5549,7 +5163,6 @@ function loadVisualConfigFromStorage() {
     const saved = localStorage.getItem('sincretismo_visual_config');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.ascii) appState.asciiConfig = { ...appState.asciiConfig, ...parsed.ascii };
       if (parsed.particles) {
         const merge = { ...appState.particlesConfig, ...parsed.particles };
         /* REVISION DE PARTICULAS: los tamanos de letra guardados de una version
@@ -5565,6 +5178,11 @@ function loadVisualConfigFromStorage() {
         appState.physicsConfig = { ...appState.physicsConfig, ...parsed.physics };
       }
       if (parsed.masterRdm) appState.masterRdm = { ...MASTER_RDM_DEF, ...parsed.masterRdm };
+      /* MIGRACIÓN: iteScale pasó de escala física 0..10 a 0..1. Un valor viejo
+         guardado (ej. 5) se divide por 10 para conservar el patrón. */
+      if (appState.masterRdm && Number(appState.masterRdm.iteScale) > 1) {
+        appState.masterRdm.iteScale = Number(appState.masterRdm.iteScale) / 10;
+      }
       /* Si el SERVER ya entregó la paleta (config.json), esa manda: si no, un
          localStorage viejo con la paleta "matrix" (verde) pisaba la paleta cobre
          recién guardada y los fondos seguían verdes. */
@@ -5581,7 +5199,6 @@ function loadVisualConfigFromStorage() {
   syncParticlesInputs();
   applyPhysicsConfig();
   syncPhysicsInputs();
-  syncAsciiInputs();
   syncMasterRdmInputs();
   applyUiColors();
   syncUiColorsInputs();
@@ -6023,24 +5640,6 @@ function syncPhysicsInputs() {
   if (DOM.valPhysWallBounce) DOM.valPhysWallBounce.textContent = wallBouncePct;
 }
 
-function syncAsciiInputs() {
-  const a = appState.asciiConfig;
-  if (DOM.cfgAsciiSize) DOM.cfgAsciiSize.value = a.charSize;
-  if (DOM.valAsciiSize) DOM.valAsciiSize.textContent = a.charSize;
-  if (DOM.cfgAsciiGlyphScale) DOM.cfgAsciiGlyphScale.value = a.glyphScale;
-  if (DOM.valAsciiGlyphScale) DOM.valAsciiGlyphScale.textContent = Number(a.glyphScale).toFixed(2);
-  if (DOM.cfgAsciiAutoTint) DOM.cfgAsciiAutoTint.checked = a.autoTint !== false;
-  if (DOM.cfgAsciiBaseColor) DOM.cfgAsciiBaseColor.value = a.baseColor || '#26f2e6';
-  if (DOM.cfgAsciiProcessingColor) DOM.cfgAsciiProcessingColor.value = a.processingColor || '#ff1a59';
-  if (DOM.cfgAsciiHijackColor) DOM.cfgAsciiHijackColor.value = a.hijackColor || '#1aff4d';
-  if (DOM.cfgAsciiBodyColor) DOM.cfgAsciiBodyColor.value = a.silhouetteColor || '#39ff14';
-  if (DOM.cfgAsciiBgColor) DOM.cfgAsciiBgColor.value = a.bgColor || '#05070a';
-  if (DOM.cfgAsciiBgAlpha) DOM.cfgAsciiBgAlpha.value = Math.round((a.bgAlpha || 0) * 100);
-  if (DOM.valAsciiBgAlpha) DOM.valAsciiBgAlpha.textContent = Math.round((a.bgAlpha || 0) * 100);
-  if (DOM.cfgAsciiSilhouette) DOM.cfgAsciiSilhouette.checked = appState.trackingConfig.depthInShader !== false;
-  if (DOM.cfgAsciiDrawBg) DOM.cfgAsciiDrawBg.checked = appState.asciiConfig.drawBg !== false;
-}
-
 // Convierte #rrggbb en rgba(...)
 function hexToRgba(hex, alpha) {
   const rgb = hexToRgb01(hex, [1, 1, 1]);
@@ -6061,13 +5660,6 @@ function applyRenderLayers() {
   if (DOM.cutoutCanvas && (!r.cutoutEnabled || !r.cameraEnabled)) {
     DOM.cutoutCanvas.style.display = 'none';
     if (DOM.video && r.cameraEnabled) DOM.video.style.opacity = r.cameraOpacity;
-  }
-
-  // 2. Shader ASCII (sincronizado con su toggle en Tab Shader)
-  if (DOM.asciiCanvas) {
-    appState.asciiConfig.enabled = r.asciiEnabled;
-    DOM.asciiCanvas.style.opacity = r.asciiOpacity;
-    DOM.asciiCanvas.style.display = r.asciiEnabled ? 'block' : 'none';
   }
 
   // 3. Frame Difference (sincronizado con su toggle en Tab Tracking)
@@ -6162,10 +5754,6 @@ function syncRenderInputs() {
   if (DOM.cfgRenderCameraOpacity) DOM.cfgRenderCameraOpacity.value = Math.round(r.cameraOpacity * 100);
   if (DOM.valRenderCameraOpacity) DOM.valRenderCameraOpacity.textContent = Math.round(r.cameraOpacity * 100);
 
-  if (DOM.cfgRenderAsciiToggle) DOM.cfgRenderAsciiToggle.checked = r.asciiEnabled;
-  if (DOM.cfgRenderAsciiOpacity) DOM.cfgRenderAsciiOpacity.value = Math.round(r.asciiOpacity * 100);
-  if (DOM.valRenderAsciiOpacity) DOM.valRenderAsciiOpacity.textContent = Math.round(r.asciiOpacity * 100);
-
   if (DOM.cfgRenderFrameDiffToggle) DOM.cfgRenderFrameDiffToggle.checked = r.frameDiffEnabled;
   if (DOM.cfgRenderFrameDiffOpacity) DOM.cfgRenderFrameDiffOpacity.value = Math.round(r.frameDiffOpacity * 100);
   if (DOM.valRenderFrameDiffOpacity) DOM.valRenderFrameDiffOpacity.textContent = Math.round(r.frameDiffOpacity * 100);
@@ -6191,8 +5779,7 @@ function syncRenderInputs() {
   if (DOM.cfgRenderCutoutContrast) DOM.cfgRenderCutoutContrast.value = Math.round((r.cutoutThreshold ?? 0.28) * 100);
   if (DOM.valRenderCutoutContrast) DOM.valRenderCutoutContrast.textContent = Math.round((r.cutoutThreshold ?? 0.28) * 100);
 
-  // Sincronizar los controles visuales (shader ASCII / partículas)
-  syncAsciiInputs();
+  // Sincronizar los controles visuales (partículas)
 
   if (DOM.cfgRenderScanlinesToggle) DOM.cfgRenderScanlinesToggle.checked = r.scanlinesEnabled;
   if (DOM.cfgRenderScanlinesOpacity) DOM.cfgRenderScanlinesOpacity.value = Math.round(r.scanlinesOpacity * 100);
@@ -6212,7 +5799,6 @@ function syncRenderInputs() {
   if (DOM.valRenderCorpParticlesOpacity) DOM.valRenderCorpParticlesOpacity.textContent = Math.round(r.corpParticlesOpacity * 100);
 
   // Sincronización continua hacia los controles de las otras pestañas
-  if (DOM.cfgAsciiEnabled) DOM.cfgAsciiEnabled.checked = r.asciiEnabled;
   if (DOM.cfgTrackFrameDiff) DOM.cfgTrackFrameDiff.checked = r.frameDiffEnabled;
   if (DOM.cfgTrackOpenpose) DOM.cfgTrackOpenpose.checked = r.openposeEnabled;
   if (DOM.cfgTrackFlowField) DOM.cfgTrackFlowField.checked = Boolean(r.flowfieldEnabled || t.flowField);
@@ -6254,114 +5840,72 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
   ctx.translate(x, y);
 
   const colPun = coloresPunteros();
+  const pal = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
   const now = performance.now();
 
-  const primaryCol = isLocking ? colPun.fijo : colPun.base;
-  const pulse = Math.sin(now * 0.008) * 2;
-  const baseR = isLocking ? (26 + pulse) : 22;
-  const outerRadius = baseR + 14;
-  const radius = baseR;
+  /* PUNTERO: un CÍRCULO NEGRO con REBORDE del color de la paleta (cobre). Sin cruz,
+     sin anillos de mira y sin muescas: mientras el puntero engancha una palabra se
+     RELLENA DE ADENTRO HACIA AFUERA (disco radial) con el color de ENERGÍA. */
+  const R = isLocking ? 26 : 24;                       // radio del puntero (px)
+  const progreso = Math.max(0, Math.min(1, Number(chargeProgress) || 0));
 
+  const cobre   = colPun.base;                                        // reborde (#d46238)
+  const energia = colPun.fijo;                                        // energía (#dca876)
+  const nucleo  = pal.clusterPelotita || pal.texto || '#ffe2c8';      // centro caliente
+
+  // 1. Disco NEGRO opaco
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.94)';
+  ctx.fill();
+
+  // 2. RELLENO DE ENERGÍA radial: del centro hacia el borde
+  if (progreso > 0.001) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, R - 1.5, 0, Math.PI * 2);
+    ctx.clip();
+
+    const rFill = Math.max(0.5, (R - 1.5) * progreso);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rFill);
+    grad.addColorStop(0.0, nucleo);
+    grad.addColorStop(0.45, energia);
+    grad.addColorStop(1.0, cobre);
+
+    ctx.beginPath();
+    ctx.arc(0, 0, rFill, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.shadowColor = energia;
+    ctx.shadowBlur = 14;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Frente de avance: aro fino y luminoso en el borde del relleno
+    ctx.beginPath();
+    ctx.arc(0, 0, rFill, 0, Math.PI * 2);
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = rgbaDesdeHex(nucleo, 0.85);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // 3. REBORDE COBRE (paleta global)
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.lineWidth = 2.6;
+  ctx.strokeStyle = cobre;
+  ctx.shadowColor = cobre;
+  ctx.shadowBlur = 6 + (isLocking ? 8 * Math.abs(Math.sin(now * 0.006)) : 4);
+  ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // 1. Fondo negro óptico
-  const lensGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, outerRadius);
-  lensGrad.addColorStop(0, 'rgba(8, 18, 26, 0.95)');
-  lensGrad.addColorStop(0.65, 'rgba(5, 11, 16, 0.98)');
-  lensGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');
-  ctx.fillStyle = lensGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. Bisel exterior con muescas mecánicas
-  ctx.strokeStyle = primaryCol;
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Muescas radiales del bisel mecánico (12 muescas a 30°)
-  ctx.lineWidth = 1.4;
-  ctx.strokeStyle = primaryCol;
-  for (let a = 0; a < 12; a++) {
-    const ang = a * (Math.PI / 6);
-    const cosA = Math.cos(ang);
-    const sinA = Math.sin(ang);
-    ctx.beginPath();
-    ctx.moveTo(cosA * (outerRadius - 3.5), sinA * (outerRadius - 3.5));
-    ctx.lineTo(cosA * (outerRadius + 1.5), sinA * (outerRadius + 1.5));
-    ctx.stroke();
-  }
-
-  // 3. Anillos concéntricos de retícula de mira (óptica de precisión)
-  ctx.strokeStyle = isLocking ? 'rgba(243, 156, 18, 0.65)' : 'rgba(0, 240, 255, 0.55)';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.45, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 4. Cruz Táctica con Mil-Dots / Marcas de Telémetro
-  ctx.lineWidth = 1.1;
-  ctx.strokeStyle = primaryCol;
-
-  ctx.beginPath();
-  ctx.moveTo(-outerRadius + 4, 0); ctx.lineTo(-radius * 0.45, 0);
-  ctx.moveTo(radius * 0.45, 0); ctx.lineTo(outerRadius - 4, 0);
-  ctx.moveTo(0, -outerRadius + 4); ctx.lineTo(0, -radius * 0.45);
-  ctx.moveTo(0, radius * 0.45); ctx.lineTo(0, outerRadius - 4);
-  ctx.stroke();
-
-  // Mil-dots / graduaciones en la cruz
-  const dots = [8, 14, 20];
-  ctx.lineWidth = 0.9;
-  ctx.strokeStyle = primaryCol;
-  dots.forEach(d => {
-    if (d < outerRadius - 6) {
-      ctx.beginPath();
-      ctx.moveTo(-d, -2); ctx.lineTo(-d, 2);
-      ctx.moveTo(d, -2); ctx.lineTo(d, 2);
-      ctx.moveTo(-2, -d); ctx.lineTo(2, -d);
-      ctx.moveTo(-2, d); ctx.lineTo(2, d);
-      ctx.stroke();
-    }
-  });
-
-  // 5. Punto Central / Bead
-  ctx.fillStyle = primaryCol;
-  ctx.beginPath();
-  ctx.arc(0, 0, 2.0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 6. Arco de Carga de Dwell (Manómetro / Muelle de Carga Steampunk):
-  // los 3 segundos de contacto con la palabra.
-  if (isLocking && chargeProgress > 0) {
-    ctx.strokeStyle = '#ff5722';
-    ctx.lineWidth = 3.6;
-    ctx.beginPath();
-    ctx.arc(0, 0, outerRadius + 4.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * chargeProgress);
-    ctx.stroke();
-
-    const curAng = -Math.PI / 2 + Math.PI * 2 * chargeProgress;
-    const hx = Math.cos(curAng) * (outerRadius + 4.5);
-    const hy = Math.sin(curAng) * (outerRadius + 4.5);
-    ctx.fillStyle = '#ffeb3b';
-    ctx.beginPath();
-    ctx.arc(hx, hy, 2.8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 7. Etiqueta de telemetría del punto de interacción
+  // 4. Etiqueta de telemetría del punto de interacción
   if (label) {
-    ctx.shadowBlur = 0;
     ctx.font = '8px "Share Tech Mono", monospace';
-    ctx.fillStyle = isLocking ? '#f39c12' : '#dfa857';
+    ctx.fillStyle = rgbaDesdeHex(isLocking ? energia : cobre, 0.9);
     ctx.textAlign = 'center';
-    ctx.fillText(label, 0, outerRadius + 14);
+    ctx.fillText(label, 0, R + 14);
   }
 
   ctx.restore();
@@ -6692,7 +6236,7 @@ class FloatingWord {
     this.isCaught = true;
     this.state = WORD_STATES.SLOTTED;
     this.slotIndex = stageIdx;
-    this.el.className = 'organic-word-item word-slotted word-charged';
+    this.el.className = 'organic-word-item word-slotted';
     // PEDIDO: la palabra llega ARRIBA con toda la energia del llenado (se vacia en el centro).
     this.energy = 1;
     if (this.lockBadge) this.lockBadge.style.display = 'none';
@@ -6705,7 +6249,7 @@ class FloatingWord {
   // Estado 2: las 3 bajan del borde superior al MEDIO y ahí se reescriben
   moveToCenter(stageIdx) {
     this.state = WORD_STATES.SCRAMBLING;
-    this.el.className = 'organic-word-item word-scrambling word-charged';
+    this.el.className = 'organic-word-item word-scrambling';
     this.empezarVaciadoEnergia();   // PEDIDO: en el medio se VACIA la energia
     const xs = [0.25, 0.5, 0.75];
     const x = window.innerWidth * xs[Math.max(0, Math.min(2, stageIdx))];
@@ -6769,7 +6313,7 @@ class FloatingWord {
           if (this.label) this.label.textContent = targetStr;
           if (this.state !== WORD_STATES.AUXILIARY) {
             this.state = WORD_STATES.TRANSFORMED;
-            this.el.className = 'organic-word-item word-transformed word-charged';
+            this.el.className = 'organic-word-item word-transformed';
             playSound('catch');
           } else {
             this.el.className = 'organic-word-item word-auxiliary';
@@ -6806,7 +6350,7 @@ class FloatingWord {
   moveToPhraseFlow(containerEl, beforeEl) {
     var eraAuxiliar = (this.state === WORD_STATES.AUXILIARY);
     this.state = WORD_STATES.PHRASE_MEMBER;
-    this.el.className = 'organic-word-item word-phrase-member' + (eraAuxiliar ? '' : ' word-charged');
+    this.el.className = 'organic-word-item word-phrase-member';
     if (this.label) this.label.textContent = this.targetText;
     this.el.style.transform = 'none';
     if (containerEl) {
@@ -6998,7 +6542,25 @@ function transitionTo(newState) {
   });
   appState.currentState = newState;
 
-  DOM.container.className = '';
+  const wordsChosen = Boolean(appState.caughtWords && appState.caughtWords.length >= 3);
+  document.body.classList.toggle('words-chosen', wordsChosen);
+  const isHaikuMode = (newState === STATES.HIJACK || newState === STATES.PROCESSING);
+  document.body.classList.toggle('mode-haiku', isHaikuMode);
+
+  let cName = '';
+  if (wordsChosen) cName += ' words-chosen';
+  if (isHaikuMode) cName += ' mode-haiku';
+  if (newState === STATES.PROCESSING || newState === STATES.HIJACK) cName += ' state-glitching';
+  DOM.container.className = cName.trim();
+
+  // REQUERIMIENTO: En modo haiku no se ven las ventanas de biometría facial, depth map ni manos
+  if (isHaikuMode) {
+    PIP_CYCLE_KEYS.forEach((which) => {
+      appState.pipCycleVisible[which] = false;
+      const el = pipElement(which);
+      if (el) el.classList.add('hidden');
+    });
+  }
 
   if (newState === STATES.IDLE) {
     DOM.hudStateText.textContent = 'ESTADO: OBSERVACIÓN (IDLE)';
@@ -7012,12 +6574,15 @@ function transitionTo(newState) {
     DOM.reticleLabel.textContent = 'ENGAGED';
   }
   else if (newState === STATES.PROCESSING) {
-    DOM.container.classList.add('state-glitching');
     DOM.hudStateText.textContent = 'ESTADO: RESIGNIFICACIÓN SEMÁNTICA';
     DOM.reticle.classList.remove('hidden');
     DOM.reticle.classList.remove('locking');
     DOM.reticleLabel.textContent = 'PROCESANDO';
     startResignificationSequence();
+  }
+  else if (newState === STATES.HIJACK) {
+    DOM.hudStateText.textContent = 'ESTADO: SECUESTRO POÉTICO (HAIKU)';
+    DOM.reticle.classList.add('hidden');
   }
   else if (newState === STATES.RESET) {
     DOM.hudStateText.textContent = 'ESTADO: REINICIO DEL SISTEMA';
@@ -7034,12 +6599,8 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
   const cp = appState.trackingConfig.collisionPoints || {};
   const collisionPointOn = (key, fallback = true) => (key in cp ? cp[key] !== false : fallback);
   const testPoints = [];
+
   if (collisionPointOn('mouse', true)) {
-    // PEDIDO: con el mouse alcanza con pasar por encima de la palabra para que se vaya
-    // llenando (antes habia que mantener apretado y el clic la seleccionaba de golpe).
-    // OJO: solo mientras el mouse se esta usando (lastUserActivity lo marca el mousemove).
-    // Si no, el puntero virtual se queda quieto en el CENTRO de la pantalla y llenaba
-    // palabras solo, disparando la secuencia sin que nadie toque nada.
     const movReciente = appState.mouseMovido && appState.lastUserActivity && (Date.now() - appState.lastUserActivity) < VENTANA_MOUSE_MS;
     if (movReciente) {
       testPoints.push({ x: appState.cursorX, y: appState.cursorY, name: appState.isUsingMouse ? 'PUNTERO_MOUSE' : 'PUNTERO_CENTRAL' });
@@ -7062,6 +6623,13 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
       ? appState.players
       : (appState.lastLandmarks && appState.lastLandmarks.length > 0 ? [{ id: 1, landmarks: appState.lastLandmarks }] : []);
 
+    const lerpFactor = Math.max(0.05, Math.min(1.0, appState.trackingConfig.pointLerpFactor !== undefined ? Number(appState.trackingConfig.pointLerpFactor) : 0.75));
+    if (!appState.trackedPointsHistory) {
+      appState.trackedPointsHistory = new Map();
+    }
+    const currentSeenKeys = new Set();
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
     for (let pIdx = 0; pIdx < playerList.length; pIdx++) {
       const pl = playerList[pIdx];
       const lms = pl.landmarks;
@@ -7072,46 +6640,95 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
         if (!collisionPointOn(c.key, c.fallback)) continue;
         const lm = lms[c.idx];
         if (lm && (lm.visibility === undefined || lm.visibility >= minConf)) {
+          const ptKey = `${prefix}${c.name}`;
+          currentSeenKeys.add(ptKey);
+          const rawTargetX = (1.0 - lm.x) * window.innerWidth;
+          const rawTargetY = lm.y * window.innerHeight;
+
+          let ptEntry = appState.trackedPointsHistory.get(ptKey);
+          if (!ptEntry) {
+            ptEntry = { x: rawTargetX, y: rawTargetY, lastSeen: now };
+            appState.trackedPointsHistory.set(ptKey, ptEntry);
+          } else {
+            // Interpolación vectorial suave hacia la nueva posición del OpenPose
+            ptEntry.x += (rawTargetX - ptEntry.x) * lerpFactor;
+            ptEntry.y += (rawTargetY - ptEntry.y) * lerpFactor;
+            ptEntry.lastSeen = now;
+          }
+
           testPoints.push({
-            x: (1.0 - lm.x) * window.innerWidth,
-            y: lm.y * window.innerHeight,
-            name: `${prefix}${c.name}`
+            x: ptEntry.x,
+            y: ptEntry.y,
+            name: ptKey
           });
         }
+      }
+    }
+
+    // Limpiar puntos inactivos por más de 120ms para que no queden residuales
+    for (const [key, entry] of appState.trackedPointsHistory.entries()) {
+      if (!currentSeenKeys.has(key) && (now - entry.lastSeen > 120)) {
+        appState.trackedPointsHistory.delete(key);
       }
     }
   }
 
   appState.activeInteractionPoints = testPoints;
 
-  // Si está en procesamiento de haiku, secuestro o reseteo, los puntos se siguen moviendo pero no interactúan con palabras
+  // Si está en procesamiento de haiku, secuestro o reseteo, o si ya se atraparon 3 palabras,
+  // los puntos se siguen moviendo pero NO interactúan con palabras ni permiten llenar una 4ta palabra
   if (appState.currentState === STATES.PROCESSING ||
     appState.currentState === STATES.HIJACK ||
-    appState.currentState === STATES.RESET) {
+    appState.currentState === STATES.RESET ||
+    (appState.caughtWords && appState.caughtWords.length >= 3) ||
+    appState.resigning) {
+    if (appState.targetedWordIndex !== -1) {
+      if (appState.floatingWords[appState.targetedWordIndex]) {
+        appState.floatingWords[appState.targetedWordIndex].setTargeted(false, 0);
+      }
+      appState.targetedWordIndex = -1;
+      appState.dwellTimer = 0;
+    }
+    // Limpiar cualquier dwell o energía residual en palabras flotantes
+    for (let i = 0; i < appState.floatingWords.length; i++) {
+      const fw = appState.floatingWords[i];
+      if (fw.isTargeted || fw.dwellProgress > 0 || fw.energy > 0) {
+        fw.setTargeted(false, 0);
+        fw.dwellProgress = 0;
+        fw.energy = 0;
+      }
+    }
     return;
   }
 
   let foundTarget = false;
   let targetIndex = -1;
   let lockingPoint = null;
+  let minDistance = Infinity;
 
+  // REQUERIMIENTO: La palabra seleccionada debe ser SIEMPRE la MÁS CERCANA al punto de interacción
   for (let i = 0; i < appState.floatingWords.length; i++) {
     const word = appState.floatingWords[i];
     if (word.isCaught) continue;
 
+    const collisionRadius = (word.radius + 38) * RADIO_COLISION_MULT;
+
     for (const pt of testPoints) {
       const dx = word.x - pt.x;
       const dy = word.y - pt.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
 
-      if (dist <= (word.radius + 38) * RADIO_COLISION_MULT) {
-        foundTarget = true;
-        targetIndex = i;
-        lockingPoint = pt;
-        break;
+      if (dist <= collisionRadius) {
+        // Histeresis suave de 15px solo para evitar parpadeo si dos palabras están casi a la misma distancia mientras se llena
+        const effectiveDist = (i === appState.targetedWordIndex) ? Math.max(0, dist - 15) : dist;
+        if (effectiveDist < minDistance) {
+          minDistance = effectiveDist;
+          foundTarget = true;
+          targetIndex = i;
+          lockingPoint = pt;
+        }
       }
     }
-    if (foundTarget) break;
   }
 
   appState.lockingPointName = lockingPoint ? lockingPoint.name : null;
@@ -7165,6 +6782,10 @@ function catchWord(word, index) {
   appState.targetedWordIndex = -1;
   appState.dwellTimer = 0;
 
+  // Captura confirmada: se resetea el reloj del cartel del objetivo y se oculta.
+  appState.lastCatchAt = Date.now();
+  hideIdleCta();
+
   playSound('catch');
 
   appState.caughtWords.push(word.text);
@@ -7193,6 +6814,18 @@ function catchWord(word, index) {
 
 
   if (appState.caughtWords.length >= 3) {
+    document.body.classList.add('words-chosen');
+    if (DOM.container) DOM.container.classList.add('words-chosen');
+
+    // REQUERIMIENTO: Limpiar de inmediato cualquier palabra flotante que se hubiera empezado a rellenar
+    appState.targetedWordIndex = -1;
+    appState.dwellTimer = 0;
+    appState.floatingWords.forEach(w => {
+      w.setTargeted(false, 0);
+      w.dwellProgress = 0;
+      w.energy = 0;
+    });
+
     setTimeout(() => {
       transitionTo(STATES.PROCESSING);
     }, 600);
@@ -7543,9 +7176,23 @@ async function startResignificationSequence() {
   // 1. Ocultar el cursor táctico y activar el fondo glitcheado suave
   DOM.reticle.classList.add('hidden');
   DOM.container.classList.add('state-glitching');
+  document.body.classList.add('mode-haiku');
+  if (DOM.container) DOM.container.classList.add('mode-haiku');
+  PIP_CYCLE_KEYS.forEach((which) => {
+    appState.pipCycleVisible[which] = false;
+    const el = pipElement(which);
+    if (el) el.classList.add('hidden');
+  });
 
-  // Fundido de salida para las palabras flotantes sobrantes
-  appState.floatingWords.forEach(w => w.fadeOut());
+  // Fundido de salida para las palabras flotantes sobrantes y reseteo estricto de energía
+  appState.targetedWordIndex = -1;
+  appState.dwellTimer = 0;
+  appState.floatingWords.forEach(w => {
+    w.setTargeted(false, 0);
+    w.dwellProgress = 0;
+    w.energy = 0;
+    w.fadeOut();
+  });
 
   const caught = [...appState.caughtWords];
   const selectedWords = [...appState.selectedWordObjects];
@@ -8522,10 +8169,20 @@ function handleStateReset() {
   DOM.finalTypewriterText.textContent = '';
 
   appState.caughtWords = [];
+  appState.lastCatchAt = Date.now();   // ciclo nuevo: 15 s otra vez para el cartel
+  document.body.classList.remove('words-chosen');
+  document.body.classList.remove('mode-haiku');
+  if (DOM.container) {
+    DOM.container.classList.remove('words-chosen');
+    DOM.container.classList.remove('mode-haiku');
+  }
+  PIP_CYCLE_KEYS.forEach((which) => {
+    appState.pipCycleVisible[which] = false;
+    const el = pipElement(which);
+    if (el) el.classList.add('hidden');
+  });
 
   // SISTEMA UNIFICADO DE PALABRAS: destruir los objetos del ciclo anterior.
-  // Sin esto quedaban "palabras fantasma": los objetos seguían vivos en
-  // selectedWordObjects/auxiliaryWords y el shader maestro les dibujaba círculos.
   (appState.selectedWordObjects || []).forEach(w => { try { w.destroy(); } catch (e) { } });
   appState.selectedWordObjects = [];
   (appState.auxiliaryWords || []).forEach(w => { try { w.destroy(); } catch (e) { } });
@@ -8560,8 +8217,9 @@ let lastTimestamp = performance.now();
 // CALL TO ACTION POR INACTIVIDAD (ELEGÍ TU PALABRA...)
 // ============================================================================
 function markUserActivity() {
+  /* OJO: el movimiento (mouse / cámara / click) NO esconde el cartel del
+     objetivo: la leyenda sólo se va cuando alguien AGARRA una palabra. */
   appState.lastUserActivity = Date.now();
-  hideIdleCta();
 }
 
 function showIdleCta() {
@@ -8580,14 +8238,21 @@ function updateIdleCta() {
   if (!DOM.idleCta) return;
   const enModal = DOM.configModal && !DOM.configModal.classList.contains('hidden');
   const enMutacion = DOM.mutationStage && !DOM.mutationStage.classList.contains('hidden');
+  /* Alguien está enganchando una palabra: no se muestra (evita que la leyenda
+     caiga encima de la palabra que se está cargando). */
+  const enganchando = appState.targetedWordIndex !== -1;
   const bloqueado =
     appState.caughtWords.length > 0 ||
     appState.resigning ||
+    enganchando ||
     enModal ||
     enMutacion ||
     (appState.currentState !== STATES.IDLE && appState.currentState !== STATES.INTERACT);
   if (bloqueado) { hideIdleCta(); return; }
-  if (Date.now() - appState.lastUserActivity >= IDLE_CTA_DELAY_MS) showIdleCta();
+  /* El reloj arranca en la ÚLTIMA CAPTURA (no en el último movimiento): 15 s sin
+     que nadie agarre una palabra = aparece la leyenda del objetivo. */
+  const desdeCaptura = appState.lastCatchAt || appState.lastUserActivity || 0;
+  if (Date.now() - desdeCaptura >= IDLE_CTA_DELAY_MS) showIdleCta();
 }
 
 // ============================================================================
@@ -8671,8 +8336,9 @@ function pipElement(which) {
 }
 
 function setPipVisible(which, visible, now) {
-  // Si no hay humano detectado, nunca activar monitor PiP
-  if (visible && !appState.hasHuman) {
+  // Si no hay humano detectado, o si estamos en modo haiku / procesamiento, nunca activar monitor PiP
+  const isHaikuMode = (appState.currentState === STATES.HIJACK || appState.currentState === STATES.PROCESSING || document.body.classList.contains('mode-haiku'));
+  if (visible && (!appState.hasHuman || isHaikuMode)) {
     visible = false;
   }
   // Si es monitor de mano, SOLO activar si la mano está trackeada en el jugador asignado
@@ -8724,15 +8390,15 @@ function setPipVisible(which, visible, now) {
 function updatePipAutoCycle(now) {
   if (appState.pipCycleDisabledByUser) return;
 
-  // Si la cámara no capta a ningún humano: asegurarse de que NINGÚN monitor PiP aparezca
-  if (!appState.hasHuman) {
+  const isHaikuMode = (appState.currentState === STATES.HIJACK || appState.currentState === STATES.PROCESSING || document.body.classList.contains('mode-haiku'));
+
+  // Si la cámara no capta a ningún humano O si estamos en modo haiku:
+  // asegurarse de que NINGÚN monitor PiP aparezca
+  if (!appState.hasHuman || isHaikuMode) {
     PIP_CYCLE_KEYS.forEach((which) => {
-      if (appState.pipCycleVisible[which]) {
-        setPipVisible(which, false, now);
-      } else {
-        const el = pipElement(which);
-        if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
-      }
+      appState.pipCycleVisible[which] = false;
+      const el = pipElement(which);
+      if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
     });
     return;
   }
@@ -8780,6 +8446,13 @@ function mainLoop(currentTimestamp) {
 
   DOM.reticle.style.left = `${appState.cursorX}px`;
   DOM.reticle.style.top = `${appState.cursorY}px`;
+  /* RELLENO DEL PUNTERO: avance 0..1 del anclaje sobre la palabra (dwell). El CSS
+     lo usa para escalar el disco de energía de adentro hacia afuera. */
+  const lockFill = (appState.targetedWordIndex !== -1)
+    ? Math.min(1, appState.dwellTimer / (appState.dwellDuration || 1.5))
+    : 0;
+  DOM.reticle.style.setProperty('--lock-fill', lockFill.toFixed(3));
+  DOM.reticle.classList.toggle('locking', lockFill > 0.001);
   const isIdleForPointers = (appState.currentState === STATES.IDLE || appState.currentState === STATES.INTERACT) &&
                             (!appState.capturedWords || appState.capturedWords.length < 3);
   const showReticle = isIdleForPointers && (!appState.isUsingMouse || appState.isMouseDown);
@@ -8812,11 +8485,6 @@ function mainLoop(currentTimestamp) {
   // 4.2 Renderizar Esqueleto OpenPose con dinámicas cinéticas a 60 FPS
   if ((FORZAR_CAMARA_SILUETA_OPENPOSE || appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose) && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
     renderOpenPoseOverlay(appState.lastLandmarks);
-  }
-
-  // 4. Renderizar Shader ASCII sobre la cámara
-  if (appState.asciiShader) {
-    appState.asciiShader.render(currentTimestamp);
   }
 
   // 4.5 Renderizar Shader Frame Difference con Feedback (Requerimiento 2)
@@ -9029,12 +8697,6 @@ function setupEventListeners() {
         return;
       }
       e.preventDefault();
-      if (appState.asciiShader && typeof appState.asciiShader.reloadShader === 'function') {
-        showToast('⟳ Recargando shaders en vivo...', 'info');
-        appState.asciiShader.reloadShader().then(ok => {
-          showToast(ok ? '✓ Shader ASCII recompilado correctamente' : '✕ Error compilando el shader ASCII — se mantiene el anterior', ok ? 'success' : 'error');
-        });
-      }
       // También recarga el SHADER MAESTRO (public/shaders/master-output.frag)
       if (appState.masterOutputShader && typeof appState.masterOutputShader.reloadShader === 'function') {
         appState.masterOutputShader.reloadShader().then(ok => {
@@ -9214,78 +8876,6 @@ function setupEventListeners() {
     });
   }
 
-  // REQUERIMIENTO 2: CONTROLES ASCII SHADER
-  DOM.cfgAsciiEnabled.addEventListener('change', (e) => {
-    appState.asciiConfig.enabled = e.target.checked;
-    appState.renderConfig.asciiEnabled = e.target.checked;
-    applyRenderLayers();
-  });
-
-  DOM.cfgAsciiSize.addEventListener('input', (e) => {
-    appState.asciiConfig.charSize = parseFloat(e.target.value);
-    DOM.valAsciiSize.textContent = e.target.value;
-    saveVisualConfigToStorage();
-  });
-
-  // REQUERIMIENTO 6: Escala de letras y colores del shader ASCII (fondo / silueta)
-  if (DOM.cfgAsciiGlyphScale) {
-    DOM.cfgAsciiGlyphScale.addEventListener('input', (e) => {
-      appState.asciiConfig.glyphScale = parseFloat(e.target.value);
-      if (DOM.valAsciiGlyphScale) DOM.valAsciiGlyphScale.textContent = Number(e.target.value).toFixed(2);
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiAutoTint) {
-    DOM.cfgAsciiAutoTint.addEventListener('change', (e) => {
-      appState.asciiConfig.autoTint = e.target.checked;
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiBaseColor) {
-    DOM.cfgAsciiBaseColor.addEventListener('input', (e) => {
-      appState.asciiConfig.baseColor = e.target.value;
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiProcessingColor) {
-    DOM.cfgAsciiProcessingColor.addEventListener('input', (e) => {
-      appState.asciiConfig.processingColor = e.target.value;
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiHijackColor) {
-    DOM.cfgAsciiHijackColor.addEventListener('input', (e) => {
-      appState.asciiConfig.hijackColor = e.target.value;
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiBodyColor) {
-    DOM.cfgAsciiBodyColor.addEventListener('input', (e) => {
-      appState.asciiConfig.silhouetteColor = e.target.value;
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiBgColor) {
-    DOM.cfgAsciiBgColor.addEventListener('input', (e) => {
-      appState.asciiConfig.bgColor = e.target.value;
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiBgAlpha) {
-    DOM.cfgAsciiBgAlpha.addEventListener('input', (e) => {
-      const pct = parseInt(e.target.value, 10);
-      appState.asciiConfig.bgAlpha = pct / 100;
-      if (DOM.valAsciiBgAlpha) DOM.valAsciiBgAlpha.textContent = pct;
-      saveVisualConfigToStorage();
-    });
-  }
-  if (DOM.cfgAsciiDrawBg) {
-    DOM.cfgAsciiDrawBg.addEventListener('change', (e) => {
-      appState.asciiConfig.drawBg = e.target.checked;
-      saveVisualConfigToStorage();
-    });
-  }
-
   // TAB COLORES: paletas globales + ajuste fino por elemento en vivo
   renderPaletteGrid();
   const UI_COLOR_INPUT_MAP = [
@@ -9319,16 +8909,6 @@ function setupEventListeners() {
     });
   }
   bindWordColorPicker();
-  if (DOM.cfgAsciiSilhouette) {
-    DOM.cfgAsciiSilhouette.addEventListener('change', (e) => {
-      appState.trackingConfig.depthInShader = e.target.checked;
-      if (DOM.cfgTrackDepthShader) DOM.cfgTrackDepthShader.checked = e.target.checked;
-      saveTrackingConfigToStorage();
-      updatePoseSegmentation();
-      if (isTrackingNeeded()) triggerPoseInference();
-    });
-  }
-
   // TAB 4: EVENTOS DE CALIBRACIÓN Y TRACKING
   if (DOM.cfgTrackOpenpose) {
     DOM.cfgTrackOpenpose.addEventListener('change', (e) => {
@@ -9379,6 +8959,82 @@ function setupEventListeners() {
       appState.trackingConfig.pointRadius = parseFloat(e.target.value);
       if (DOM.valTrackPointRadius) DOM.valTrackPointRadius.textContent = e.target.value;
       saveTrackingConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgTrackPointLerp) {
+    DOM.cfgTrackPointLerp.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      appState.trackingConfig.pointLerpFactor = val;
+      if (DOM.valTrackPointLerp) DOM.valTrackPointLerp.textContent = val.toFixed(2);
+      saveTrackingConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgHaikuRdmBrillo) {
+    DOM.cfgHaikuRdmBrillo.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      appState.trackingConfig.haikuRdmBrillo = val;
+      masterRdmState().haikuRdmBrillo = val;
+      if (DOM.valHaikuRdmBrillo) DOM.valHaikuRdmBrillo.textContent = val.toFixed(2);
+      const masterInp = document.getElementById('cfg-rdm-haikuRdmBrillo');
+      const masterVal = document.getElementById('val-rdm-haikuRdmBrillo');
+      if (masterInp) masterInp.value = val;
+      if (masterVal) masterVal.textContent = val.toFixed(2);
+      saveTrackingConfigToStorage();
+      saveVisualConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgSilBlur) {
+    DOM.cfgSilBlur.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      masterRdmState().silBlur = val;
+      if (DOM.valSilBlur) DOM.valSilBlur.textContent = val.toFixed(1);
+      const mInp = document.getElementById('cfg-rdm-silBlur');
+      const mVal = document.getElementById('val-rdm-silBlur');
+      if (mInp) mInp.value = val;
+      if (mVal) mVal.textContent = val.toFixed(1);
+      saveVisualConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgSilEdge) {
+    DOM.cfgSilEdge.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      masterRdmState().silEdge = val;
+      if (DOM.valSilEdge) DOM.valSilEdge.textContent = val;
+      const mInp = document.getElementById('cfg-rdm-silEdge');
+      const mVal = document.getElementById('val-rdm-silEdge');
+      if (mInp) mInp.value = val;
+      if (mVal) mVal.textContent = val;
+      saveVisualConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgSilRdm) {
+    DOM.cfgSilRdm.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      masterRdmState().silRdm = val;
+      if (DOM.valSilRdm) DOM.valSilRdm.textContent = val;
+      const mInp = document.getElementById('cfg-rdm-silRdm');
+      const mVal = document.getElementById('val-rdm-silRdm');
+      if (mInp) mInp.value = val;
+      if (mVal) mVal.textContent = val;
+      saveVisualConfigToStorage();
+    });
+  }
+
+  if (DOM.cfgSilCamVis) {
+    DOM.cfgSilCamVis.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      masterRdmState().camVis = val;
+      if (DOM.valSilCamVis) DOM.valSilCamVis.textContent = val;
+      const mInp = document.getElementById('cfg-rdm-camVis');
+      const mVal = document.getElementById('val-rdm-camVis');
+      if (mInp) mInp.value = val;
+      if (mVal) mVal.textContent = val;
+      saveVisualConfigToStorage();
     });
   }
 
@@ -9608,20 +9264,6 @@ function setupEventListeners() {
       saveTrackingConfigToStorage();
     });
   });
-  if (DOM.cfgTrackDepthShader) {
-    DOM.cfgTrackDepthShader.addEventListener('change', (e) => {
-      appState.trackingConfig.depthInShader = e.target.checked;
-      saveTrackingConfigToStorage();
-    });
-  }
-
-  if (DOM.cfgTrackBodyColor) {
-    DOM.cfgTrackBodyColor.addEventListener('change', (e) => {
-      appState.trackingConfig.bodyColor = e.target.value;
-      saveTrackingConfigToStorage();
-    });
-  }
-
   if (DOM.cfgTrackFrameDiff) {
     DOM.cfgTrackFrameDiff.addEventListener('change', (e) => {
       appState.trackingConfig.frameDifference = e.target.checked;
@@ -9695,24 +9337,6 @@ function setupEventListeners() {
       appState.renderConfig.cutoutThreshold = val / 100;
       if (DOM.valRenderCutoutContrast) DOM.valRenderCutoutContrast.textContent = val;
       saveRenderConfigToStorage();
-    });
-  }
-
-  // 2. Shader ASCII (sincronizado bidireccionalmente con Tab Shader)
-  if (DOM.cfgRenderAsciiToggle) {
-    DOM.cfgRenderAsciiToggle.addEventListener('change', (e) => {
-      appState.renderConfig.asciiEnabled = e.target.checked;
-      appState.asciiConfig.enabled = e.target.checked;
-      if (DOM.cfgAsciiEnabled) DOM.cfgAsciiEnabled.checked = e.target.checked;
-      applyRenderLayers();
-    });
-  }
-  if (DOM.cfgRenderAsciiOpacity) {
-    DOM.cfgRenderAsciiOpacity.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      appState.renderConfig.asciiOpacity = val / 100;
-      if (DOM.valRenderAsciiOpacity) DOM.valRenderAsciiOpacity.textContent = val;
-      applyRenderLayers();
     });
   }
 
@@ -10288,8 +9912,6 @@ function setupEventListeners() {
         showDepthMap: false,
         depthMode: 'cyberpunk',
         depthContrast: 1.5,
-        depthInShader: true,
-        bodyColor: 'neon-green',
         showFaceCamera: false,
         faceZoom: 1.8,
         faceReticle: true,
@@ -10388,7 +10010,6 @@ function setupEventListeners() {
       DOM.cutoutCanvas.width = window.innerWidth;
       DOM.cutoutCanvas.height = window.innerHeight;
     }
-    if (appState.asciiShader) appState.asciiShader.resize();
     if (appState.frameDiffShader) appState.frameDiffShader.resize();
   });
 }
@@ -10494,15 +10115,12 @@ function toggleFullscreen() {
 async function init() {
   console.log('================================================================');
   console.log('   SINCRETISMO DE SILICIO - SECUESTRO CIBERNÉTICO');
-  console.log('   Shader ASCII WebGL + Prioridad de Mouse + Modelos Ollama');
+  console.log('   Prioridad de Mouse + Modelos Ollama');
   console.log('================================================================');
 
   setupEventListeners();
   setupDraggableModal();
   initNoiseCanvas();
-
-  // 1. Inicializar Shader ASCII sobre la cámara
-  appState.asciiShader = new AsciiCameraShader(DOM.asciiCanvas, DOM.video);
 
   // 1.2 Inicializar SHADER MAESTRO DE SALIDA (composición final en GPU).
   // Es la capa base visible: cámara + depth + silueta + círculos de palabras +
@@ -10554,7 +10172,7 @@ async function init() {
   // 2.75 Cargar configuración de Glitch & Envelope de secuencia
   loadGlitchConfigFromStorage();
 
-  // 2.8 Cargar configuración visual de partículas, shader ASCII y colores UI
+  // 2.8 Cargar configuración visual de partículas y colores UI
   loadVisualConfigFromStorage();
 
   // 2.9 Garantizar Modo Mouse por defecto en arranque (MediaPipe en standby pasivo a 60 FPS)
@@ -10572,13 +10190,13 @@ async function init() {
   // 4. Generar palabras orgánicas flotantes iniciales
   spawnInitialFloatingWords();
 
-  // 5. Inicializar Webcam (opcional/secundaria para el video y ASCII)
+  // 5. Inicializar Webcam (opcional/secundaria para el video)
   initWebcamAndPose();
 
   // 6. Iniciar bucle de render, shader y física
   requestAnimationFrame(mainLoop);
 
-  showToast('Modo Mouse activo con clics directos. Shader ASCII en línea. Presiona [P] para Ollama.', 'success');
+  showToast('Modo Mouse activo con clics directos. Presiona [P] para Ollama.', 'success');
 }
 
 if (document.readyState === 'loading') {

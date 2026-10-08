@@ -64,7 +64,7 @@ uniform float u_time;
 // (arriba de todo en public/cambiapalabras/script.js). Llegan NORMALIZADOS a
 // 0..1 y acá se pasan a la escala física del shader original con rdMap().
 uniform float u_rdmCnt;        // CAPAS          (físico 1..20)
-uniform float u_rdmIteScale;   // ESCALA X CAPA  (físico 0..10)
+uniform float u_rdmIteScale;   // ESCALA X CAPA  (0..1)
 uniform float u_rdmSpeedX;     // deriva X       (físico -0.2..0.2)
 uniform float u_rdmSpeedY;     // deriva Y       (físico -0.2..0.2)
 uniform float u_rdmSpeedRot;   // rotación       (físico -0.01..0.01)
@@ -74,6 +74,7 @@ uniform float u_rdmSm2;        // SMOOTH ALTO (dónde llega a blanco pleno)
 uniform float u_rdmForce;      // brillo final (e_force del original)
 uniform float u_rdmMix;        // PRESENCIA: 1 = tapa el fondo anterior
 uniform vec3  u_rdmColor;      // tinte del patrón
+uniform float u_haikuRdmBrillo; // brillo del patrón RDM detrás del haiku (default 1.0)
 
 // ---------------------------------------------------------------------------
 // PALETA UNIFICADA (la del GLOBALSTYLE: /globalstyle.html y global_style.json)
@@ -113,8 +114,8 @@ uniform vec2  u_depthTexel;     // 1.0 / tamaño real del canvas de depth
 // Tamaño del contenedor del HAIKU (media medida, en UV)
 // 0.38 media medida = 0.76 ancho total (~1460px en 1920) para que 3 versos queden cómodos en una sola línea
 // 0.22 media medida = 0.44 alto total (~475px en 1080) para dar holgura vertical sin desbordar
-#define HAIKU_BOX_W       0.25
-#define HAIKU_BOX_H       0.25
+#define HAIKU_BOX_W       0.36
+#define HAIKU_BOX_H       0.28
 
 // VELOCIDAD DE GIRO de los marcos de las palabras (rad/s aprox).
 // Antes era 1.0 + 2*animPulse (= hasta 3.0 rad/s, "giraban como locos").
@@ -184,7 +185,7 @@ vec3 rdmPatternSlow(vec2 uv, float speedFactor) {
 
     int mcnt = int(floor(rdMap(u_rdmCnt, 1.0, 20.0)));
     if (mcnt < 1) mcnt = 1;
-    float mite_scale = rdMap(u_rdmIteScale, 0.0, 10.0);
+    float mite_scale = clamp(u_rdmIteScale, 0.001, 1.0);   // ite_scale ya viene en 0..1
     float mspeedx    = rdMap(u_rdmSpeedX, -0.2, 0.2) * speedFactor;
     float mspeedy    = rdMap(u_rdmSpeedY, -0.2, 0.2) * speedFactor;
     float mspeedrot  = rdMap(u_rdmSpeedRot, -0.01, 0.01) * speedFactor;
@@ -357,45 +358,40 @@ vec4 getHaikuContainer(vec2 uv, vec3 weights) {
 
     vec4 outColor = vec4(0.0);
 
-    // 1. Fondo interior del contenedor (negro silicio obsidiana puro, cero marrón)
+    // 1. Fondo interior del contenedor
     if (b.inside > 0.5) {
         // Rejilla de silicio interna hiper-sutil
         vec2 gridUv = fract(uv * vec2(36.0 * aspect, 36.0) + vec2(u_time * 0.01, 0.0));
         float gridLine = (step(0.96, gridUv.x) + step(0.96, gridUv.y)) * 0.008;
 
-        // Patrón RDM a velocidad lenta pero en escala monocromática carbón neutra (cero marrón)
-        vec3 p = rdmPatternSlow(uv, 0.08);
-        float pVal = clamp(dot(p, vec3(0.3333)), 0.0, 1.0);
-        // Textura carbón sutil: neutral monochromático sobre negro azabache
-        vec3 rdmCarbon = vec3(0.012, 0.012, 0.014) * smoothstep(0.30, 0.85, pVal);
-
-        // Base negro profundo puro / obsidiana profunda (cero marrón)
-        vec3 baseNegro = vec3(0.001, 0.001, 0.002);
-        vec3 bg = baseNegro + rdmCarbon * clamp(u_rdmMix, 0.0, 1.0) + vec3(gridLine);
+        // Patrón RDM a velocidad lenta claramente visible con la paleta activa y modulado por u_haikuRdmBrillo
+        vec3 rdm = getRdmBgSlow(uv, 0.10) * u_haikuRdmBrillo;
+        // Base táctica de fondo con el patrón RDM enriquecido y visible (no oscuro/apagado)
+        vec3 bg = mix(getHighFreqNoiseBg(uv), rdm, clamp(u_rdmMix, 0.0, 1.0)) + vec3(gridLine);
 
         // SIN TRANSPARENCIA en el cuerpo: el interior tapa el fondo de la cámara por completo
         float fillAlpha = smoothstep(0.02, 0.40, b.presence);
         outColor = vec4(bg, fillAlpha);
     }
 
-    // 2. Borde hairline nítido y elegante (~1px, mucho menos ancho)
-    float edgeLine = smoothstep(0.0011, 0.0, abs(b.sdf));
+    // 2. Borde hairline nítido y elegante
+    float edgeLine = smoothstep(0.0012, 0.0, abs(b.sdf));
 
-    // Resplandor exterior mínimo, CEÑIDO estrictamente al borde exterior (cero penetración interior)
-    float edgeGlow = (b.inside < 0.5) ? exp(-max(0.0, b.sdf) * 260.0) * 0.22 : 0.0;
+    // Resplandor exterior sutil ceñido estrictamente al borde exterior
+    float edgeGlow = (b.inside < 0.5) ? exp(-max(0.0, b.sdf) * 200.0) * 0.35 : 0.0;
 
-    // Brackets de esquina discretos y finos
+    // Brackets de esquina tácticos
     vec2 p_sc = b.p * vec2(aspect, 1.0);
     vec2 b_sc = b.size * vec2(aspect, 1.0);
     vec2 cornerDist = max(vec2(0.0), b_sc - abs(p_sc));
-    float cornerWeight = smoothstep(0.035, 0.008, min(cornerDist.x, cornerDist.y));
+    float cornerWeight = smoothstep(0.045, 0.010, min(cornerDist.x, cornerDist.y));
 
-    float lineaAlpha = (edgeLine * 1.3 + edgeLine * cornerWeight * 0.4) * b.presence;
+    float lineaAlpha = (edgeLine * 1.4 + edgeLine * cornerWeight * 0.6) * b.presence;
     float auraAlpha = edgeGlow * b.presence;
 
-    // Línea del contenedor: acento nítido fino, aura neutra sutil (cero marrón)
+    // Línea del contenedor: acento nítido fino, aura sutil con la paleta
     vec3 lineaCol = mix(vec3(0.95, 0.95, 1.0), u_palB, clamp(u_palModo, 0.0, 1.0));
-    vec3 auraCol  = (u_palModo > 0.5) ? u_palB * 0.35 : vec3(0.2, 0.2, 0.25);
+    vec3 auraCol  = mix(vec3(0.25, 0.25, 0.3), u_palA * 0.45, clamp(u_palModo, 0.0, 1.0));
 
     if (b.inside < 0.5) {
         outColor.rgb = mix(outColor.rgb, auraCol, clamp(auraAlpha, 0.0, 1.0));
@@ -466,7 +462,7 @@ float getDepthMask(vec2 p) {
     vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
     if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
     vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
-    return (d.a > 0.005) ? clamp(d.a, 0.0, 1.0) : 0.0;
+    return (d.a > 0.001) ? d.a : max(d.r, max(d.g, d.b));
 }
 
 void main() {

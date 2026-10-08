@@ -17,7 +17,7 @@
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="stylesheet" href="css/fonts-local.css?v=1">
-  <link rel="stylesheet" href="style.css?v=3.59">
+  <link rel="stylesheet" href="style.css?v=3.63">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="vendor/mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -85,9 +85,6 @@
 
     <!-- Capa 1.2: Recorte de Silueta por Depth Map / Segmentación (Cutout) -->
     <canvas id="cutout-camera-canvas"></canvas>
-
-    <!-- Capa 1.5: Shader ASCII sobre la Webcam (WebGL Canvas) -->
-    <canvas id="ascii-camera-canvas"></canvas>
 
     <!-- Capa 1.6: Shader Frame Difference con Feedback (WebGL2 Canvas) -->
     <canvas id="framediff-camera-canvas"></canvas>
@@ -191,7 +188,7 @@
     <!-- Capa 4: Contenedor de Palabras Orgánicas Flotantes -->
     <div id="floating-words-layer"></div>
 
-    <!-- Capa 5: Call to action por inactividad (nadie tocó nada en 12 s) -->
+    <!-- Capa 5: Cartel del OBJETIVO. Oculto por defecto: aparece tras 15 s sin que nadie agarre una palabra y se va al capturar la primera -->
     <div id="idle-cta" class="idle-cta hidden">
       <div class="idle-cta-frame">
         <div class="idle-cta-kicker">ESTADO : ESPERANDO INPUT DEL USUARIO</div>
@@ -200,12 +197,10 @@
       </div>
     </div>
 
-    <!-- Cursor Táctico / Retículo de Fijación -->
+    <!-- Cursor Táctico / Puntero: círculo negro + reborde cobre + relleno de energía -->
     <div id="cursor-reticle" class="reticle">
+      <div class="reticle-fill"></div>
       <div class="reticle-ring"></div>
-      <div class="reticle-core"></div>
-      <div class="reticle-crosshair ch-x"></div>
-      <div class="reticle-crosshair ch-y"></div>
       <div class="reticle-label" id="reticle-label">LOCK_OFF</div>
     </div>
 
@@ -357,18 +352,13 @@
             <span class="tab-icon">🧠</span>
             <span class="tab-text">MODELO &amp; PROMPT</span>
           </button>
-          <button type="button" class="modal-tab-btn" data-tab="tab-words-pool">
-            <span class="tab-icon">🌐</span>
-            <span class="tab-text">BANCO DE PALABRAS</span>
-            <span class="tab-badge" id="tab-words-count-badge">154</span>
-          </button>
-          <button type="button" class="modal-tab-btn" data-tab="tab-shader">
-            <span class="tab-icon">⚡</span>
-            <span class="tab-text">SHADER ASCII</span>
-          </button>
           <button type="button" class="modal-tab-btn" data-tab="tab-tracking">
             <span class="tab-icon">🎯</span>
             <span class="tab-text">TRACKING &amp; CALIBRACIÓN</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-silhouette">
+            <span class="tab-icon">👤</span>
+            <span class="tab-text">SILLOUETE CALIBRATION</span>
           </button>
           <button type="button" class="modal-tab-btn" data-tab="tab-render">
             <span class="tab-icon">🎛️</span>
@@ -476,270 +466,11 @@
             </div>
           </div>
 
-          <!-- TAB 2: BANCO DE PALABRAS -->
-          <div class="modal-tab-pane" id="tab-words-pool">
-            <div class="words-pool-card">
-              <div class="section-subtitle">
-                <span>🌐 BANCO DE PALABRAS ORGÁNICAS (<span id="words-count-badge">154</span> ACTIVAS)</span>
-              </div>
-              <p class="words-help-text">
-                Pega o escribe múltiples palabras separadas por comas o saltos de línea para que floten en la pantalla
-                interactiva:
-              </p>
-              <div class="words-input-group">
-                <textarea id="cfg-words-input" rows="3"
-                  placeholder="ej. amor, nostalgia, recuerdo, latido, esperanza, silencio, libertad, ternura..."></textarea>
-                <div class="words-actions-row">
-                  <button type="button" class="btn-word-action btn-add-words" id="btn-add-words">
-                    ➕ Agregar al Banco
-                  </button>
-                  <button type="button" class="btn-word-action btn-replace-words" id="btn-replace-words">
-                    🔄 Reemplazar Todo el Banco
-                  </button>
-                  <button type="button" class="btn-word-action btn-default-words" id="btn-default-words">
-                    ↺ Restaurar Palabras Poéticas
-                  </button>
-                </div>
-              </div>
-              <!-- Visualizador interactivo de etiquetas de palabras -->
-              <div class="words-chips-container" id="words-chips-container"></div>
-            </div>
-          </div>
-
-          <!-- TAB 3: SHADER ASCII -->
-          <div class="modal-tab-pane" id="tab-shader">
-            <div class="ascii-controls-card">
-              <div class="section-subtitle">
-                <span>⚡ SHADER ASCII SOBRE CÁMARA (WEBGL)</span>
-              </div>
-              <p class="words-help-text">
-                Efecto visual que renderiza el feed de video en tiempo real mediante una matriz tipográfica procedural
-                de fósforo CCTV:
-              </p>
-              <div class="ascii-row-stacked">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="cfg-ascii-enabled" checked>
-                  <span>Activar Shader ASCII sobre el fondo de video</span>
-                </label>
-
-                <div class="ascii-slider-group">
-                  <label for="cfg-ascii-size">Densidad de Caracteres ASCII: <span
-                      id="val-ascii-size">11</span>px</label>
-                  <input type="range" id="cfg-ascii-size" min="6" max="26" step="1" value="11">
-                </div>
-
-                <div class="ascii-slider-group">
-                  <label for="cfg-ascii-glyph-scale">Escala de las Letras (glifos): <span
-                      id="val-ascii-glyph-scale">0.90</span>x</label>
-                  <input type="range" id="cfg-ascii-glyph-scale" min="0.30" max="1.40" step="0.05" value="0.90">
-                </div>
-
-                <label class="checkbox-label">
-                  <input type="checkbox" id="cfg-ascii-draw-bg" checked>
-                  <span>Dibujar letras de fondo (desactivar = solo silueta corporal)</span>
-                </label>
-
-                <label class="checkbox-label">
-                  <input type="checkbox" id="cfg-ascii-auto-tint" checked>
-                  <span>Tinte automático por estado (REC / RESIGNIFICACIÓN / SECUESTRO)</span>
-                </label>
-
-                <div class="ascii-colors-grid">
-                  <div class="ascii-color-item">
-                    <label for="cfg-ascii-base-color">Letras del Fondo (REC / normal):</label>
-                    <input type="color" id="cfg-ascii-base-color" value="#26f2e6">
-                  </div>
-                  <div class="ascii-color-item">
-                    <label for="cfg-ascii-processing-color">Letras del Fondo en DESPROCESANDO:</label>
-                    <input type="color" id="cfg-ascii-processing-color" value="#ff1a59">
-                  </div>
-                  <div class="ascii-color-item">
-                    <label for="cfg-ascii-hijack-color">Letras del Fondo en SECUESTRO:</label>
-                    <input type="color" id="cfg-ascii-hijack-color" value="#1aff4d">
-                  </div>
-                  <div class="ascii-color-item">
-                    <label for="cfg-ascii-body-color">Letras de la Silueta:</label>
-                    <input type="color" id="cfg-ascii-body-color" value="#39ff14">
-                  </div>
-                  <div class="ascii-color-item">
-                    <label for="cfg-ascii-bg-color">Color de Fondo del Shader:</label>
-                    <input type="color" id="cfg-ascii-bg-color" value="#05070a">
-                  </div>
-                </div>
-
-                <div class="ascii-slider-group">
-                  <label for="cfg-ascii-bg-alpha">Opacidad del Fondo del Shader: <span
-                      id="val-ascii-bg-alpha">0</span>%</label>
-                  <input type="range" id="cfg-ascii-bg-alpha" min="0" max="100" step="1" value="0">
-                </div>
-
-                <label class="checkbox-label">
-                  <input type="checkbox" id="cfg-ascii-silhouette" checked>
-                  <span>Pintar la silueta corporal con un color distinto al fondo</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- TAB 4: TRACKING & CALIBRACIÓN (OPENPOSE, DEPTH MAP, CÁMARA FACIAL) -->
+          <!-- TAB 4: TRACKING & SENSORES (MONITORES PiP, ANÁLISIS ÓPTICO, DISPOSITIVOS) -->
           <div class="modal-tab-pane" id="tab-tracking">
-            <!-- 1) Master Toggle OpenPose y Articulaciones/Puntos -->
-            <div class="tracking-card">
-              <div class="tracking-card-header">
-                <div class="section-subtitle">
-                  <span>🎯 1) SUPERPOSICIÓN OPENPOSE EN PANTALLA PRINCIPAL</span>
-                </div>
-                <label class="switch-toggle" title="Activar/Desactivar Overlay de OpenPose">
-                  <input type="checkbox" id="cfg-track-openpose">
-                  <span class="slider-round"></span>
-                </label>
-              </div>
-              <p class="words-help-text">
-                Proyecta el esqueleto cinemático y los 33 nodos anatómicos calculados por MediaPipe Pose en tiempo real
-                sobre el feed interactivo.
-              </p>
-
-              <div class="calibration-grid">
-                <!-- 1.1) Graficar Articulaciones / Huesos -->
-                <div class="calib-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="cfg-track-bones" checked>
-                    <strong>Graficar Articulaciones / Huesos</strong>
-                  </label>
-                  <div class="calib-subslider">
-                    <label for="cfg-track-bone-width">Grosor de líneas (px): <span
-                        id="val-track-bone-width">0.5</span></label>
-                    <input type="range" id="cfg-track-bone-width" min="0.25" max="5" step="0.25" value="0.5">
-                  </div>
-                </div>
-
-                <!-- 1.2) Graficar Puntos del Cuerpo (Landmarks) -->
-                <div class="calib-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="cfg-track-points" checked>
-                    <strong>Graficar Puntos del Cuerpo (33 Nodos)</strong>
-                  </label>
-                  <div class="calib-subslider">
-                    <label for="cfg-track-point-radius">Radio de articulación (px): <span
-                        id="val-track-point-radius">0.75</span></label>
-                    <input type="range" id="cfg-track-point-radius" min="0.5" max="7" step="0.25" value="0.75">
-                  </div>
-                </div>
-
-                <!-- Umbral de Confianza Mínima -->
-                <div class="calib-item">
-                  <label for="cfg-track-confidence">
-                    <strong>Filtro de Confianza Mínima:</strong> <span id="val-track-confidence">50</span>%
-                  </label>
-                  <input type="range" id="cfg-track-confidence" min="10" max="95" step="5" value="50">
-                  <small class="item-desc">Descarta articulaciones de baja visibilidad o ruidosas</small>
-                </div>
-
-                <!-- Paleta de Color -->
-                <div class="calib-item">
-                  <label for="cfg-track-theme">
-                    <strong>Paleta Visual de Articulaciones:</strong>
-                  </label>
-                  <select id="cfg-track-theme" class="cyber-select-sm">
-                    <option value="classic">OpenPose Clásico (Multicolor Anatómico)</option>
-                    <option value="cyberpunk" selected>CCTV Cyberpunk (Cyan &amp; Verde Neón)</option>
-                    <option value="phosphor">Fósforo Militar (Verde Monocromo CRT)</option>
-                    <option value="thermal">Alerta Térmica (Infrarrojo Naranja / Magenta)</option>
-                  </select>
-                </div>
-
-                <!-- 6) Colisión Multi-articular con Palabras -->
-                <div class="calib-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="cfg-track-body-collision" checked>
-                    <strong>6) Colisión Corporal con Palabras</strong>
-                  </label>
-                  <small class="item-desc">Los puntos habilitados abajo pueden tocar y atrapar palabras directamente.
-                    Por defecto: el puntero y las dos manos.</small>
-
-                  <!-- Modo selector: qué puntos SÍ colisionan y cuáles NO -->
-                  <div class="collision-points">
-                    <div class="collision-points-title">PUNTOS QUE CAPTURAN PALABRAS</div>
-                    <div class="collision-points-grid">
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mouse" checked><span>PUNTERO /
-                          MOUSE</span></label>
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mano-izq" checked><span>MANO
-                          IZQUIERDA</span></label>
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mano-der" checked><span>MANO
-                          DERECHA</span></label>
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-dedo-izq"><span>ÍNDICE
-                          IZQUIERDO</span></label>
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-dedo-der"><span>ÍNDICE
-                          DERECHO</span></label>
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-codo-izq"><span>CODO
-                          IZQUIERDO</span></label>
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-codo-der"><span>CODO
-                          DERECHO</span></label>
-                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-centro-facial"><span>CENTRO
-                          FACIAL</span></label>
-                    </div>
-                    <small class="item-desc">Por defecto sólo el <strong>puntero</strong> y las <strong>dos
-                        manos</strong> del OpenPose capturan. Destildá un punto para que NO colisione.</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 2) DEPTH MAP (Mapa de Profundidad / Segmentación & Máscara de Silueta) -->
-            <div class="tracking-card">
-              <div class="tracking-card-header">
-                <div class="section-subtitle">
-                  <span>🗺️ 2) MAPA DE PROFUNDIDAD (DEPTH MAP &amp; MÁSCARA SILUETA)</span>
-                </div>
-                <label class="switch-toggle" title="Mostrar/Ocultar Monitor PiP de Profundidad">
-                  <input type="checkbox" id="cfg-track-depth">
-                  <span class="slider-round"></span>
-                </label>
-              </div>
-              <p class="words-help-text">
-                Procesa la máscara de segmentación humana de MediaPipe para aislar tu cuerpo del fondo y proyectar la
-                profundidad espacial Z.
-              </p>
-
-              <div class="calibration-grid">
-                <!-- 3) Máscara de Silueta en Shader ASCII -->
-                <div class="calib-item">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="cfg-track-depth-shader" checked>
-                    <strong>3) Máscara Depth en Shader ASCII</strong>
-                  </label>
-                  <small class="item-desc">Pinta las letras de tu silueta corporal en un color diferente al
-                    fondo</small>
-                </div>
-
-                <div class="calib-item">
-                  <label for="cfg-track-body-color"><strong>Color de Letras en tu Cuerpo:</strong></label>
-                  <select id="cfg-track-body-color" class="cyber-select-sm">
-                    <option value="neon-green" selected>Verde Neón Tóxico (#39ff14)</option>
-                    <option value="gold">Oro Sintético (#ffcc00)</option>
-                    <option value="magenta">Alerta Magenta (#ff0055)</option>
-                    <option value="cyan">Cyan Luminoso (#00f0ff)</option>
-                    <option value="white">Blanco Fósforo (#ffffff)</option>
-                  </select>
-                </div>
-
-                <div class="calib-item">
-                  <label for="cfg-track-depth-mode"><strong>Modo del Monitor PiP:</strong></label>
-                  <select id="cfg-track-depth-mode" class="cyber-select-sm">
-                    <option value="cyberpunk" selected>Cyberpunk Glow (Gradiente Térmico Cyan-Magenta)</option>
-                    <option value="thermal">Infrarrojo FLIR (Heatmap Turbo)</option>
-                    <option value="monochrome">Monocromático Estricto (Matriz Binaria de Silicio)</option>
-                  </select>
-                </div>
-
-                <div class="calib-item">
-                  <label for="cfg-track-depth-contrast">
-                    <strong>Ganancia de Contraste / Profundidad:</strong> <span
-                      id="val-track-depth-contrast">1.5</span>x
-                  </label>
-                  <input type="range" id="cfg-track-depth-contrast" min="0.5" max="3.0" step="0.1" value="1.5">
-                </div>
-              </div>
+            <div style="padding: 12px 16px; margin-bottom: 16px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.35); border-radius: 6px; font-family: monospace; font-size: 13px; color: #bbf7ff; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+              <span>💡 La calibración de <strong>OpenPose</strong>, <strong>Silueta</strong>, <strong>Interpolación de Puntos (Lerp)</strong> y <strong>RDM Haiku</strong> ahora cuenta con su pestaña exclusiva:</span>
+              <button type="button" class="btn-calib-action" onclick="document.querySelector('.modal-tab-btn[data-tab=\'tab-silhouette\']')?.click()" style="margin: 0; padding: 6px 14px; font-size: 11px; border-color: #00f0ff; color: #00f0ff;">IR A SILLOUETE CALIBRATION ➔</button>
             </div>
 
             <!-- 3) CÁMARA DE LA CARA & CUADRITO DE RASTREO FACIAL -->
@@ -950,6 +681,199 @@
             </div>
           </div>
 
+          <!-- TAB: SILLOUETE CALIBRATION (INTERPOLACIÓN VECTORIAL, RDM HAIKU, OPENPOSE & SILUETA DEPTH) -->
+          <div class="modal-tab-pane" id="tab-silhouette">
+            <!-- 1) INTERPOLACIÓN VECTORIAL DE PUNTOS & BRILLO RDM HAIKU -->
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>⚡ 1) INTERPOLACIÓN VECTORIAL Y FONDO RDM HAIKU</span>
+                </div>
+              </div>
+              <p class="words-help-text">
+                Control de suavizado dinámico tipo vector lerp para eliminar saltos bruscos en articulaciones/manos y ajuste de brillo del patrón RDM del contenedor Haiku.
+              </p>
+
+              <div class="calibration-grid">
+                <!-- 1.1 Interpolación Vectorial (Lerp Factor) -->
+                <div class="calib-item">
+                  <label for="cfg-track-point-lerp">
+                    <strong>Interpolación de Puntos (Vector Lerp):</strong> <span id="val-track-point-lerp">0.75</span>
+                  </label>
+                  <input type="range" id="cfg-track-point-lerp" min="0.05" max="1.0" step="0.05" value="0.75">
+                  <small class="item-desc">Interpola suavemente las posiciones de las manos y articulaciones evitando saltos: lerp(posicionGuardada, posicionNueva, factor). 0.75 = ágil y fluido (recomendado), 0.20 = ultra suave, 1.0 = directo sin interpolar.</small>
+                </div>
+
+                <!-- 1.2 Brillo del Patrón RDM Detrás del Haiku -->
+                <div class="calib-item">
+                  <label for="cfg-haiku-rdm-brillo">
+                    <strong>Brillo Patrón RDM (Fondo Haiku):</strong> <span id="val-haiku-rdm-brillo">1.00</span>x
+                  </label>
+                  <input type="range" id="cfg-haiku-rdm-brillo" min="0.0" max="3.0" step="0.05" value="1.0">
+                  <small class="item-desc">Ajusta la intensidad lumínica y presencia del patrón RDM dentro del contenedor del Haiku.</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2) CALIBRACIÓN COMPLETA OPENPOSE -->
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>🎯 2) CALIBRACIÓN OPENPOSE (ESQUELETO Y NODOS ANATÓMICOS)</span>
+                </div>
+                <label class="switch-toggle" title="Activar/Desactivar Overlay de OpenPose">
+                  <input type="checkbox" id="cfg-track-openpose">
+                  <span class="slider-round"></span>
+                </label>
+              </div>
+              <p class="words-help-text">
+                Proyecta el esqueleto cinemático y los 33 nodos anatómicos calculados por MediaPipe Pose en tiempo real sobre el feed interactivo.
+              </p>
+
+              <div class="calibration-grid">
+                <!-- Umbral de Confianza Mínima -->
+                <div class="calib-item">
+                  <label for="cfg-track-confidence">
+                    <strong>Filtro de Confianza Mínima:</strong> <span id="val-track-confidence">50</span>%
+                  </label>
+                  <input type="range" id="cfg-track-confidence" min="10" max="95" step="5" value="50">
+                  <small class="item-desc">Descarta articulaciones de baja visibilidad o ruidosas</small>
+                </div>
+
+                <!-- Graficar Articulaciones / Huesos -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-bones" checked>
+                    <strong>Graficar Articulaciones / Huesos</strong>
+                  </label>
+                  <div class="calib-subslider">
+                    <label for="cfg-track-bone-width">Grosor de líneas (px): <span id="val-track-bone-width">0.5</span></label>
+                    <input type="range" id="cfg-track-bone-width" min="0.25" max="5" step="0.25" value="0.5">
+                  </div>
+                </div>
+
+                <!-- Graficar Puntos del Cuerpo (Landmarks) -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-points" checked>
+                    <strong>Graficar Puntos del Cuerpo (33 Nodos)</strong>
+                  </label>
+                  <div class="calib-subslider">
+                    <label for="cfg-track-point-radius">Radio de articulación (px): <span id="val-track-point-radius">0.75</span></label>
+                    <input type="range" id="cfg-track-point-radius" min="0.5" max="7" step="0.25" value="0.75">
+                  </div>
+                </div>
+
+                <!-- Paleta de Color -->
+                <div class="calib-item">
+                  <label for="cfg-track-theme">
+                    <strong>Paleta Visual de Articulaciones:</strong>
+                  </label>
+                  <select id="cfg-track-theme" class="cyber-select-sm">
+                    <option value="classic">OpenPose Clásico (Multicolor Anatómico)</option>
+                    <option value="cyberpunk" selected>CCTV Cyberpunk (Cyan &amp; Verde Neón)</option>
+                    <option value="phosphor">Fósforo Militar (Verde Monocromo CRT)</option>
+                    <option value="thermal">Alerta Térmica (Infrarrojo Naranja / Magenta)</option>
+                  </select>
+                </div>
+
+                <!-- Colisión Multi-articular con Palabras -->
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-track-body-collision" checked>
+                    <strong>Colisión Corporal con Palabras</strong>
+                  </label>
+                  <small class="item-desc">Los puntos habilitados abajo pueden tocar y atrapar palabras directamente. Por defecto: el puntero y las dos manos.</small>
+
+                  <div class="collision-points">
+                    <div class="collision-points-title">PUNTOS QUE CAPTURAN PALABRAS</div>
+                    <div class="collision-points-grid">
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mouse" checked><span>PUNTERO / MOUSE</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mano-izq" checked><span>MANO IZQUIERDA</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-mano-der" checked><span>MANO DERECHA</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-dedo-izq"><span>ÍNDICE IZQUIERDO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-dedo-der"><span>ÍNDICE DERECHO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-codo-izq"><span>CODO IZQUIERDO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-codo-der"><span>CODO DERECHO</span></label>
+                      <label class="cb-point"><input type="checkbox" id="cfg-col-point-centro-facial"><span>CENTRO FACIAL</span></label>
+                    </div>
+                    <small class="item-desc">Por defecto sólo el <strong>puntero</strong> y las <strong>dos manos</strong> del OpenPose capturan. Destildá un punto para que NO colisione.</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3) CALIBRACIÓN DE SILUETA Y MAPA DE PROFUNDIDAD (DEPTH MAP) -->
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>🗺️ 3) CALIBRACIÓN DE SILUETA Y DEPTH MAP</span>
+                </div>
+                <label class="switch-toggle" title="Mostrar/Ocultar Monitor PiP de Profundidad">
+                  <input type="checkbox" id="cfg-track-depth">
+                  <span class="slider-round"></span>
+                </label>
+              </div>
+              <p class="words-help-text">
+                Procesa la máscara de segmentación humana de MediaPipe para aislar tu cuerpo del fondo y proyectar la profundidad espacial Z y los efectos en el shader final.
+              </p>
+
+              <div class="calibration-grid">
+                <div class="calib-item">
+                  <label for="cfg-track-depth-mode"><strong>Modo del Monitor PiP:</strong></label>
+                  <select id="cfg-track-depth-mode" class="cyber-select-sm">
+                    <option value="cyberpunk" selected>Cyberpunk Glow (Gradiente Térmico Cyan-Magenta)</option>
+                    <option value="thermal">Infrarrojo FLIR (Heatmap Turbo)</option>
+                    <option value="monochrome">Monocromático Estricto (Matriz Binaria de Silicio)</option>
+                  </select>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-track-depth-contrast">
+                    <strong>Ganancia de Contraste / Profundidad:</strong> <span id="val-track-depth-contrast">1.5</span>x
+                  </label>
+                  <input type="range" id="cfg-track-depth-contrast" min="0.5" max="3.0" step="0.1" value="1.5">
+                </div>
+
+                <!-- Blur del Depth en Shader -->
+                <div class="calib-item">
+                  <label for="cfg-sil-blur">
+                    <strong>Blur de Silueta (u_silBlur):</strong> <span id="val-sil-blur">1.5</span> texeles
+                  </label>
+                  <input type="range" id="cfg-sil-blur" min="0" max="6" step="0.5" value="1.5">
+                  <small class="item-desc">Suavizado de la máscara de depth en texeles para evitar pixelado.</small>
+                </div>
+
+                <!-- Borde Blanco de Silueta -->
+                <div class="calib-item">
+                  <label for="cfg-sil-edge">
+                    <strong>Borde Blanco de Silueta (u_silEdge):</strong> <span id="val-sil-edge">100</span>%
+                  </label>
+                  <input type="range" id="cfg-sil-edge" min="0" max="100" step="1" value="100">
+                  <small class="item-desc">Contorno blanco nítido sacado del gradiente de la silueta.</small>
+                </div>
+
+                <!-- Relleno RDM en Silueta -->
+                <div class="calib-item">
+                  <label for="cfg-sil-rdm">
+                    <strong>Relleno RDM en Silueta (u_silRdm):</strong> <span id="val-sil-rdm">100</span>%
+                  </label>
+                  <input type="range" id="cfg-sil-rdm" min="0" max="100" step="1" value="100">
+                  <small class="item-desc">Pinta la silueta humana con el patrón RDM de la paleta global.</small>
+                </div>
+
+                <!-- Mezcla Cámara / Depth -->
+                <div class="calib-item">
+                  <label for="cfg-sil-cam-vis">
+                    <strong>Mezcla Cámara ↔ Silueta RDM (u_camVis):</strong> <span id="val-sil-cam-vis">50</span>%
+                  </label>
+                  <input type="range" id="cfg-sil-cam-vis" min="0" max="100" step="1" value="50">
+                  <small class="item-desc">0% = Silueta RDM pura · 100% = Cámara de color pura · 50% = Mezcla equilibrada.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- TAB 5: RENDER & CAPAS (SWITCHES Y CONTROL DE OPACIDAD) -->
           <div class="modal-tab-pane" id="tab-render">
             <div class="render-layers-card">
@@ -958,7 +882,7 @@
               </div>
               <p class="words-help-text">
                 Enciende, apaga y gradúa individualmente la opacidad de cada capa de renderizado. Los interruptores se
-                sincronizan continuamente en tiempo real con las pestañas de Tracking y Shader.
+                sincronizan continuamente en tiempo real con la pestaña de Tracking.
               </p>
 
               <div class="render-layers-grid">
@@ -996,22 +920,6 @@
                   </div>
                 </div>
 
-                <!-- Capa 2: Shader ASCII -->
-                <div class="render-layer-item">
-                  <div class="layer-header">
-                    <label class="switch-toggle" title="Activar/Desactivar Shader ASCII">
-                      <input type="checkbox" id="cfg-render-ascii-toggle" checked>
-                      <span class="slider-round"></span>
-                    </label>
-                    <span class="layer-title">2. Shader ASCII (WebGL)</span>
-                  </div>
-                  <div class="layer-slider-group">
-                    <label for="cfg-render-ascii-opacity">Opacidad: <span
-                        id="val-render-ascii-opacity">92</span>%</label>
-                    <input type="range" id="cfg-render-ascii-opacity" min="0" max="100" step="1" value="92">
-                  </div>
-                </div>
-
                 <!-- Capa 3: Shader Frame Difference -->
                 <div class="render-layer-item">
                   <div class="layer-header">
@@ -1019,7 +927,7 @@
                       <input type="checkbox" id="cfg-render-framediff-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">3. Shader Frame Difference (Feedback)</span>
+                    <span class="layer-title">2. Shader Frame Difference (Feedback)</span>
                   </div>
                   <div class="layer-slider-group">
                     <label for="cfg-render-framediff-opacity">Opacidad: <span
@@ -1035,7 +943,7 @@
                       <input type="checkbox" id="cfg-render-openpose-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">4. Esqueleto OpenPose (Huesos &amp; Nodos)</span>
+                    <span class="layer-title">3. Esqueleto OpenPose (Huesos &amp; Nodos)</span>
                   </div>
                   <div class="layer-slider-group">
                     <label for="cfg-render-openpose-opacity">Opacidad: <span
@@ -1051,7 +959,7 @@
                       <input type="checkbox" id="cfg-render-flowfield-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">4b. Vectores Flow Field (Flujo Óptico)</span>
+                    <span class="layer-title">3b. Vectores Flow Field (Flujo Óptico)</span>
                   </div>
                   <div class="layer-slider-group">
                     <label for="cfg-render-flowfield-opacity">Opacidad: <span
@@ -1067,7 +975,7 @@
                       <input type="checkbox" id="cfg-render-pointers-toggle" checked>
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">5. Punteros de Selección (Retículas HUD)</span>
+                    <span class="layer-title">4. Punteros de Selección (Retículas HUD)</span>
                   </div>
                   <div class="layer-slider-group">
                     <label for="cfg-render-pointers-opacity">Opacidad: <span
@@ -1083,7 +991,7 @@
                       <input type="checkbox" id="cfg-render-depth-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">6. Monitor PiP Depth Map</span>
+                    <span class="layer-title">5. Monitor PiP Depth Map</span>
                   </div>
                   <small class="item-desc">Visor táctico de segmentación en esquina inferior</small>
                 </div>
@@ -1095,7 +1003,7 @@
                       <input type="checkbox" id="cfg-render-face-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">7. Monitor PiP Cámara Rostro</span>
+                    <span class="layer-title">6. Monitor PiP Cámara Rostro</span>
                   </div>
                   <small class="item-desc">Visor biométrico en esquina superior derecha</small>
                 </div>
@@ -1107,7 +1015,7 @@
                       <input type="checkbox" id="cfg-render-lefthand-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">7b. Monitor PiP Mano Izquierda</span>
+                    <span class="layer-title">6b. Monitor PiP Mano Izquierda</span>
                   </div>
                   <small class="item-desc">Recorte de la cámara SOLO sobre la mano izquierda</small>
                 </div>
@@ -1118,7 +1026,7 @@
                       <input type="checkbox" id="cfg-render-righthand-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">7c. Monitor PiP Mano Derecha</span>
+                    <span class="layer-title">6c. Monitor PiP Mano Derecha</span>
                   </div>
                   <small class="item-desc">Recorte de la cámara SOLO sobre la mano derecha</small>
                 </div>
@@ -1130,7 +1038,7 @@
                       <input type="checkbox" id="cfg-render-scanlines-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">8. Filtro Analógico CCTV (Scanlines &amp; Viñeta)</span>
+                    <span class="layer-title">7. Filtro Analógico CCTV (Scanlines &amp; Viñeta)</span>
                   </div>
                   <div class="layer-slider-group">
                     <label for="cfg-render-scanlines-opacity">Opacidad: <span
@@ -1146,7 +1054,7 @@
                       <input type="checkbox" id="cfg-render-noise-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">9. Ruido Estático &amp; Grano Analógico</span>
+                    <span class="layer-title">8. Ruido Estático &amp; Grano Analógico</span>
                   </div>
                   <div class="layer-slider-group">
                     <label for="cfg-render-noise-opacity">Opacidad: <span
@@ -1167,7 +1075,7 @@
                       <input type="checkbox" id="cfg-render-corpparticles-toggle">
                       <span class="slider-round"></span>
                     </label>
-                    <span class="layer-title">10. Partículas Corporativas (👔 😊 💪 💵)</span>
+                    <span class="layer-title">9. Partículas Corporativas (👔 😊 💪 💵)</span>
                   </div>
                   <div class="layer-slider-group">
                     <label for="cfg-render-corpparticles-opacity">Opacidad: <span
@@ -1725,7 +1633,7 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=3.59"></script>
+  <script src="script.js?v=3.63"></script>
 </body>
 
 </html>
