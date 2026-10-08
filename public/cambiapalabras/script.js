@@ -935,6 +935,7 @@ const appState = {
     boneWidth: 0.5,
     pointRadius: 0.75,
     minConfidence: 0.5,
+    pointerConfidence: 0.2,   // umbral propio de los CUADRADOS de las manos (slider pestaña SILUETA)
     colorTheme: 'cyberpunk', // 'classic' | 'cyberpunk' | 'phosphor' | 'thermal'
     bodyCollision: true, // REQUERIMIENTO 6: Colisión multi-articular de OpenPose con palabras
     // Modo selector de colisión: qué puntos SÍ capturan palabras y cuáles NO.
@@ -1282,6 +1283,8 @@ const DOM = {
   cfgSilRdm: document.getElementById('cfg-sil-rdm'),
   valSilRdm: document.getElementById('val-sil-rdm'),
   cfgSilCamVis: document.getElementById('cfg-sil-cam-vis'),
+  cfgPunteroConf: document.getElementById('cfg-puntero-conf'),
+  valPunteroConf: document.getElementById('val-puntero-conf'),
   valSilCamVis: document.getElementById('val-sil-cam-vis'),
   cfgTrackOpenpose: document.getElementById('cfg-track-openpose'),
   cfgTrackBones: document.getElementById('cfg-track-bones'),
@@ -3632,6 +3635,68 @@ function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, b
   }
 }
 
+/* ============================================================================
+// CUADRADO QUE RECUBRE LA SILUETA + SU VALOR DE CONFIANZA (pedido del artista)
+// ----------------------------------------------------------------------------
+// Se calcula el bounding box de los landmarks visibles, se cuadra (lado = el mayor)
+// y se centra sobre la silueta. Arriba a la izquierda del cuadrado se escribe un
+// string chiquito con la CONFIANZA media de los puntos clave del cuerpo: cuánto cree
+// el sistema que eso que está capturando es una silueta humana.
+// ============================================================================ */
+function drawSilhouetteBox(ctx, landmarks, w, h, minConf) {
+  if (!landmarks || !landmarks.length) return;
+  const CLAVES = [0, 11, 12, 13, 14, 15, 16, 23, 24];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, n = 0, suma = 0, nClave = 0;
+  for (let i = 0; i < landmarks.length; i++) {
+    const l = landmarks[i];
+    if (!l) continue;
+    const vis = (l.visibility !== undefined ? l.visibility : 1);
+    if (CLAVES.indexOf(i) !== -1) { suma += vis; nClave++; }
+    if (vis < minConf) continue;
+    const x = (1.0 - l.x) * w;
+    const y = l.y * h;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    n++;
+  }
+  if (n < 6 || !isFinite(minX)) return;
+
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const lado = Math.max(maxX - minX, maxY - minY) * 1.12 + 40;
+  const x0 = cx - lado / 2;
+  const y0 = cy - lado / 2;
+  const conf = Math.round((nClave ? suma / nClave : 0) * 100);
+  const col = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores && window.GlobalStyleConfig.colores.borde) || '#d46238';
+
+  ctx.save();
+  ctx.setLineDash([6, 5]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = col;
+  ctx.shadowColor = col;
+  ctx.shadowBlur = 6;
+  ctx.strokeRect(x0, y0, lado, lado);
+  ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
+
+  // String chiquito con el valor de confianza, arriba a la izquierda del cuadrado
+  const txt = 'SILUETA ' + conf + '%';
+  ctx.font = '10px "Share Tech Mono", monospace';
+  const tw = ctx.measureText(txt).width;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
+  ctx.fillRect(x0 - 1, y0 - 18, tw + 10, 16);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = col;
+  ctx.strokeRect(x0 - 1, y0 - 18, tw + 10, 16);
+  ctx.fillStyle = col;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(txt, x0 + 4, y0 - 10);
+  ctx.restore();
+}
+
 function renderOpenPoseOverlay(landmarks) {
   const canvas = DOM.openposeCanvas;
   if (!canvas) return;
@@ -3668,6 +3733,10 @@ function renderOpenPoseOverlay(landmarks) {
 
   for (let pi = 0; pi < playersToDraw.length; pi++) {
     drawSingleSkeleton(ctx, playersToDraw[pi].landmarks, pi, w, h, theme, minConf, boneWidth, ptRadius, shouldDrawBones, shouldDrawLandmarks, now);
+  }
+  // CUADRADO QUE RECUBRE LA SILUETA + string con su confianza (pedido del artista)
+  for (let pi = 0; pi < playersToDraw.length; pi++) {
+    drawSilhouetteBox(ctx, playersToDraw[pi].landmarks, w, h, minConf);
   }
   ctx.shadowBlur = 0;
 }
@@ -4723,6 +4792,8 @@ function syncTrackingConfigToInputs() {
   if (DOM.cfgSilRdm) DOM.cfgSilRdm.value = rdmSt.silRdm ?? 100;
   if (DOM.valSilRdm) DOM.valSilRdm.textContent = Math.round(rdmSt.silRdm ?? 100);
   if (DOM.cfgSilCamVis) DOM.cfgSilCamVis.value = rdmSt.camVis ?? 50;
+  if (DOM.cfgPunteroConf) DOM.cfgPunteroConf.value = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100);
+  if (DOM.valPunteroConf) DOM.valPunteroConf.textContent = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100) + '%';
   if (DOM.valSilCamVis) DOM.valSilCamVis.textContent = Math.round(rdmSt.camVis ?? 50);
   if (DOM.cfgTrackOpenpose) DOM.cfgTrackOpenpose.checked = c.showOpenPose;
   if (DOM.cfgTrackBones) DOM.cfgTrackBones.checked = c.drawBones;
@@ -5140,6 +5211,8 @@ function syncMasterRdmInputs() {
   if (DOM.cfgSilRdm) DOM.cfgSilRdm.value = st.silRdm ?? 100;
   if (DOM.valSilRdm) DOM.valSilRdm.textContent = Math.round(st.silRdm ?? 100);
   if (DOM.cfgSilCamVis) DOM.cfgSilCamVis.value = st.camVis ?? 50;
+  if (DOM.cfgPunteroConf) DOM.cfgPunteroConf.value = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100);
+  if (DOM.valPunteroConf) DOM.valPunteroConf.textContent = Math.round((appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2) * 100) + '%';
   if (DOM.valSilCamVis) DOM.valSilCamVis.textContent = Math.round(st.camVis ?? 50);
   _pipTinteUltimo = '';
 }
@@ -5843,30 +5916,31 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
   const pal = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores) || {};
   const now = performance.now();
 
-  /* PUNTERO: un CÍRCULO NEGRO con REBORDE del color de la paleta (cobre). Sin cruz,
-     sin anillos de mira y sin muescas: mientras el puntero engancha una palabra se
-     RELLENA DE ADENTRO HACIA AFUERA (disco radial) con el color de ENERGÍA. */
-  const R = isLocking ? 26 : 24;                       // radio del puntero (px)
+  /* PUNTERO CUADRADO: CUADRADO NEGRO opaco con REBORDE de la paleta (cobre). Mouse y
+     manos usan EXACTAMENTE la misma forma: el puntero del mouse tambien es cuadrado
+     (la retícula DOM tiene border-radius 0), asi que los dos tienen que ser CUADRADOS.
+     Mientras engancha una palabra se RELLENA DE ADENTRO HACIA AFUERA (disco radial) con
+     el color de ENERGÍA. Sin cruz, sin anillos de mira y sin muescas. */
+  const S = isLocking ? 52 : 46;                       // lado del cuadrado (px)
+  const mitad = S / 2;
   const progreso = Math.max(0, Math.min(1, Number(chargeProgress) || 0));
 
   const cobre   = colPun.base;                                        // reborde (#d46238)
   const energia = colPun.fijo;                                        // energía (#dca876)
   const nucleo  = pal.clusterPelotita || pal.texto || '#ffe2c8';      // centro caliente
 
-  // 1. Disco NEGRO opaco
-  ctx.beginPath();
-  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  // 1. CUADRADO NEGRO opaco
   ctx.fillStyle = 'rgba(0, 0, 0, 0.94)';
-  ctx.fill();
+  ctx.fillRect(-mitad, -mitad, S, S);
 
-  // 2. RELLENO DE ENERGÍA radial: del centro hacia el borde
+  // 2. RELLENO DE ENERGÍA radial (del centro hacia afuera), recortado al cuadrado
   if (progreso > 0.001) {
     ctx.save();
     ctx.beginPath();
-    ctx.arc(0, 0, R - 1.5, 0, Math.PI * 2);
+    ctx.rect(-mitad + 1.5, -mitad + 1.5, S - 3, S - 3);
     ctx.clip();
 
-    const rFill = Math.max(0.5, (R - 1.5) * progreso);
+    const rFill = Math.max(0.5, (mitad - 1.5) * progreso);
     const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rFill);
     grad.addColorStop(0.0, nucleo);
     grad.addColorStop(0.45, energia);
@@ -5880,9 +5954,9 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Frente de avance: aro fino y luminoso en el borde del relleno
+    // Frente de avance: cuadrado fino y luminoso en el borde del relleno
     ctx.beginPath();
-    ctx.arc(0, 0, rFill, 0, Math.PI * 2);
+    ctx.rect(-rFill, -rFill, rFill * 2, rFill * 2);
     ctx.lineWidth = 1.6;
     ctx.strokeStyle = rgbaDesdeHex(nucleo, 0.85);
     ctx.stroke();
@@ -5890,9 +5964,9 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
     ctx.restore();
   }
 
-  // 3. REBORDE COBRE (paleta global)
+  // 3. REBORDE COBRE CUADRADO (paleta global)
   ctx.beginPath();
-  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.rect(-mitad, -mitad, S, S);
   ctx.lineWidth = 2.6;
   ctx.strokeStyle = cobre;
   ctx.shadowColor = cobre;
@@ -5905,7 +5979,7 @@ function drawUnifiedReticle(ctx, x, y, isLocking, chargeProgress = 0, label = ''
     ctx.font = '8px "Share Tech Mono", monospace';
     ctx.fillStyle = rgbaDesdeHex(isLocking ? energia : cobre, 0.9);
     ctx.textAlign = 'center';
-    ctx.fillText(label, 0, R + 14);
+    ctx.fillText(label, 0, mitad + 14);
   }
 
   ctx.restore();
@@ -6326,6 +6400,21 @@ class FloatingWord {
     });
   }
 
+  /* Fija el texto SIN efecto de scramble. Se usa para las palabras que se PRESERVAN
+     del visitante: el efecto de letras girando es SOLO para las que mutan (5% IA). */
+  resolveInstant(targetWord) {
+    this.stopContinuousScramble();
+    const targetStr = String(targetWord || '').toUpperCase();
+    this.text = targetStr;
+    this.targetText = targetStr;
+    if (this.label) this.label.textContent = targetStr;
+    if (this.state !== WORD_STATES.AUXILIARY) {
+      this.state = WORD_STATES.TRANSFORMED;
+      if (this.el) this.el.className = 'organic-word-item word-transformed';
+    }
+    return Promise.resolve();
+  }
+
   /* PEDIDO: las palabras se van VACIANDO de energia mientras estan en el MEDIO
      (barra interior de 100% -> 0%) hasta que se van al haiku. */
   empezarVaciadoEnergia() {
@@ -6608,7 +6697,11 @@ function handleProximityAndInteractions(dt, currentTimestamp) {
   }
 
   if (appState.trackingConfig.bodyCollision) {
-    const minConf = appState.trackingConfig.minConfidence || 0.45;
+    /* UMBRAL DE CONFIANZA DE LOS PUNTEROS: lo maneja el slider "Umbral de Confianza de
+       los Punteros" de la pestaña SILUETA (trackingConfig.pointerConfidence). Con el
+       valor bajo (20% por defecto) los CUADRADOS de las manos se dibujan SIEMPRE, aunque
+       la pose venga con poca confianza; subilo si querés sólo manos bien detectadas. */
+    const minConf = Number(appState.trackingConfig.pointerConfidence !== undefined ? appState.trackingConfig.pointerConfidence : 0.2);
     const candidates = [
       { idx: 15, name: 'MANO_IZQ', key: 'manoIzq', fallback: true },
       { idx: 16, name: 'MANO_DER', key: 'manoDer', fallback: true },
@@ -7239,7 +7332,12 @@ async function startResignificationSequence() {
   }
 
   // Empezar a randomizar caracteres en bucle continuo MIENTRAS el modelo procesa
-  selectedWords.forEach(wordObj => wordObj.startContinuousScramble());
+  /* DECISIÓN DE MUTACIÓN (5% por palabra) ANTES de animar: SOLO la palabra que va a
+     cambiar hace el efecto de letras girando; las que se preservan del visitante quedan
+     quietas. Se decide acá y se reusa tal cual después de la respuesta del modelo. */
+  const AI_MUTATION_CHANCE = 0.05;
+  const mutationFlags = caught.map(() => Math.random() < AI_MUTATION_CHANCE);
+  selectedWords.forEach((wordObj, i) => { if (wordObj && mutationFlags[i]) wordObj.startContinuousScramble(); });
 
   // Lanzar consulta a Ollama en segundo plano
   let aiResult = null;
@@ -7270,22 +7368,16 @@ async function startResignificationSequence() {
 
   // REQUERIMIENTO: Solo un 5% de posibilidades por palabra de que la IA las cambie.
   // Si no (95% de los casos), quedan intactas las palabras que el usuario agregó.
-  const AI_MUTATION_CHANCE = 0.05;
   const rawAiCandidates = (aiResult && Array.isArray(aiResult.nuevas_palabras) && aiResult.nuevas_palabras.length >= 3)
     ? aiResult.nuevas_palabras.map((w, idx) => sanitizeColdToken(w, caught[idx]))
     : caught.map(w => getColdSynonym(w));
 
+  // La decisión (mutationFlags) ya se tomó antes de animar: acá sólo se resuelve el
+  // TEXTO de cada término (el frío del modelo para las mutadas, la palabra del visitante
+  // para las preservadas).
   const coldSynonyms = [];
-  const mutationFlags = [];
-
   for (let idx = 0; idx < caught.length; idx++) {
-    const shouldMutate = Math.random() < AI_MUTATION_CHANCE;
-    mutationFlags.push(shouldMutate);
-    if (shouldMutate) {
-      coldSynonyms.push(rawAiCandidates[idx]);
-    } else {
-      coldSynonyms.push(caught[idx]); // Preserva la palabra original del usuario
-    }
+    coldSynonyms.push(mutationFlags[idx] ? rawAiCandidates[idx] : caught[idx]);
   }
 
   emitAgentEvent('synthesis', 'términos resignificados resueltos (5% prob. mutación)', 'ok', {
@@ -7298,14 +7390,23 @@ async function startResignificationSequence() {
   });
   emitReasoning(`[PENSAMIENTO] Reviso si la frase de ${oraculo} realmente usa los 3 términos y si no los enumera seguidos.\n`);
 
-  // Decodificación progresiva hacia la nueva palabra de cada objeto unificado
-  const p0 = selectedWords[0] ? selectedWords[0].resolveScramble(coldSynonyms[0].toUpperCase(), 1400) : Promise.resolve();
-  await wait(220);
-  const p1 = selectedWords[1] ? selectedWords[1].resolveScramble(coldSynonyms[1].toUpperCase(), 1400) : Promise.resolve();
-  await wait(220);
-  const p2 = selectedWords[2] ? selectedWords[2].resolveScramble(coldSynonyms[2].toUpperCase(), 1400) : Promise.resolve();
-
-  await Promise.all([p0, p1, p2]);
+  /* ESCRITURA DE LOS 3 TÉRMINOS: el efecto de LETRAS GIRANDO (scramble) lo hace SOLO la
+     palabra que CAMBIA (la mutación del 5%); las que se preservan del visitante pasan
+     directo, sin animación. */
+  const promesasEscritura = [];
+  for (let i = 0; i < selectedWords.length; i++) {
+    const obj = selectedWords[i];
+    if (obj) {
+      const destino = coldSynonyms[i].toUpperCase();
+      if (mutationFlags[i] && typeof obj.resolveScramble === 'function') {
+        promesasEscritura.push(obj.resolveScramble(destino, 1400));
+      } else if (typeof obj.resolveInstant === 'function') {
+        promesasEscritura.push(obj.resolveInstant(destino));
+      }
+    }
+    await wait(220);
+  }
+  await Promise.all(promesasEscritura);
 
   // Ocultar cartel de desprocesando
   if (DOM.desprocesandoBanner) {
@@ -7539,6 +7640,12 @@ async function composeFinalPhraseFlow(speech, selectedWordObjs, coldSynonyms) {
 
 async function requestOllamaHijack(words) {
   const coldList = words.map(w => getColdSynonym(w));
+  /* TÉRMINOS DEL VERSO: son las palabras que el visitante eligió, las que la app va a
+     MOSTRAR y las que ensurePhraseUsesColdWords EXIGE en el haiku. Antes el prompt pedía
+     los términos FRÍOS (getColdSynonym) mientras la validación exigía los ORIGINALES: el
+     haiku del modelo se descartaba el 95% de las veces (el 5% restante es la mutación IA)
+     y en pantalla terminaba el banco procedural local. Ahora prompt y validación coinciden. */
+  const terminos = words.map(w => String(w || '').toUpperCase().trim());
   const wordsJoined = words.join(', ');
   const coldJoined = coldList.join(', ');
 
@@ -7552,17 +7659,29 @@ async function requestOllamaHijack(words) {
   const userPrompt = `Palabras humanas elegidas: ${wordsJoined}
 Conceptos cibernéticos correspondientes: ${coldJoined}
 
+ATENCIÓN — PRIORIDAD MÁXIMA (anula cualquier otra instrucción, incluida la del SISTEMA):
+los 3 términos de 'frase_generada' son EXACTAMENTE estos, tal cual, SIN resignificar, sin traducir y
+sin reemplazarlos por términos fríos: ${terminos[0]} · ${terminos[1]} · ${terminos[2]}.
+La resignificación cibernética va SOLO en 'nuevas_palabras'; la frase NO usa esas versiones frías.
+
+PROCESO DE PENSAMIENTO (resolvelo en este orden y volcá el paso 2 en "analisis"):
+1) SIGNIFICADO: ¿qué significa cada una de las 3 palabras por separado?
+2) RELACIÓN: ¿cómo se relacionan entre sí las 3 palabras? (escribilo en "analisis", 1 o 2 frases)
+3) SÍNTESIS: con esa relación ya clara, escribí el haiku con las 3 palabras integradas.
+
 Misión poética:
 Escribe un poema en formato HAIKU de EXACTAMENTE 3 versos (SON 3 LÍNEAS / 3 ORACIONES: NI UNA MÁS, NUNCA 4) (separados por \\n) concebido e inspirado ENTERAMENTE ALREDEDOR del significado de estos tres conceptos:
-- Verso 1: debe construirse en torno a la idea de "${coldList[0]}", integrando la palabra en MAYÚSCULAS. Breve: 4 a 7 palabras.
-- Verso 2: debe construirse en torno a la idea de "${coldList[1]}", integrando la palabra en MAYÚSCULAS. Breve: 4 a 7 palabras.
-- Verso 3: debe construirse en torno a la idea de "${coldList[2]}", integrando la palabra en MAYÚSCULAS y expresando una revelación íntima en primera persona. Breve: 4 a 7 palabras.
+- Verso 1: debe construirse en torno a la idea de "${terminos[0]}", integrando la palabra en MAYÚSCULAS. Breve: 4 a 7 palabras.
+- Verso 2: debe construirse en torno a la idea de "${terminos[1]}", integrando la palabra en MAYÚSCULAS. Breve: 4 a 7 palabras.
+- Verso 3: debe construirse en torno a la idea de "${terminos[2]}", integrando la palabra en MAYÚSCULAS y expresando una revelación íntima en primera persona. Breve: 4 a 7 palabras.
+
+TÉRMINOS OBLIGATORIOS DEL POEMA: ${terminos[0]} · ${terminos[1]} · ${terminos[2]} (los tres tienen que aparecer, uno por verso).
 
 REGLAS DE ORO:
-0. Cada uno de los 3 conceptos es UNA SOLA PALABRA (sin guion bajo, sin espacios: si escribís OPTIMO_LUJO está MAL, va OPTIMO). No los cambies ni los compongas.
+0. Cada uno de los 3 términos es UNA SOLA PALABRA (sin guion bajo, sin espacios: si escribís OPTIMO_LUJO está MAL, va OPTIMO). No los cambies ni los compongas: escribilos EXACTAMENTE así, en MAYÚSCULAS.
 1. LONGITUD BREVE OBLIGATORIA: Cada verso debe tener entre 4 y 7 palabras (MÁXIMO 8 PALABRAS). Prohibido hacer versos largos o explicativos para que quepan en una sola línea horizontal.
 2. CONTEO OBLIGATORIO: EXACTAMENTE 3 ORACIONES (una sola oración por verso). Verso 1 y 2 terminan en coma o sin punto. Verso 3 termina con un solo punto final. Prohibido poner dos oraciones o puntos dentro de un mismo verso. NUNCA agregues un cuarto verso.
-3. El haiku debe formarse de manera directa y coherente ALREDEDOR de los conceptos elegidos. Prohibido usar frases genéricas desconectadas o hablar de temas ajenos.
+3. Los 3 versos tienen que estar RELACIONADOS ENTRE SÍ: forman UNA sola escena/idea coherente (no 3 frases sueltas), y cada verso integra uno de los términos.
 4. Cada verso debe tener sentido sintáctico natural e impecable en español.
 5. CONCORDANCIA OBLIGATORIA (lo más importante): cada término tiene un género y un número fijos, y los artículos, preposiciones y adjetivos que lo acompañan DEBEN concordar con él. Ejemplos de lo PROHIBIDO y su forma correcta:
    - MAL "del marcas" → BIEN "de las marcas"
@@ -7576,9 +7695,11 @@ REGLAS DE ORO:
 
 Responde ÚNICAMENTE un objeto JSON:
 {
-  "nuevas_palabras": ["${coldList[0]}", "${coldList[1]}", "${coldList[2]}"],
-  "frase_generada": "Verso 1 breve sobre ${coldList[0]}\\nVerso 2 breve sobre ${coldList[1]}\\nVerso 3 breve sobre ${coldList[2]}."
+  "analisis": "qué significa cada término y cómo se relacionan entre sí (1 o 2 frases)",
+  "nuevas_palabras": ["version fria de ${terminos[0]}", "version fria de ${terminos[1]}", "version fria de ${terminos[2]}"],
+  "frase_generada": "Verso 1 breve con ${terminos[0]}\\nVerso 2 breve con ${terminos[1]}\\nVerso 3 breve con ${terminos[2]}."
 }`;
+
 
   const payload = {
     model: appState.config.ollamaModel,
@@ -7644,6 +7765,8 @@ Responde ÚNICAMENTE un objeto JSON:
           }
         }
 
+        const mAnalisis = String(fullResponse || '').match(/"analisis"\s*:\s*"((?:[^"\\]|\\.){5,400})"/i);
+        if (mAnalisis) emitReasoning(`[PENSAMIENTO] Análisis semántico: qué significa cada término y cómo se relacionan → ${mAnalisis[1]}\n`);
         const parsed = parseOllamaResponse(fullResponse);
         if (parsed) {
           emitAgentEvent('inference', `inferencia completada en ${ollamaBase} (${payload.model})`, 'ok', {
@@ -7672,6 +7795,8 @@ Responde ÚNICAMENTE un objeto JSON:
     });
     if (proxyRes.ok) {
       const proxyData = await proxyRes.json();
+      const mAnalisis2 = String(proxyData.response || '').match(/"analisis"\s*:\s*"((?:[^"\\]|\\.){5,400})"/i);
+      if (mAnalisis2) emitReasoning(`[PENSAMIENTO] Análisis semántico: qué significa cada término y cómo se relacionan → ${mAnalisis2[1]}\n`);
       const parsed = parseOllamaResponse(proxyData.response);
       if (parsed) {
         emitAgentThought(proxyData.response, false, proxyData.response);
@@ -9159,6 +9284,15 @@ function setupEventListeners() {
     });
   }
 
+  if (DOM.cfgPunteroConf) {
+    DOM.cfgPunteroConf.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      appState.trackingConfig.pointerConfidence = val / 100;
+      if (DOM.valPunteroConf) DOM.valPunteroConf.textContent = val + '%';
+      saveTrackingConfigToStorage();
+    });
+  }
+
   if (DOM.cfgTrackConfidence) {
     DOM.cfgTrackConfidence.addEventListener('input', (e) => {
       appState.trackingConfig.minConfidence = parseInt(e.target.value, 10) / 100;
@@ -10027,6 +10161,7 @@ function setupEventListeners() {
         boneWidth: 0.5,
         pointRadius: 0.75,
         minConfidence: 0.5,
+    pointerConfidence: 0.2,   // umbral propio de los CUADRADOS de las manos (slider pestaña SILUETA)
         colorTheme: 'cyberpunk',
         bodyCollision: true,
         collisionPoints: { mouse: true, manoIzq: true, manoDer: true, dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false },

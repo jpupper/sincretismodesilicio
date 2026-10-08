@@ -462,7 +462,12 @@ float getDepthMask(vec2 p) {
     vec2 pWide = vec2(0.5 + (p.x - 0.5) * sx, p.y);
     if (pWide.x < 0.0 || pWide.x > 1.0) return 0.0;
     vec4 d = texture2D(u_depthTexture, vec2(pWide.x, 1.0 - pWide.y));
-    return (d.a > 0.001) ? d.a : max(d.r, max(d.g, d.b));
+    /* El canal ALFA del canvas de depth ES la máscara limpia 0..1 (lo dice el propio
+       DepthMapShader: "Canal alpha contiene rawVal limpio (0 fuera, 1 dentro) para uso
+       directo en el shader maestro"). El fallback a max(r,g,b) que había acá tomaba
+       los colores del COLORMAP (que sí están fuera del cuerpo) y metía ruido/parpadeo
+       en el contorno: se removió (ya se había arreglado así el 2026-10-06). */
+    return (d.a > 0.005) ? clamp(d.a, 0.0, 1.0) : 0.0;
 }
 
 void main() {
@@ -547,7 +552,12 @@ void main() {
        (cobre) + un contorno BLANCO sacado del gradiente del depth.
        u_camVis (0 = cámara reemplazada, 1 = cámara original), u_silRdm y u_silEdge lo
        controlan desde el panel MASTER OUTPUT SHADER. */
-    float silLum = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 1.9, 0.0, 1.0);
+        /* PATRÓN ESTÁTICO (speedFactor = 0): antes usaba getRdmBg() (el RDM animado de
+       u_time) y como acá el RDM solo modula el BRILLO de la silueta, el cuerpo
+       "latía" y a veces saltaba a blanco puro frame a frame (strobo medido en el
+       harness: Δ 0.05-0.17 por frame sobre el cuerpo). Con el patrón congelado la
+       silueta queda PINTADA y estable; el movimiento lo pone la máscara del depth. */
+    float silLum = clamp(dot(getRdmBgSlow(rawUv, 0.0), vec3(0.33333)) * 1.9, 0.0, 1.0);
     vec3  silRelleno = mix(u_palA, u_palB, 0.35) * (0.40 + 1.5 * silLum);
     vec3  silCol = mix(camCol, silRelleno, clamp(u_silRdm, 0.0, 1.0));
     /* MEZCLA: 0 = depth pintada con el RDM · 1 = cámara de color · en el medio, las dos
@@ -616,7 +626,10 @@ void main() {
     vec3 opLayer = vec3(0.0);
     if (u_hasOpenpose == 1) {
         float opMask = clamp(max(openposeCol.a, max(openposeCol.r, max(openposeCol.g, openposeCol.b))), 0.0, 1.0);
-        float opRdm = clamp(dot(getRdmBg(rawUv), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
+                /* Ídem: la opacidad de esta capa BLANCA no puede salir del RDM animado
+           (era la causa principal del destello blanco: blanco × 1.0 saturado y
+           oscilando cada frame). Patrón congelado = silueta blanca estable. */
+        float opRdm = clamp(dot(getRdmBgSlow(rawUv, 0.0), vec3(0.33333)) * 2.6 + 0.10, 0.0, 1.0);
         opLayer = vec3(1.0) * opMask * opRdm * ((u_openposeOpacity > 0.0) ? u_openposeOpacity : 1.0);
     }
 

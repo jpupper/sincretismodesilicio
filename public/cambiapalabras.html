@@ -17,7 +17,7 @@
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="stylesheet" href="css/fonts-local.css?v=1">
-  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.73">
+  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.77">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="vendor/mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -873,6 +873,14 @@
                   <input type="range" id="cfg-sil-cam-vis" min="0" max="100" step="1" value="50">
                   <small class="item-desc">0% = Silueta RDM pura · 100% = Cámara de color pura · 50% = Mezcla equilibrada.</small>
                 </div>
+                <!-- UMBRAL DE CONFIANZA DE LOS PUNTEROS (cuadrados de las manos) -->
+                <div class="calib-item">
+                  <label for="cfg-puntero-conf">
+                    <strong>Umbral de Confianza de los Punteros:</strong> <span id="val-puntero-conf">20%</span>
+                  </label>
+                  <input type="range" id="cfg-puntero-conf" min="5" max="95" step="5" value="20">
+                  <small class="item-desc">Visibilidad mínima de la muñeca (OpenPose) para dibujar el CUADRADO de selección sobre la mano. Bajo = los cuadrados aparecen siempre aunque la pose venga con poca confianza; alto = solo con manos bien detectadas.</small>
+                </div>
               </div>
             </div>
           </div>
@@ -1636,7 +1644,7 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="cambiapalabras/script.js?v=3.73"></script>
+  <script src="cambiapalabras/script.js?v=3.77"></script>
 </body>
 
 </html>
