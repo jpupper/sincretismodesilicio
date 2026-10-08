@@ -888,10 +888,18 @@
                 <!-- UMBRAL MÍNIMO DE SILUETA VISIBLE -->
                 <div class="calib-item">
                   <label for="cfg-sil-min-conf">
-                    <strong>Umbral Mínimo de Silueta Visible:</strong> <span id="val-sil-min-conf">30%</span>
+                    <strong>Umbral Mínimo de Silueta Visible:</strong> <span id="val-sil-min-conf">87%</span>
                   </label>
-                  <input type="range" id="cfg-sil-min-conf" min="5" max="95" step="5" value="30">
-                  <small class="item-desc">Confianza mínima que debe tener una silueta para ser visible y dibujarse en pantalla. Si la detección está por debajo de este umbral, se oculta.</small>
+                  <input type="range" id="cfg-sil-min-conf" min="5" max="98" step="1" value="87">
+                  <small class="item-desc">Confianza mínima que debe tener una silueta para ser visible y dibujarse en pantalla. Si la detección está por debajo de este umbral (87%), se descarta.</small>
+                </div>
+                <!-- TIEMPO MÍNIMO DE TRACKEO (VIDA DE LA SILUETA) -->
+                <div class="calib-item">
+                  <label for="cfg-sil-min-time">
+                    <strong>Tiempo Mínimo de Trackeo (Vida):</strong> <span id="val-sil-min-time">3.0s</span>
+                  </label>
+                  <input type="range" id="cfg-sil-min-time" min="0" max="10" step="0.5" value="3.0">
+                  <small class="item-desc">Tiempo continuo de trackeo antes de mostrar la silueta. Si no supera este tiempo (3 segundos), se descarta y no se dibuja.</small>
                 </div>
               </div>
             </div>
