@@ -17,7 +17,7 @@
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="stylesheet" href="css/fonts-local.css?v=1">
-  <link rel="stylesheet" href="style.css?v=3.72">
+  <link rel="stylesheet" href="style.css?v=3.75">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="vendor/mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -91,6 +91,10 @@
 
     <!-- Capa 1.8: Superposición Cinemática de Esqueleto y Articulaciones OpenPose -->
     <canvas id="openpose-overlay-canvas"></canvas>
+    <!-- STRING con la CONFIABILIDAD de la silueta: chip DOM (negro + letra blanca) porque
+         el canvas del OpenPose se compone con blending aditivo en el shader y ahí el negro
+         desaparece (se veía blanco sobre blanco). -->
+    <div id="silueta-conf">SILUETA 0%</div>
 
     <!-- Capa 1.8b: Superposición de Campo de Flujo Vectorial (Flow Field) -->
     <canvas id="flowfield-overlay-canvas"></canvas>
@@ -469,7 +473,7 @@
           <!-- TAB 4: TRACKING & SENSORES (MONITORES PiP, ANÁLISIS ÓPTICO, DISPOSITIVOS) -->
           <div class="modal-tab-pane" id="tab-tracking">
             <div style="padding: 12px 16px; margin-bottom: 16px; background: rgba(0, 240, 255, 0.08); border: 1px solid rgba(0, 240, 255, 0.35); border-radius: 6px; font-family: monospace; font-size: 13px; color: #bbf7ff; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-              <span>💡 La calibración de <strong>OpenPose</strong>, <strong>Silueta</strong>, <strong>Interpolación de Puntos (Lerp)</strong> y <strong>RDM Haiku</strong> ahora cuenta con su pestaña exclusiva:</span>
+              <span>💡 La calibración de <strong>OpenPose</strong>, <strong>Silueta</strong>, <strong>Interpolación de Puntos (Lerp)</strong> ahora cuenta con su pestaña exclusiva:</span>
               <button type="button" class="btn-calib-action" onclick="document.querySelector('.modal-tab-btn[data-tab=\'tab-silhouette\']')?.click()" style="margin: 0; padding: 6px 14px; font-size: 11px; border-color: #00f0ff; color: #00f0ff;">IR A SILLOUETE CALIBRATION ➔</button>
             </div>
 
@@ -687,11 +691,11 @@
             <div class="tracking-card">
               <div class="tracking-card-header">
                 <div class="section-subtitle">
-                  <span>⚡ 1) INTERPOLACIÓN VECTORIAL Y FONDO RDM HAIKU</span>
+                  <span>⚡ 1) INTERPOLACIÓN VECTORIAL (PUNTOS Y SILUETA OPENPOSE)</span>
                 </div>
               </div>
               <p class="words-help-text">
-                Control de suavizado dinámico tipo vector lerp para eliminar saltos bruscos en articulaciones/manos y ajuste de brillo del patrón RDM del contenedor Haiku.
+                Suavizado tipo vector lerp para eliminar saltos bruscos en las manos/articulaciones y en el ESQUELETO del OpenPose. El BRILLO DEL PATRÓN RDM del contenedor Haiku se movió a la pestaña MASTER OUTPUT (ahí se ve el patrón que afecta).
               </p>
 
               <div class="calibration-grid">
@@ -704,14 +708,6 @@
                   <small class="item-desc">Interpola suavemente las posiciones de las manos y articulaciones evitando saltos: lerp(posicionGuardada, posicionNueva, factor). 0.75 = ágil y fluido (recomendado), 0.20 = ultra suave, 1.0 = directo sin interpolar.</small>
                 </div>
 
-                <!-- 1.2 Brillo del Patrón RDM Detrás del Haiku -->
-                <div class="calib-item">
-                  <label for="cfg-haiku-rdm-brillo">
-                    <strong>Brillo Patrón RDM (Fondo Haiku):</strong> <span id="val-haiku-rdm-brillo">1.00</span>x
-                  </label>
-                  <input type="range" id="cfg-haiku-rdm-brillo" min="0.0" max="3.0" step="0.05" value="1.0">
-                  <small class="item-desc">Ajusta la intensidad lumínica y presencia del patrón RDM dentro del contenedor del Haiku.</small>
-                </div>
               </div>
             </div>
 
@@ -1357,9 +1353,15 @@
                 </div>
 
                 <div class="calib-item">
-                  <label for="cfg-part-lifetime">Tiempo de Vida de cada Palabra: <span id="val-part-lifetime">0</span>s
-                    <small>(0 = infinita)</small></label>
-                  <input type="range" id="cfg-part-lifetime" min="0" max="60" step="1" value="0">
+                  <label for="cfg-part-lifetime-min">Tiempo de Vida MÍNIMO de cada Palabra: <span id="val-part-lifetime-min">8</span>s</label>
+                  <input type="range" id="cfg-part-lifetime-min" min="0" max="60" step="1" value="8">
+                  <small class="item-desc">Piso del sorteo: cada palabra que aparece sortea su vida entre el MÍNIMO y el MÁXIMO (ej. 8 y 10). 0 = sin vida (infinita).</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-part-lifetime-max">Tiempo de Vida MÁXIMO de cada Palabra: <span id="val-part-lifetime-max">10</span>s</label>
+                  <input type="range" id="cfg-part-lifetime-max" min="0" max="60" step="1" value="10">
+                  <small class="item-desc">Techo del sorteo. Si el mínimo quedara más alto que el máximo, se ordenan solos.</small>
                 </div>
 
                 <div class="calib-item">
@@ -1641,7 +1643,7 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=3.72"></script>
+  <script src="script.js?v=3.75"></script>
 </body>
 
 </html>

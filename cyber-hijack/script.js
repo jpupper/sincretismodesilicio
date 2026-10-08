@@ -859,7 +859,9 @@ const appState = {
     color: '#ffffff',
     outline: 1.5,
     outlineGlow: false,
-    lifetime: 0,
+    lifetime: 0,          // legado: ya no se usa (la vida sale de lifetimeMin/lifetimeMax)
+    lifetimeMin: 8,       // VIDA mínima sorteada por palabra (segundos)
+    lifetimeMax: 10,      // VIDA máxima sorteada por palabra (segundos)
     maxWords: 9,
     speed: 1.0,
     maxSpeed: 2.0,
@@ -1242,6 +1244,10 @@ const DOM = {
   valPartOutline: document.getElementById('val-part-outline'),
   cfgPartLifetime: document.getElementById('cfg-part-lifetime'),
   valPartLifetime: document.getElementById('val-part-lifetime'),
+  cfgPartLifetimeMin: document.getElementById('cfg-part-lifetime-min'),
+  valPartLifetimeMin: document.getElementById('val-part-lifetime-min'),
+  cfgPartLifetimeMax: document.getElementById('cfg-part-lifetime-max'),
+  valPartLifetimeMax: document.getElementById('val-part-lifetime-max'),
   cfgPartMaxWords: document.getElementById('cfg-part-maxwords'),
   valPartMaxWords: document.getElementById('val-part-maxwords'),
   cfgPartSpeed: document.getElementById('cfg-part-speed'),
@@ -3434,7 +3440,16 @@ function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, b
   }
   const smObj = appState.playerSmoothing[pKey];
 
+  /* INTERPOLACIÓN DE LA SILUETA OPENPOSE (mismo criterio que los PUNTOS, pero con dos
+     filtros extra porque acá hay 33 articulaciones que tiemblan por separado):
+       a) LERP con el mismo factor de interpolación de la pestaña SILUETA (pointLerpFactor),
+       b) TECHO ANTI-SALTO: una lectura mala no puede mover una articulación más de
+          SALTO_MAX (5% del cuadro) en un frame -> se acabó el "salta como loco",
+       c) la CONFIANZA también se interpola (más lento): los huesos y nodos ya no
+          aparecen/desaparecen de golpe, se desvanecen. */
   const OPENPOSE_SUAVIZADO = Math.max(0.05, Math.min(1.0, appState.trackingConfig.pointLerpFactor !== undefined ? Number(appState.trackingConfig.pointLerpFactor) : 0.75));
+  const OPENPOSE_SUAVIZADO_VIS = Math.max(0.03, OPENPOSE_SUAVIZADO * 0.5);
+  const SALTO_MAX = 0.05;
   if (!smObj.suave || smObj.suave.length !== landmarks.length) {
     smObj.suave = landmarks.map((l) => ({
       x: l.x, y: l.y, visibility: (l.visibility !== undefined ? l.visibility : 1)
@@ -3442,9 +3457,17 @@ function drawSingleSkeleton(ctx, landmarks, playerIndex, w, h, theme, minConf, b
   } else {
     for (let i = 0; i < landmarks.length; i++) {
       const l = landmarks[i], sm = smObj.suave[i];
-      sm.x += (l.x - sm.x) * OPENPOSE_SUAVIZADO;
-      sm.y += (l.y - sm.y) * OPENPOSE_SUAVIZADO;
-      sm.visibility = (l.visibility !== undefined ? l.visibility : 1);
+      let tx = l.x, ty = l.y;
+      const dx = tx - sm.x, dy = ty - sm.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > SALTO_MAX) {
+        tx = sm.x + (dx / dist) * SALTO_MAX;
+        ty = sm.y + (dy / dist) * SALTO_MAX;
+      }
+      sm.x += (tx - sm.x) * OPENPOSE_SUAVIZADO;
+      sm.y += (ty - sm.y) * OPENPOSE_SUAVIZADO;
+      const vis = (l.visibility !== undefined ? l.visibility : 1);
+      sm.visibility += (vis - sm.visibility) * OPENPOSE_SUAVIZADO_VIS;
     }
   }
   const suaves = smObj.suave;
@@ -3669,37 +3692,36 @@ function drawSilhouetteBox(ctx, landmarks, w, h, minConf) {
   const x0 = cx - lado / 2;
   const y0 = cy - lado / 2;
   const conf = Math.round((nClave ? suma / nClave : 0) * 100);
-  const col = (window.GlobalStyleConfig && window.GlobalStyleConfig.colores && window.GlobalStyleConfig.colores.borde) || '#d46238';
+  const col = coloresPunteros().base;   // color de la PALETA global (el mismo de los punteros)
 
+  // REBORDE MUY FINITO (0.8 px) y del color de la paleta
   ctx.save();
-  ctx.setLineDash([6, 5]);
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = 0.8;
   ctx.strokeStyle = col;
-  ctx.shadowColor = col;
-  ctx.shadowBlur = 6;
   ctx.strokeRect(x0, y0, lado, lado);
-  ctx.setLineDash([]);
-  ctx.shadowBlur = 0;
 
-  // String chiquito con el valor de confianza, arriba a la izquierda del cuadrado
-  const txt = 'SILUETA ' + conf + '%';
-  ctx.font = '10px "Share Tech Mono", monospace';
-  const tw = ctx.measureText(txt).width;
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
-  ctx.fillRect(x0 - 1, y0 - 18, tw + 10, 16);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = col;
-  ctx.strokeRect(x0 - 1, y0 - 18, tw + 10, 16);
-  ctx.fillStyle = col;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(txt, x0 + 4, y0 - 10);
   ctx.restore();
+
+  /* STRING con el valor de confianza: chip del DOM (no canvas). El canvas del OpenPose
+     se compone en el master output con blending aditivo: ahí el negro desaparece y el
+     texto quedaba BLANCO SOBRE BLANCO. En el DOM el fondo negro es negro de verdad, y la
+     letra es más grande. */
+  const chip = document.getElementById('silueta-conf');
+  if (chip) {
+    chip.textContent = 'SILUETA ' + conf + '%';
+    chip.style.left = Math.round(x0) + 'px';
+    chip.style.top = Math.round(y0 - 27) + 'px';
+    chip.classList.add('visible');
+  }
 }
 
 function renderOpenPoseOverlay(landmarks) {
   const canvas = DOM.openposeCanvas;
   if (!canvas) return;
+  // El chip de la confianza se esconde al empezar el frame; drawSilhouetteBox lo vuelve a
+  // mostrar si hay silueta detectada (así no queda un string colgado cuando no hay nadie).
+  const chipSilueta = document.getElementById('silueta-conf');
+  if (chipSilueta) chipSilueta.classList.remove('visible');
   const isEnabled = FORZAR_CAMARA_SILUETA_OPENPOSE || appState.renderConfig.openposeEnabled || appState.trackingConfig.showOpenPose;
   if (!isEnabled) {
     if (canvas.style.display !== 'none') canvas.style.display = 'none';
@@ -5664,6 +5686,12 @@ function syncParticlesInputs() {
   if (DOM.valPartOutline) DOM.valPartOutline.textContent = Number(p.outline).toFixed(1);
   if (DOM.cfgPartLifetime) DOM.cfgPartLifetime.value = p.lifetime;
   if (DOM.valPartLifetime) DOM.valPartLifetime.textContent = p.lifetime;
+  const vMin = (p.lifetimeMin !== undefined && p.lifetimeMin > 0) ? p.lifetimeMin : (p.lifetime > 0 ? p.lifetime : 8);
+  const vMax = (p.lifetimeMax !== undefined && p.lifetimeMax > 0) ? p.lifetimeMax : Math.max(vMin, Math.round(vMin * 1.25));
+  if (DOM.cfgPartLifetimeMin) DOM.cfgPartLifetimeMin.value = vMin;
+  if (DOM.valPartLifetimeMin) DOM.valPartLifetimeMin.textContent = vMin;
+  if (DOM.cfgPartLifetimeMax) DOM.cfgPartLifetimeMax.value = vMax;
+  if (DOM.valPartLifetimeMax) DOM.valPartLifetimeMax.textContent = vMax;
   if (DOM.cfgPartMaxWords) DOM.cfgPartMaxWords.value = p.maxWords;
   if (DOM.valPartMaxWords) DOM.valPartMaxWords.textContent = p.maxWords;
   if (DOM.cfgPartSpeed) DOM.cfgPartSpeed.value = p.speed;
@@ -6096,6 +6124,22 @@ function capitalizeFirstLetter(str) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
+/* VIDA DE LA PARTÍCULA (palabra flotante): se SORTEA una sola vez por spawn entre el
+   MÍNIMO y el MÁXIMO configurados en la pestaña PARTÍCULAS (ej. 8-10 s). Antes era un
+   único valor global igual para todas. */
+function vidaAleatoriaDeParticula() {
+  const p = appState.particlesConfig || {};
+  const minRaw = Number(p.lifetimeMin);
+  const maxRaw = Number(p.lifetimeMax);
+  const sinConfigurar = (p.lifetimeMin === undefined && p.lifetimeMax === undefined);
+  // Los DOS sliders en 0 = sin vida (infinita, como antes).
+  if (!sinConfigurar && !(minRaw > 0) && !(maxRaw > 0)) return 0;
+  let min = (isFinite(minRaw) && minRaw > 0) ? minRaw : 8;
+  let max = (isFinite(maxRaw) && maxRaw > 0) ? maxRaw : Math.max(min, min * 1.25);
+  if (max < min) { const t = min; min = max; max = t; }
+  return min + Math.random() * (max - min);
+}
+
 class FloatingWord {
   constructor(text, x, y, state = WORD_STATES.FLOATING) {
     this.text = text;
@@ -6116,6 +6160,8 @@ class FloatingWord {
     this.ay = 0;
     this.dwell = 0;
     this.age = 0;
+    // Vida SORTEADA de esta partícula (segundos): min/max de la pestaña PARTÍCULAS.
+    this.vida = (state === WORD_STATES.FLOATING) ? vidaAleatoriaDeParticula() : 0;
     this.isTargeted = false;
     this.isCaught = false;
     this.slotIndex = -1;
@@ -6169,12 +6215,20 @@ class FloatingWord {
 
     const pCfg = appState.particlesConfig || {};
     const physCfg = appState.physicsConfig || {};
-    const life = Number(pCfg.lifetime) || 0;
+    // Vida PROPIA de la partícula (sorteada al spawn). El valor global viejo queda sólo
+    // como respaldo por compatibilidad.
+    const life = (this.vida !== undefined) ? this.vida : (Number(pCfg.lifetime) || 0);   // 0 = infinita
     const speedMul = Number(pCfg.speed) || 1;
     const friction = Number(physCfg.friction !== undefined ? physCfg.friction : 0.05);
     const wallBounce = Number(physCfg.wallBounce !== undefined ? physCfg.wallBounce : 0.80);
 
-    if (life > 0) {
+    /* PEDIDO: si un puntero está COLISIONANDO con esta partícula (la está tocando o
+       cargando), la partícula NO puede morir: no se le descuenta vida mientras la tocan
+       y al soltarla sigue con la vida que le quedaba. */
+    const siendoTocada = Boolean(this.isTargeted || (this.dwellProgress && this.dwellProgress > 0) ||
+      (this.energy && this.energy > 0) || this.state === WORD_STATES.LOCKING);
+
+    if (life > 0 && !siendoTocada) {
       this.age += dt;
       const remain = life - this.age;
       if (remain <= 0) {
@@ -10014,6 +10068,19 @@ function setupEventListeners() {
       applyParticlesConfig();
     });
   }
+  // VIDA de las partículas: MÍNIMO y MÁXIMO del sorteo de cada spawn
+  if (DOM.cfgPartLifetimeMin) {
+    DOM.cfgPartLifetimeMin.addEventListener('input', (e) => {
+      appState.particlesConfig.lifetimeMin = parseInt(e.target.value, 10);
+      if (DOM.valPartLifetimeMin) DOM.valPartLifetimeMin.textContent = e.target.value;
+    });
+  }
+  if (DOM.cfgPartLifetimeMax) {
+    DOM.cfgPartLifetimeMax.addEventListener('input', (e) => {
+      appState.particlesConfig.lifetimeMax = parseInt(e.target.value, 10);
+      if (DOM.valPartLifetimeMax) DOM.valPartLifetimeMax.textContent = e.target.value;
+    });
+  }
   if (DOM.cfgPartMaxWords) {
     DOM.cfgPartMaxWords.addEventListener('input', (e) => {
       appState.particlesConfig.maxWords = parseInt(e.target.value, 10);
@@ -10059,7 +10126,9 @@ function setupEventListeners() {
         color: '#ffffff',
         outline: 1.0,
         outlineGlow: true,
-        lifetime: 0,
+        lifetime: 0,      // legado
+        lifetimeMin: 8,
+        lifetimeMax: 10,
         maxWords: 9,
         speed: 1.0,
         maxSpeed: 2.0
