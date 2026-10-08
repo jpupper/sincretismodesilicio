@@ -7564,6 +7564,15 @@ REGLAS DE ORO:
 2. CONTEO OBLIGATORIO: EXACTAMENTE 3 ORACIONES (una sola oración por verso). Verso 1 y 2 terminan en coma o sin punto. Verso 3 termina con un solo punto final. Prohibido poner dos oraciones o puntos dentro de un mismo verso. NUNCA agregues un cuarto verso.
 3. El haiku debe formarse de manera directa y coherente ALREDEDOR de los conceptos elegidos. Prohibido usar frases genéricas desconectadas o hablar de temas ajenos.
 4. Cada verso debe tener sentido sintáctico natural e impecable en español.
+5. CONCORDANCIA OBLIGATORIA (lo más importante): cada término tiene un género y un número fijos, y los artículos, preposiciones y adjetivos que lo acompañan DEBEN concordar con él. Ejemplos de lo PROHIBIDO y su forma correcta:
+   - MAL "del marcas" → BIEN "de las marcas"
+   - MAL "del comunicaciones" → BIEN "de las comunicaciones"
+   - MAL "el armonía" → BIEN "la armonía"
+   - MAL "la sistema" → BIEN "el sistema"
+   - MAL "los estructura" → BIEN "la estructura"
+   Si el término está en PLURAL se usa "los / las" y "de los / de las" (NUNCA "el", "la" ni "del" delante de un plural). Si el término ya está en plural, se mantiene en plural.
+6. NO INVENTES SUSTANTIVOS NUEVOS: los únicos sustantivos del poema son los 3 términos. Podés usar artículos, preposiciones, verbos, adverbios, pronombres y adjetivos, pero NO agregues otros sustantivos ni nombres propios.
+7. ANTES DE RESPONDER: releé cada verso y verificá la concordancia de CADA artículo o preposición con su sustantivo (número y género).
 
 Responde ÚNICAMENTE un objeto JSON:
 {
@@ -7578,7 +7587,11 @@ Responde ÚNICAMENTE un objeto JSON:
     format: 'json',
     stream: true,
     options: {
-      num_predict: 350,
+      /* 1200 y no 350: con modelos "thinking" (gemma4, qwen3…) el presupuesto se
+         consumía ENTERO en el razonamiento y la respuesta volvía VACÍA (done=length
+         con response=""), así que el haiku terminaba saliendo del banco procedural
+         local en vez del modelo. Con 1200 el razonamiento cierra y llega el JSON. */
+      num_predict: 1200,
       temperature: 0.7,
       repeat_penalty: 1.15
     }
@@ -7847,17 +7860,123 @@ function normalizeForMatch(str) {
     .trim();
 }
 
-// Helper gramatical para concordancia de género y artículos en español
-function getArticleGrammar(word) {
-  const clean = String(word || '').toUpperCase().trim();
-  const isFem = clean.endsWith('A') || clean.endsWith('IÓN') || clean.endsWith('DAD') || clean.endsWith('TUD') || clean.endsWith('ENCIA') || clean.endsWith('ANCIA');
+// ============================================================================
+// GÉNERO Y NÚMERO DE UN TÉRMINO (base de la concordancia de los haikus)
+// ----------------------------------------------------------------------------
+// El helper viejo miraba SÓLO la última letra ("termina en A / IÓN / DAD"): todo
+// PLURAL caía entonces en "masculino singular" y los haikus salían con
+// "del MARCAS" / "del COMUNICACIONES" en vez de "de las MARCAS" /
+// "de las COMUNICACIONES". Acá se resuelve NÚMERO (singular/plural) y GÉNERO.
+// ============================================================================
+const SUST_SING_EN_S = new Set(['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','MES','PAIS','COMPAS','VIRUS','ATLAS','CAOS','COSMOS','CACTUS','DOS','TRES','SEIS','PARENTESIS','BUS','CHASIS','TOBILLO']);
+const SUST_SING_EN_S_FEM = new Set(['CRISIS','TESIS','SINTESIS','HIPOTESIS','ANALISIS','ENFASIS','PARALISIS','DIABETES','SINTAXIS','APOPTOSIS','MITOSIS','OSMOSIS']);
+// Terminan en A pero son MASCULINOS (griegos en -MA y algunos sueltos)
+const SUST_MASC_EN_A = new Set(['MAPA','DIA','SOFA','PLANETA','COMETA','AROMA','CLIMA','TEMA','SISTEMA','PROBLEMA','IDIOMA','PROGRAMA','ESQUEMA','DILEMA','PARADIGMA','EMBLEMA','TELEGRAMA','SINTOMA','AXIOMA','POEMA','DRAMA','FANTASMA','LEMA','MAGMA','PLASMA','ENIGMA','ESTIGMA','CARISMA','ANATEMA','TEOREMA','MORFEMA','LEXEMA','FONEMA','GRAFEMA','TRAUMA','PANORAMA','MEGABIOMA','AUTOMATA']);
+// Femeninos que no se deducen por la terminación
+const SUST_FEM_ESPECIAL = new Set(['PAZ','LUZ','VOZ','CRUZ','NARIZ','RAIZ','SALUD','MUERTE','MENTE','NOCHE','SANGRE','CARNE','CLASE','LLAVE','FUENTE','TARDE','NUBE','SAL','FLOR','PIEL','MIEL','SENAL','LABOR','SERIE','ESPECIE']);
+// Femeninos que en SINGULAR llevan "el" por fonética (en plural van con "las")
+const FEM_EL_FONETICA = new Set(['AGUA','AGUILA','ALMA','ARMA','HAMBRE','AULA','AREA','ALA','HADA','ANCLA','AVE','ALBA','ARPA','ASA','ASTA','HACHA','ANIMA']);
+
+// Saca acentos y mayúsculas: "comunicación" y "COMUNICACION" son la misma clave.
+function claveSustantivo(w) {
+  return String(w || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+// Género y número del término (singular/plural + femenino/masculino).
+function rasgosSustantivo(word) {
+  const w = claveSustantivo(word);
+  const singEnS = SUST_SING_EN_S.has(w) || SUST_SING_EN_S_FEM.has(w);   // CRISIS/TESIS/ANÁLISIS… terminan en S pero son SINGULARES
+  const plural = !singEnS && /S$/.test(w) && w.length > 2;
+  let base = w;
+  if (plural) base = w.endsWith('ES') ? w.slice(0, -2) : w.slice(0, -1);
+  let fem;
+  if (SUST_SING_EN_S_FEM.has(w) || SUST_FEM_ESPECIAL.has(w) || SUST_FEM_ESPECIAL.has(base)) fem = true;
+  else if (SUST_MASC_EN_A.has(w) || SUST_MASC_EN_A.has(base)) fem = false;
+  else fem = /(A|ION|DAD|TUD|ENCIA|ANCIA|EZA|UMBRE|TRIZ|ITIS)$/.test(base);
+  return { genero: fem ? 'f' : 'm', numero: plural ? 'p' : 's', base: base, clave: w };
+}
+
+// TODAS las formas del artículo para ese término: definido e indefinido.
+function formasArticulo(term) {
+  const r = rasgosSustantivo(term);
+  const fem = r.genero === 'f';
+  const pl = r.numero === 'p';
+  const conEl = fem && !pl && FEM_EL_FONETICA.has(r.clave);   // "el agua", "el alma"
+  const conLa = fem && !conEl;
   return {
-    el_la: isFem ? 'la' : 'el',
-    del_al: isFem ? 'de la' : 'del',
-    al_a: isFem ? 'a la' : 'al',
-    en: isFem ? 'en la' : 'en el'
+    r: r,
+    fem: fem,
+    pl: pl,
+    el_la: pl ? (fem ? 'las' : 'los') : (conLa ? 'la' : 'el'),
+    del_al: pl ? (fem ? 'de las' : 'de los') : (conLa ? 'de la' : 'del'),
+    al_a: pl ? (fem ? 'a las' : 'a los') : (conLa ? 'a la' : 'al'),
+    un_una: pl ? (fem ? 'unas' : 'unos') : (conLa ? 'una' : 'un')
   };
 }
+
+// Artículos y preposiciones que le corresponden al término.
+function getArticleGrammar(word) {
+  const f = formasArticulo(word);
+  return {
+    el_la: f.el_la,
+    del_al: f.del_al,
+    al_a: f.al_a,
+    en: f.pl ? (f.fem ? 'en las' : 'en los') : (f.el_la === 'la' ? 'en la' : 'en el'),
+    // Concordancia VERBAL y de posesivos con el número del término:
+    // art.v('guarda','guardan') devuelve 'guardan' si el término es plural.
+    v: (singular, plural) => (f.pl ? plural : singular)
+  };
+}
+
+// Dado el determinante que traía el texto delante del término, devuelve el correcto.
+function determinanteParaTermino(det, term) {
+  const f = formasArticulo(term);
+  const d = String(det || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (d === 'del') return f.del_al;
+  if (d === 'al') return f.al_a;
+  const indefinido = /^(un|una|unos|unas|de un|de una|de unos|de unas)$/.test(d);
+  const prep = (d.match(/^(de|a|en|con|por|sin) /) || [null, ''])[1];
+  if (!prep) return indefinido ? f.un_una : f.el_la;
+  if (prep === 'de') return indefinido ? ('de ' + f.un_una) : f.del_al;
+  if (prep === 'a') return indefinido ? ('a ' + f.un_una) : f.al_a;
+  return prep + ' ' + (indefinido ? f.un_una : f.el_la);
+}
+
+/* CONCORDANCIA FINAL DEL HAIKU: repara el determinante que precede a cada término
+   (venga del modelo o del banco procedural): "del MARCAS" -> "de las MARCAS",
+   "el COMUNICACIONES" -> "las COMUNICACIONES", "la SISTEMAS" -> "los SISTEMAS".
+   Los términos en MAYÚSCULAS que el modelo agregue de más se corrigen sólo en los
+   casos evidentes (determinante en singular delante de un plural, o "la/las"
+   delante de un plural en -OS). */
+function repararConcordanciaHaiku(texto, terminos) {
+  let out = String(texto == null ? '' : texto);
+  const claves = [];
+  (terminos || []).forEach((t) => {
+    const term = primerTokenDeTerminoFrio(t);
+    if (!term || term.length < 3) return;
+    claves.push(claveSustantivo(term));
+    const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('(?<![\\wÁÉÍÓÚÜÑáéíóúüñ])((?:de |a |en |con |por |sin )?(?:el|la|los|las|un|una|unos|unas|del|al))\\s+(' + esc + ')(?![A-Za-zÁÉÍÓÚÜÑáéíóúüñ])', 'gi');
+    out = out.replace(re, (m, det, palabra) => {
+      const nuevo = determinanteParaTermino(det, palabra);
+      return (nuevo && nuevo.toLowerCase() !== det.toLowerCase()) ? nuevo + ' ' + palabra : m;
+    });
+  });
+  const caps = Array.from(new Set(out.match(/[A-ZÁÉÍÓÚÜÑ]{3,}/g) || []));
+  caps.forEach((palabra) => {
+    if (claves.indexOf(claveSustantivo(palabra)) !== -1) return;
+    const r = rasgosSustantivo(palabra);
+    let esperado = null;
+    if (r.numero === 'p' && r.genero === 'f') esperado = 'las';
+    else if (r.numero === 'p' && r.genero === 'm' && /OS$/.test(r.clave)) esperado = 'los';
+    if (!esperado) return;
+    const esc = palabra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('(?<![\\wÁÉÍÓÚÜÑáéíóúüñ])(del|el|la)\\s+(' + esc + ')(?![A-Za-zÁÉÍÓÚÜÑáéíóúüñ])', 'g');
+    out = out.replace(re, (m, det, p2) => ((det === 'del') ? (esperado === 'las' ? 'de las' : 'de los') : esperado) + ' ' + p2);
+  });
+  return out;
+}
+
 
 // Categorías semánticas exhaustivas para generación armónica y coherente de Haikus
 const SEMANTIC_CLUSTERS_DATA = {
@@ -7868,19 +7987,19 @@ const SEMANTIC_CLUSTERS_DATA = {
       `En la estricta doctrina ${art.del_al} ${w},`,
       `Rige la severa norma ${art.del_al} ${w},`,
       `En el mandato firme ${art.del_al} ${w},`,
-      `Donde impone su ley ${art.el_la} ${w},`
+      `Donde ${art.v('impone','imponen')} su ley ${art.el_la} ${w},`
     ],
     v2: (w, art) => [
       `se impone la ley tenaz ${art.del_al} ${w},`,
-      `dicta su mandato frío ${art.el_la} ${w},`,
-      `regula cada pulso ${art.el_la} ${w},`,
-      `doblega toda duda ${art.el_la} ${w},`,
-      `disciplina el rumbo ${art.el_la} ${w},`
+      `${art.v('dicta','dictan')} su mandato frío ${art.el_la} ${w},`,
+      `${art.v('regula','regulan')} cada pulso ${art.el_la} ${w},`,
+      `${art.v('doblega','dobiegan')} toda duda ${art.el_la} ${w},`,
+      `${art.v('disciplina','disciplinan')} el rumbo ${art.el_la} ${w},`
     ],
     v3: (w, art) => [
       `y acato en silencio el peso ${art.del_al} ${w}.`,
       `sintiendo el rigor supremo ${art.del_al} ${w}.`,
-      `donde reclamo al fin mi propia ${w}.`,
+      `donde reclamo al fin ${art.v('mi propia','mis propias')} ${w}.`,
       `y en soledad me someto ${art.al_a} ${w}.`,
       `para sellar el pacto con ${art.el_la} ${w}.`
     ]
@@ -7892,15 +8011,15 @@ const SEMANTIC_CLUSTERS_DATA = {
       `En el territorio alerta ${art.del_al} ${w},`,
       `Bajo el rastro dormido ${art.del_al} ${w},`,
       `En la guardia oculta ${art.del_al} ${w},`,
-      `Acecha en la sombra ${art.el_la} ${w},`,
+      `${art.v('Acecha','Acechan')} en la sombra ${art.el_la} ${w},`,
       `En el latido salvaje ${art.del_al} ${w},`
     ],
     v2: (w, art) => [
-      `avanza con sigilo ${art.el_la} ${w},`,
+      `${art.v('avanza','avanzan')} con sigilo ${art.el_la} ${w},`,
       `despierta el instinto ciego ${art.del_al} ${w},`,
-      `cruza la penumbra ${art.el_la} ${w},`,
-      `rastrea sin descanso ${art.el_la} ${w},`,
-      `quiebra el silencio ${art.el_la} ${w},`
+      `${art.v('cruza','cruzan')} la penumbra ${art.el_la} ${w},`,
+      `${art.v('rastrea','rastrean')} sin descanso ${art.el_la} ${w},`,
+      `${art.v('quiebra','quiebran')} el silencio ${art.el_la} ${w},`
     ],
     v3: (w, art) => [
       `reconociendo el pulso ${art.del_al} ${w}.`,
@@ -7922,17 +8041,17 @@ const SEMANTIC_CLUSTERS_DATA = {
     ],
     v2: (w, art) => [
       `se dibuja el equilibrio ${art.del_al} ${w},`,
-      `revela su ley exacta ${art.el_la} ${w},`,
-      `despliega su estructura ${art.el_la} ${w},`,
-      `orbita en calma ${art.el_la} ${w},`,
-      `guarda su armonía ${art.el_la} ${w},`
+      `${art.v('revela','revelan')} su ley exacta ${art.el_la} ${w},`,
+      `${art.v('despliega','despliegan')} su estructura ${art.el_la} ${w},`,
+      `${art.v('orbita','orbitan')} en calma ${art.el_la} ${w},`,
+      `${art.v('guarda','guardan')} su armonía ${art.el_la} ${w},`
     ],
     v3: (w, art) => [
       `y en mi mente reconozco ${art.el_la} ${w}.`,
       `hasta hallar mi lugar en ${art.el_la} ${w}.`,
       `comprendiendo el enigma ${art.del_al} ${w}.`,
       `y descubro el sentido ${art.del_al} ${w}.`,
-      `donde reposa al fin mi ${w}.`
+      `donde ${art.v('reposa','reposan')} al fin ${art.v('mi','mis')} ${w}.`
     ]
   },
 
@@ -7946,16 +8065,16 @@ const SEMANTIC_CLUSTERS_DATA = {
       `En el circuito vivo ${art.del_al} ${w},`
     ],
     v2: (w, art) => [
-      `se ejecuta sin pausa ${art.el_la} ${w},`,
-      `transmite su señal limpia ${art.el_la} ${w},`,
-      `cruza la red interna ${art.el_la} ${w},`,
+      `${art.v('se ejecuta','se ejecutan')} sin pausa ${art.el_la} ${w},`,
+      `${art.v('transmite','transmiten')} su señal limpia ${art.el_la} ${w},`,
+      `${art.v('cruza','cruzan')} la red interna ${art.el_la} ${w},`,
       `procesa la corriente ${art.del_al} ${w},`,
-      `conecta en secreto ${art.el_la} ${w},`
+      `${art.v('conecta','conectan')} en secreto ${art.el_la} ${w},`
     ],
     v3: (w, art) => [
       `y descifro la clave ${art.del_al} ${w}.`,
-      `sintiendo cómo late en mí ${art.el_la} ${w}.`,
-      `hasta reiniciar mi propio ${w}.`,
+      `sintiendo cómo ${art.v('late','laten')} en mí ${art.el_la} ${w}.`,
+      `hasta reiniciar ${art.v('mi propio','mis propios')} ${w}.`,
       `y hallo mi código en ${art.el_la} ${w}.`,
       `donde fluye mi pulso con ${art.el_la} ${w}.`
     ]
@@ -7971,18 +8090,18 @@ const SEMANTIC_CLUSTERS_DATA = {
       `En la honda vigilia ${art.del_al} ${w},`
     ],
     v2: (w, art) => [
-      `conmueve en secreto ${art.el_la} ${w},`,
-      `enciende una chispa ${art.el_la} ${w},`,
+      `${art.v('conmueve','conmueven')} en secreto ${art.el_la} ${w},`,
+      `${art.v('enciende','encienden')} una chispa ${art.el_la} ${w},`,
       `revive el eco herido ${art.del_al} ${w},`,
-      `respira en la penumbra ${art.el_la} ${w},`,
+      `${art.v('respira','respiran')} en la penumbra ${art.el_la} ${w},`,
       `despierta la emoción ${art.del_al} ${w},`
     ],
     v3: (w, art) => [
       `y en soledad abrazo ${art.el_la} ${w}.`,
-      `sintiendo cómo sana mi ${w}.`,
+      `sintiendo cómo ${art.v('sana','sanan')} ${art.v('mi','mis')} ${w}.`,
       `y lloro en silencio por ${art.el_la} ${w}.`,
       `hasta encontrar la paz en ${art.el_la} ${w}.`,
-      `donde descansa al fin mi ${w}.`
+      `donde ${art.v('descansa','descansan')} al fin ${art.v('mi','mis')} ${w}.`
     ]
   },
 
@@ -7995,15 +8114,15 @@ const SEMANTIC_CLUSTERS_DATA = {
       `En la fértil hondura ${art.del_al} ${w},`
     ],
     v2: (w, art) => [
-      `fluye sin descanso ${art.el_la} ${w},`,
-      `germina en el silencio ${art.el_la} ${w},`,
-      `despierta con el viento ${art.el_la} ${w},`,
+      `${art.v('fluye','fluyen')} sin descanso ${art.el_la} ${w},`,
+      `${art.v('germina','germinan')} en el silencio ${art.el_la} ${w},`,
+      `${art.v('despierta','despiertan')} con el viento ${art.el_la} ${w},`,
       `recorre la espesura ${art.del_al} ${w},`
     ],
     v3: (w, art) => [
       `hasta calmar mi sed en ${art.el_la} ${w}.`,
       `y siento renacer mi ser en ${art.el_la} ${w}.`,
-      `donde enraíza al fin mi ${w}.`,
+      `donde ${art.v('enraíza','enraízan')} al fin ${art.v('mi','mis')} ${w}.`,
       `fundiendo mi respiración con ${art.el_la} ${w}.`
     ]
   }
@@ -8063,7 +8182,7 @@ function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
 
   if (!phrase || typeof phrase !== 'string') {
     emitReasoning('[ENSAMBLADO] No llegó texto del modelo → armo el haiku con el banco procedural.\n');
-    return composeHaikuWithConcepts(validCold, caughtWords);
+    return repararConcordanciaHaiku(composeHaikuWithConcepts(validCold, caughtWords), validCold);
   }
 
   const cleaned = cleanSpeechText(phrase);
@@ -8072,7 +8191,7 @@ function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
     emitReasoning(badRep
       ? '[ENSAMBLADO] La frase del modelo se repite de forma degenerativa → la descarto y recompongo.\n'
       : '[ENSAMBLADO] La frase del modelo viene vacía o demasiado corta → recompongo con el banco procedural.\n');
-    return composeHaikuWithConcepts(validCold, caughtWords);
+    return repararConcordanciaHaiku(composeHaikuWithConcepts(validCold, caughtWords), validCold);
   }
 
   let lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
@@ -8129,25 +8248,27 @@ function ensurePhraseUsesColdWords(phrase, coldList = [], caughtWords = []) {
         return line;
       };
 
-      return [
+      const versosDelModelo = [
         fixLineToken(lines[0], validCold[0]),
         fixLineToken(lines[1], validCold[1]),
         fixLineToken(lines[2], validCold[2])
       ].join('\n');
+      // La concordancia del modelo también se repara (artículos/número de los términos).
+      return repararConcordanciaHaiku(versosDelModelo, validCold);
     }
   }
 
   // Si no pasó la validación de 3 versos con sus términos, generar un haiku poético
   // semántico garantizado que conecta profundamente los 3 conceptos.
   emitReasoning('[ENSAMBLADO] No cerró como 3 versos con sus 3 términos → recompongo con una plantilla de cláusulas separadas (nunca los enumera juntos).\n');
-  return composeHaikuWithConcepts(validCold, caughtWords);
+  return repararConcordanciaHaiku(composeHaikuWithConcepts(validCold, caughtWords), validCold);
 }
 
 function generateEmergencyHijack(words) {
   const coldList = words.map(w => getColdSynonym(w));
   return {
     nuevas_palabras: coldList,
-    frase_generada: composeHaikuWithConcepts(coldList, words)
+    frase_generada: repararConcordanciaHaiku(composeHaikuWithConcepts(coldList, words), coldList)
   };
 }
 
