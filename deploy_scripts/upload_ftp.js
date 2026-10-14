@@ -3,20 +3,28 @@
    Destino: /sincretismodesilicio/   ->  https://fullscreencode.com/sincretismodesilicio/
    Uso:     node deploy_scripts/upload_ftp.js        (lo llama run_deploy.bat)
 
+   OJO: el package.json del proyecto es "type": "module", asi que este script
+   usa import (ESM), NO require. Si se renombra a upload_ftp.cjs, cambiar
+   tambien la llamada en run_deploy.bat.
+
    Reglas del ecosistema:
      - NUNCA subir archivos de configuracion de Apache (.htaccess/.htpasswd).
      - NUNCA subir .env ni nada que empiece con punto.
      - NO se publica public/models/ (130 MB de ONNX del motor Laya: los usa el
-       server Node local, el front resuelve lo semantico con ./data/vocab.json
+       server Node local; el front resuelve lo semantico con ./data/vocab.json
        + laya_embeddings.bin, que si se publican).
      - Compara tamanios: sube solo lo nuevo o lo que cambio.
      - Ferozo corta el socket de control en sesiones largas (ECONNRESET): se
        rota la conexion cada N subidas y se reintenta cada archivo 3 veces.
    ============================================================================ */
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
-const ftp = require('basic-ftp');
-const path = require('path');
-const fs = require('fs');
+import { Client } from 'basic-ftp';
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const LOCAL_ROOT = path.join(__dirname, '..', 'public');
 const REMOTE_ROOT = '/sincretismodesilicio';
@@ -29,7 +37,7 @@ const MAX_INTENTOS = 3;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function nuevoCliente() {
-  const c = new ftp.Client(30000);
+  const c = new Client(30000);
   c.ftp.verbose = false;
   await c.access({
     host: process.env.FTP_HOST,
@@ -41,7 +49,7 @@ async function nuevoCliente() {
   return c;
 }
 
-const state = { client: null, subidos: 0, sesion: 0, salteados: 0, errores: [] };
+const state = { client: null, subidos: 0, sesion: 1, salteados: 0, errores: [] };
 
 async function rotarSesion(motivo) {
   try { state.client.close(); } catch (e) { /* noop */ }
@@ -77,7 +85,7 @@ async function subirArchivo(localPath, remoteDir, nombre) {
 
 async function syncDir(localDir, remoteDir) {
   await state.client.ensureDir(remoteDir);
-  let remoteMap = new Map();
+  const remoteMap = new Map();
   try {
     for (const item of await state.client.list()) remoteMap.set(item.name, item);
   } catch (err) {
@@ -110,7 +118,7 @@ async function main() {
     console.error('[ERROR] Faltan FTP_HOST / FTP_USER / FTP_PASS en el .env');
     process.exit(1);
   }
-  console.log(`=== SINCRONIZANDO public/  ->  ${process.env.FTP_HOST}:${REMOTE_ROOT}/ ===`);
+  console.log(`=== SINCRONIZANDO public/  --  ${process.env.FTP_HOST}:${REMOTE_ROOT}/ ===`);
   console.log('    (compara tamanios: sube solo lo nuevo o modificado)');
 
   state.client = await nuevoCliente();
@@ -130,7 +138,7 @@ async function main() {
     process.exit(1);
   }
   console.log('=== SINCRONIZACION FTP COMPLETA ===');
-  console.log(`    sesiones FTP usadas: ${state.sesion + 1} | carpetas salteadas: ${state.salteados}`);
+  console.log(`    sesiones FTP usadas: ${state.sesion} | carpetas salteadas: ${state.salteados}`);
 }
 
 main();

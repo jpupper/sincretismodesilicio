@@ -35,6 +35,13 @@ if "!VPS_HOST!"=="" (
 :: ---------------------------------------------------------------------------
 echo [1/3] SUBIENDO EL REPO A GITHUB (el VPS hace fetch de ahi)...
 echo.
+:: El VPS baja el ULTIMO COMMIT: si hay cambios sin commitear, avisar (no viajan).
+for /f "delims=" %%c in ('git status --porcelain') do set "SINCOMMIT=1"
+if defined SINCOMMIT (
+    echo [AVISO] Hay cambios SIN COMMITEAR en el working tree: NO van al VPS.
+    echo         ^(git status^)  El FTP si sube el estado actual de public/.
+    echo.
+)
 git push origin main
 if !ERRORLEVEL! neq 0 (
     echo [ERROR] Fallo el push a GitHub. El VPS bajaria una version vieja.
@@ -55,7 +62,7 @@ if !ERRORLEVEL! neq 0 (
 
 :: ---------------------------------------------------------------------------
 echo.
-echo [3/3] SUBIENDO EL FRONT AL FTP (!FTP_HOST!) -> /sincretismodesilicio/ ...
+echo [3/3] SUBIENDO EL FRONT AL FTP !FTP_HOST! destino /sincretismodesilicio/ ...
 echo.
 node "%~dp0upload_ftp.js"
 if !ERRORLEVEL! neq 0 (
