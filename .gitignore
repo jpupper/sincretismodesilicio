@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Credenciales del deploy (FTP/VPS/GitHub) — NUNCA al repo
+.env
+.env.*
+deploy_scripts/.deploy_manifest.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

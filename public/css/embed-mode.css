@@ -1,0 +1,47 @@
+/* ============================================================================
+   SINCRETISMO DE SILICIO — CSS DEL MODO EMBED (ventanita / mini-monitor)
+   ----------------------------------------------------------------------------
+   Sólo actúa cuando js/embed-mode.js detecta ?embed=1 (lo agrega la ventanita
+   del sistema de ventanas de Sicre2). Esconde lo que no tiene sentido dentro de
+   un monitor chico: la barra de navegación de la página y sus paneles flotantes.
+   La ESCALA (achicar la página entera) la aplica el padre sobre el iframe.
+   ============================================================================ */
+
+/* --- Universo 3D por Cúmulos: sin barra de navegación ni panel de ajustes --- */
+body.modo-embed .cosmos-standalone-header,
+.modo-embed .cosmos-standalone-header {
+  display: none !important;
+}
+
+body.modo-embed #panel-ajustes-cosmos,
+.modo-embed #panel-ajustes-cosmos {
+  display: none !important;
+}
+
+/* El viewport ya es absoluto (inset: 0), así que al esconder la barra el 3D
+   ocupa la ventanita completa. */
+body.modo-embed .cosmos-clusters-viewport,
+.modo-embed .cosmos-clusters-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Universo 3D por Cúmulos en ventanita: la TELEMETRÍA TÉCNICA se esconde ---
+   En una ventanita de ~400x300 los paneles de VECTORES 3D/GIROSCOPIO y de
+   TRAYECTORIA 2D tapaban casi todo el cosmos. El monitor de la obra deja
+   solamente el 3D y las ÓRDENES CEREBRALES (que es la conexión con Sicre2). */
+body.modo-embed .alien-nav-hud,
+body.modo-embed .semantic-tree-hud,
+.modo-embed .alien-nav-hud,
+.modo-embed .semantic-tree-hud {
+  display: none !important;
+}
+
+/* Las órdenes cerebrales (Sicre2) quedan, pero más chicas para que no tapen. */
+body.modo-embed .neural-orders-hud,
+.modo-embed .neural-orders-hud {
+  transform: scale(0.78);
+  transform-origin: top left;
+}

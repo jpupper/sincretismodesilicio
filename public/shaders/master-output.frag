@@ -30,6 +30,9 @@ uniform vec2 u_wordPositions[MAX_WORDS];
 uniform float u_wordWidths[MAX_WORDS];
 uniform float u_wordDwell[MAX_WORDS];
 uniform int u_wordCount;
+// ESCALA del CONTENEDOR (caja) de cada palabra: la manda el slider "CAJAS DE LAS
+// PALABRAS" de la pestaña PARTÍCULAS del modal (tecla P). 1.0 = tamaño original.
+uniform float u_wordBoxScale;
 
 uniform sampler2D renderJPSHADER;
 
@@ -261,24 +264,30 @@ vec4 getWords(vec2 uv, float animPulse){
     }
     return wordsEffect;
 }
-vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
+vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse, float wThinking){
 
     float t = u_time * WORD_SPIN_SPEED * (1.0 + animPulse);
     vec4 wordsEffect = vec4(0.0);
     float fx = u_resolution.x / u_resolution.y;
 
+    // TAMAÑO DE LAS CAJAS: escala global del contenedor de cada palabra (uniform
+    // u_wordBoxScale, slider de la pestaña PARTÍCULAS). Escala ancho Y alto a la vez.
+    // Si el uniform no llega (0 = nunca seteado, ej. otra página que use este frag),
+    // se queda en el tamaño original del shader.
+    float boxScale = (u_wordBoxScale > 0.0) ? u_wordBoxScale : 1.0;
+
     for (int i = 0; i < MAX_WORDS; i++) {
         if (i >= u_wordCount) break;
         vec2 wPos = u_wordPositions[i];
 
-        float s = _s * (1.0 + animPulse * 0.35);
+        float s = _s * (1.0 + animPulse * 0.35) * boxScale;
         // grosor del trazo: nunca 0 (smoothstep con bordes iguales es indefinido
         // y en algunos drivers el marco desaparecía por completo)
         float d = max(_d, s * 0.10) * (1.0 + animPulse * 0.35);
 
         // ANCHO POR PALABRA: el marco se estira hasta el ancho real de la palabra
         // (u_wordWidths[i], en UV x). Si no hay dato, cae al ancho fijo de siempre.
-        float wAncho = u_wordWidths[i] * WORD_BOX_PAD * 0.5;
+        float wAncho = u_wordWidths[i] * WORD_BOX_PAD * 0.5 * boxScale;
         float kx = (wAncho > 0.0005) ? (s / wAncho) : (fx * WORD_BOX_X);
         float ky = WORD_BOX_KY;
         // uv_m = uv con ejes adaptados para pantalla vertical (alto reducido)
@@ -289,10 +298,9 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
         float inner = poly(uv_m, wPos, s * 0.90, s * 0.90 + d, 4, rot);
         float border = max(0.0, full - inner);
 
-        // PEDIDO USUARIO (2026-10-06): el FONDO de la palabra SIEMPRE se dibuja CON COLOR
-        // (antes, sin dwell, quedaba solo la silueta del rombo y se veia el patron del fondo
-        // a traves) y mientras la mano/cursor la va llenando, el frente de llenado avanza
-        // de IZQUIERDA a DERECHA en espacio de pantalla.
+        // RELLENO: la primera parte (elegir palabras) mantiene el relleno negro opaco;
+        // recien con las 3 palabras seleccionadas (THINKING/medio) pasa a TRANSPARENTE
+        // y queda el BORDE NEGRO. El frente de llenado (energia) sigue igual.
         float dwell = (i < MAX_WORDS) ? u_wordDwell[i] : 0.0;
         float effAncho = max(0.015, (wAncho > 0.0005) ? wAncho : (s / max(0.001, fx * WORD_BOX_X)));
         // Coordenada horizontal normalizada dentro del contenedor de la palabra
@@ -317,8 +325,17 @@ vec4 getQuadWords(vec2 uv, float _s, float _d, float animPulse){
             wordsEffect.rgb += igniteCol * igniteIntensity * (0.85 + 0.6 * dwell);
         }
 
-        // Borde exterior eliminado según requerimiento de diseño
-        wordsEffect.a = max(wordsEffect.a, full);
+        /* MASCARA DEL CONTENEDOR (pedido 08-Oct-2026, corregido):
+           - PRIMERA PARTE (se estan eligiendo/llenando las palabras: state IDLE):
+             relleno NEGRO OPACO como siempre → se usa `full`.
+           - YA ESTAN LAS 3 PALABRAS SELECCIONADAS (state THINKING = los rombos
+             girando en el MEDIO): el relleno es TRANSPARENTE (se ve el fondo a traves
+             del rombo) y queda SOLO EL BORDE NEGRO.
+           La ANIMACION INTERNA (la energia del llenado/vaciado) NO se toca: la suma
+           el composite por separado, sin recortarla al borde. */
+        float rellenoTransparente = smoothstep(0.15, 0.55, wThinking);
+        float mask = max(border, full * (1.0 - rellenoTransparente));
+        wordsEffect.a = max(wordsEffect.a, mask);
     }
     return wordsEffect;
 }
@@ -533,7 +550,7 @@ void main() {
     // 5) Efectos de palabras en pantalla (fondo de las palabras)
     float animPulse = weights.y * 1.0 + weights.z * 0.3;
     vec4 words = getWords(uv, animPulse);
-    vec4 wordsq = getQuadWords(rawUv, mix(0.03, 0.045, weights.y), 0.0, animPulse);
+    vec4 wordsq = getQuadWords(rawUv, mix(0.03, 0.045, weights.y), 0.0, animPulse, weights.y);
 
     float cajaPresence = clamp(weights.z, 0.0, 1.0);   // = presencia del contenedor
     wordsq *= (1.0 - smoothstep(0.03, 0.45, cajaPresence));
@@ -644,12 +661,13 @@ void main() {
     fin = mix(fin, haikuBox.rgb, haikuBox.a);
 
     // CONTENEDOR DE LAS PALABRAS: SE DIBUJA SOLO ACA, EN EL SHADER (pedido usuario).
-    // Fondo NEGRO OPACO siempre (idle, enganchada arriba y en el MEDIO mientras se vacia:
-    // lo que se vacia es la ENERGIA, el fondo NO queda transparente, queda negro) y encima
-    // la energia (wordsq.rgb) que se LLENA con el puntero/mano y se VACIA en el medio.
+    // wordsq.a = mascara del RELLENO OSCURO (rombo completo mientras se eligen las
+    // palabras; SOLO EL BORDE NEGRO cuando ya estan las 3 elegidas y giran en el medio).
+    // La ENERGIA (wordsq.rgb) va aparte y SIN recortar: ya viene multiplicada por el
+    // rombo de cada palabra, asi la animacion interna se sigue viendo en el medio.
     float wordMask = clamp(wordsq.a, 0.0, 1.0);
     fin = mix(fin, vec3(0.0), wordMask);
-    fin += wordsq.rgb * wordMask;
+    fin += wordsq.rgb;
 
     // Borde de las palabras: ELIMINADO según requerimiento (sin marco exterior)
     // fin += wordsq.rgb * wordQuadCol;

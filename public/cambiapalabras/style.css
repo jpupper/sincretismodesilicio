@@ -3559,3 +3559,165 @@ textarea {
 .silueta-conf-chip.visible {
   display: block;
 }
+
+/* ==========================================================================
+   SISTEMA DE VENTANAS (CLASE MAESTRA) — js/ventanas/sistemaVentanas.js
+   --------------------------------------------------------------------------
+   Todas las ventanitas de la experiencia comparten esta capa: las de cámara
+   (DEPTH, BIOMETRÍA, MANOS) y las nuevas de PÁGINA (UNIVERSO 3D POR CÚMULOS,
+   LOG), que muestran su contenido real como MINI-MONITOR escalado.
+   La posición (left/top) la escribe el sistema; acá sólo se define el aspecto:
+   agarre, arrastre, dwell de cierre y el panel de la pestaña VENTANAS.
+   ========================================================================== */
+
+/* --- Contenido inyectado (iframe = mini-monitor de la página real) -------- */
+.ventana-contenido {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.ventana-iframe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 0;
+  display: block;
+  background: #000;
+  transform-origin: top left;
+}
+
+/* --- Tamaños fijos de los MONITORES DE PÁGINA (deben coincidir con el
+       descriptor 'tamano' del registro en cambiapalabras/script.js) -------- */
+#cosmos-clusters-ventana { width: 400px; }
+#cosmos-clusters-ventana .ventana-contenido { height: 250px; }
+
+#log-ventana { width: 420px; }
+#log-ventana .ventana-contenido { height: 264px; }
+
+.ventana-monitor .pip-title-text { letter-spacing: 1px; }
+.ventana-monitor .pip-footer { justify-content: space-between; }
+
+/* --- Estados del control por manos (OpenPose) ---------------------------- */
+/* Mano apoyada en la barra (todavía no agarró): la barra avisa. */
+.ventana-sistema.agarrando .ventana-barra {
+  outline: 1px dashed var(--accent-1-line);
+  outline-offset: -3px;
+}
+
+/* Ventana tomada por una mano (o arrastrada con el mouse). */
+.ventana-sistema.arrastrando {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.9), 0 0 26px var(--accent-1-mid);
+}
+
+.ventana-sistema.arrastrando .ventana-barra {
+  background: var(--accent-1-mid);
+  box-shadow: inset 0 -1px 14px var(--accent-1-mid);
+}
+
+/* --- Cierre por dwell: la ✕ se va llenando desde abajo ------------------- */
+.ventana-cerrar {
+  position: relative;
+  overflow: hidden;
+}
+
+.ventana-cerrar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--cierre, 0) * 100%);
+  background: var(--accent-red);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.ventana-sistema.cerrando {
+  border-color: var(--accent-red);
+}
+
+.ventana-sistema.cerrando .ventana-cerrar {
+  color: var(--accent-red);
+  border-color: var(--accent-red);
+}
+
+/* --- Pestaña VENTANAS del panel de configuración (tecla P) --------------- */
+.ventanas-global-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.ventanas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 16px;
+}
+
+.ventana-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  background: var(--bg-panel-deep);
+  border: 1px solid var(--accent-1-line);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.4px;
+}
+
+.ventana-fila.activa {
+  border-color: var(--accent-cyan);
+  background: var(--bg-panel);
+}
+
+.ventana-fila-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  background: var(--text-muted);
+  box-shadow: 0 0 6px var(--text-muted);
+}
+
+.ventana-fila.activa .ventana-fila-dot {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+
+.ventana-fila-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ventana-fila-titulo { color: var(--text-main); }
+.ventana-fila-sub { color: var(--text-muted); font-size: 10px; }
+
+.ventana-fila-btn {
+  background: none;
+  border: 1px solid var(--accent-1-line);
+  color: var(--accent-cyan);
+  font: inherit;
+  font-size: 10.5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+
+.ventana-fila-btn:hover {
+  background: var(--accent-1-line);
+  color: var(--bg-panel-deep);
+}
+
+.ventanas-controles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--accent-1-line);
+  padding-top: 12px;
+}

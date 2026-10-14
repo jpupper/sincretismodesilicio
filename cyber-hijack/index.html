@@ -1358,6 +1358,14 @@
                 </div>
 
                 <div class="calib-item">
+                  <label for="cfg-part-boxscale"><strong>Tamaño de las CAJAS de las palabras</strong> (contenedor que el
+                    shader dibuja detrás de cada palabra): <span id="val-part-boxscale">1.00</span>x</label>
+                  <input type="range" id="cfg-part-boxscale" min="0.5" max="5" step="0.05" value="1">
+                  <small class="item-desc">Escala el ancho Y el alto del contenedor de cada palabra. 1.00 = tamaño
+                    original; subilo para hacer las cajas más grandes.</small>
+                </div>
+
+                <div class="calib-item">
                   <label for="cfg-part-fontfamily"><strong>Tipografía:</strong></label>
                   <select id="cfg-part-fontfamily" class="cyber-select-sm">
                     <option value="organic">Share Tech Mono (Terminal Ciber)</option>
@@ -1670,7 +1678,7 @@
   </div>
 
   <!-- Script principal del juego -->
-  <script src="script.js?v=3.82"></script>
+  <script src="script.js?v=3.84"></script>
 </body>
 
 </html>

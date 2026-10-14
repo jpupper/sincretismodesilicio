@@ -339,6 +339,49 @@
       </div>
     </div>
 
+    <!-- Capa 7.b: VENTANAS DE MONITOR (UNIVERSO 3D POR CÚMULOS & LOG DE SUCESOS)
+         Mismo sistema de ventanas que los monitores PiP (js/ventanas/sistemaVentanas.js):
+         aparecen y se cierran con su propio reloj, se dejan AGARRAR y ARRASTRAR con
+         los puntos de las manos de OpenPose, y se cierran dejando la mano apoyada
+         sobre la ✕. El contenido real de cada página entra como MINI-MONITOR escalado. -->
+    <div id="cosmos-clusters-ventana" class="tactical-pip-card ventana-maestra ventana-monitor hidden">
+      <div class="pip-header">
+        <div class="pip-title">
+          <span class="pip-status-dot"></span>
+          <span class="pip-title-text">UNIVERSO 3D POR CÚMULOS</span>
+        </div>
+        <div class="pip-actions">
+          <span class="pip-tag" id="cosmos-ventana-tag">LIVE</span>
+          <button type="button" class="pip-close-btn" id="btn-close-cosmos-ventana"
+            title="Cerrar ventana (o dejá la mano apoyada sobre la ✕)">✕</button>
+        </div>
+      </div>
+      <div class="pip-canvas-wrapper ventana-contenido" id="cosmos-ventana-contenido"></div>
+      <div class="pip-footer">
+        <span>MONITOR: CÚMULOS 3D</span>
+        <span id="cosmos-ventana-pie">SINCRONÍA SICRE2</span>
+      </div>
+    </div>
+
+    <div id="log-ventana" class="tactical-pip-card ventana-maestra ventana-monitor hidden">
+      <div class="pip-header">
+        <div class="pip-title">
+          <span class="pip-status-dot"></span>
+          <span class="pip-title-text">LOG DE SUCESOS</span>
+        </div>
+        <div class="pip-actions">
+          <span class="pip-tag" id="log-ventana-tag">STREAM</span>
+          <button type="button" class="pip-close-btn" id="btn-close-log-ventana"
+            title="Cerrar ventana (o dejá la mano apoyada sobre la ✕)">✕</button>
+        </div>
+      </div>
+      <div class="pip-canvas-wrapper ventana-contenido" id="log-ventana-contenido"></div>
+      <div class="pip-footer">
+        <span>MONITOR: TELEMETRÍA</span>
+        <span id="log-ventana-pie">BUS SEMÁNTICO</span>
+      </div>
+    </div>
+
     <!-- Capa 8: Panel Modal de Configuración (Tecla 'P') -->
     <div id="config-modal" class="modal-overlay hidden">
       <div class="modal-card">
@@ -387,6 +430,10 @@
           <button type="button" class="modal-tab-btn" data-tab="tab-colors">
             <span class="tab-icon">🎨</span>
             <span class="tab-text">COLORES</span>
+          </button>
+          <button type="button" class="modal-tab-btn" data-tab="tab-ventanas">
+            <span class="tab-icon">🪟</span>
+            <span class="tab-text">VENTANAS</span>
           </button>
         </div>
 
@@ -1358,6 +1405,14 @@
                 </div>
 
                 <div class="calib-item">
+                  <label for="cfg-part-boxscale"><strong>Tamaño de las CAJAS de las palabras</strong> (contenedor que el
+                    shader dibuja detrás de cada palabra): <span id="val-part-boxscale">1.00</span>x</label>
+                  <input type="range" id="cfg-part-boxscale" min="0.5" max="5" step="0.05" value="1">
+                  <small class="item-desc">Escala el ancho Y el alto del contenedor de cada palabra. 1.00 = tamaño
+                    original; subilo para hacer las cajas más grandes.</small>
+                </div>
+
+                <div class="calib-item">
                   <label for="cfg-part-fontfamily"><strong>Tipografía:</strong></label>
                   <select id="cfg-part-fontfamily" class="cyber-select-sm">
                     <option value="organic">Share Tech Mono (Terminal Ciber)</option>
@@ -1647,6 +1702,72 @@
             </div>
           </div>
 
+          <!-- TAB 10: SISTEMA DE VENTANAS (monitores PiP + monitores de página) -->
+          <div class="modal-tab-pane" id="tab-ventanas">
+            <div class="tracking-card">
+              <div class="tracking-card-header">
+                <div class="section-subtitle">
+                  <span>🪟 SISTEMA DE VENTANAS (CLASE MAESTRA)</span>
+                </div>
+              </div>
+              <p class="words-help-text">
+                Todas las ventanitas —DEPTH MAP, BIOMETRÍA FACIAL, MANOS, UNIVERSO 3D POR CÚMULOS
+                y LOG— viven en el mismo sistema (<strong>js/ventanas/sistemaVentanas.js</strong>):
+                cada una tiene su propio reloj de aparición y se puede cerrar, arrastrar y ordenar
+                por acá. Los <strong>puntos de las manos de OpenPose</strong> también las agarran
+                (apoyá la mano en la barra de título) y las cierran (dejá la mano sobre la ✕).
+              </p>
+
+              <div class="calib-actions-row ventanas-global-row">
+                <button type="button" class="btn-calib-action" id="btn-ventanas-todas">⬍ Cerrar Todas</button>
+                <button type="button" class="btn-calib-action" id="btn-ventanas-azar">🎲 Abrir una al Azar</button>
+                <button type="button" class="btn-calib-action" id="btn-ventanas-pesadas">🛰️ Abrir Monitor de Página</button>
+              </div>
+
+              <div class="ventanas-lista" id="ventanas-lista"></div>
+
+              <div class="ventanas-controles">
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-ventanas-manos" checked>
+                    <strong>Control por puntos de las manos (OpenPose)</strong>
+                  </label>
+                  <small class="item-desc">Agarra y arrastra la ventana apoyando la mano en su barra; la cierra dejándola sobre la ✕</small>
+                </div>
+
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-ventanas-mouse">
+                    <strong>El puntero del mouse también agarra las ventanas</strong>
+                  </label>
+                  <small class="item-desc">Apagado: con el mouse se arrastra igual, pero sólo con el botón apretado sobre la barra</small>
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-ventanas-dwell">
+                    <strong>Dwell de cierre (mano sobre la ✕):</strong> <span id="val-ventanas-dwell">1.2</span>s
+                  </label>
+                  <input type="range" id="cfg-ventanas-dwell" min="0.3" max="3" step="0.1" value="1.2">
+                </div>
+
+                <div class="calib-item">
+                  <label for="cfg-ventanas-agarre">
+                    <strong>Dwell de agarre (mano apoyada en la barra):</strong> <span id="val-ventanas-agarre">0.18</span>s
+                  </label>
+                  <input type="range" id="cfg-ventanas-agarre" min="0" max="1" step="0.02" value="0.18">
+                </div>
+
+                <div class="calib-item">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="cfg-ventanas-humano" checked>
+                    <strong>Sólo con humano detectado</strong>
+                  </label>
+                  <small class="item-desc">Sin nadie delante de la cámara no aparece ninguna ventana</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="config-status-msg" id="config-status-msg"></div>
         </div>
 
@@ -1669,8 +1790,10 @@
 
   </div>
 
+  <!-- Sistema de ventanas (clase maestra): se carga ANTES del script del juego -->
+  <script src="js/ventanas/sistemaVentanas.js?v=1.1"></script>
   <!-- Script principal del juego -->
-  <script src="cambiapalabras/script.js?v=3.82"></script>
+  <script src="cambiapalabras/script.js?v=3.85"></script>
 </body>
 
 </html>

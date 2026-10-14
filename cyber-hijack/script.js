@@ -866,7 +866,8 @@ const appState = {
     speed: 1.0,
     maxSpeed: 2.0,
     fontSizeCenter: 56,
-    fontSizePhrase: 48
+    fontSizePhrase: 48,
+    boxScale: 1.0         // TAMAÑO de las CAJAS de las palabras (contenedor del shader)
   },
 
   // Sistema de Física y Colisiones de Palabras (Pestaña FÍSICAS & COLISIÓN)
@@ -1241,6 +1242,8 @@ const DOM = {
   valPartFontSizeCenter: document.getElementById('val-part-fontsize-center'),
   cfgPartFontSizePhrase: document.getElementById('cfg-part-fontsize-phrase'),
   valPartFontSizePhrase: document.getElementById('val-part-fontsize-phrase'),
+  cfgPartBoxScale: document.getElementById('cfg-part-boxscale'),
+  valPartBoxScale: document.getElementById('val-part-boxscale'),
   cfgPartFontFamily: document.getElementById('cfg-part-fontfamily'),
   cfgPartColor: document.getElementById('cfg-part-color'),
   cfgPartOutline: document.getElementById('cfg-part-outline'),
@@ -1696,6 +1699,7 @@ class MasterOutputShader {
       renderJPSHADER: gl.getUniformLocation(this.program, 'renderJPSHADER'),
       wordPositions: gl.getUniformLocation(this.program, 'u_wordPositions'),
       wordWidths: gl.getUniformLocation(this.program, 'u_wordWidths'),
+      wordBoxScale: gl.getUniformLocation(this.program, 'u_wordBoxScale'),
       wordDwell: gl.getUniformLocation(this.program, 'u_wordDwell'),
       wordCount: gl.getUniformLocation(this.program, 'u_wordCount'),
       activeState: gl.getUniformLocation(this.program, 'u_activeState'),
@@ -2009,6 +2013,14 @@ class MasterOutputShader {
     if (this.uniforms.wordWidths) gl.uniform1fv(this.uniforms.wordWidths, widthBuffer);
     if (this.uniforms.wordDwell) gl.uniform1fv(this.uniforms.wordDwell, dwellBuffer);
     gl.uniform1i(this.uniforms.wordCount, wCount);
+
+    // TAMAÑO DE LAS CAJAS de las palabras: slider de la pestaña PARTÍCULAS.
+    // 1.0 = tamaño original del shader; >1 agranda el contenedor (ancho y alto).
+    if (this.uniforms.wordBoxScale) {
+      const bsRaw = Number(appState.particlesConfig && appState.particlesConfig.boxScale);
+      const bs = (isFinite(bsRaw) && bsRaw > 0) ? bsRaw : 1.0;
+      gl.uniform1f(this.uniforms.wordBoxScale, Math.max(0.05, bs));
+    }
 
     // 5) Estados interpolados y Glitch Amount con curva configurable
     let targetState = 'idle';
@@ -2913,6 +2925,23 @@ async function loadConfigFromServer() {
         syncUiColorsInputs();
         updatePaletteUi();
         console.log('[CONFIG] Paleta de colores cargada desde config.json del servidor.');
+      }
+      /* TRACKING & CALIBRACIÓN (umbral mínimo de silueta visible, tiempo mínimo de
+         trackeo, dwell, etc.): el server lo guarda en config.json cuando se aprieta
+         "Guardar Físicamente en Servidor". Se aplica como SEMILLA de la calibración;
+         el localStorage de este navegador tiene la última palabra sobre lo que el
+         usuario ya configuró acá. */
+      if (data.trackingConfig && typeof data.trackingConfig === 'object') {
+        appState._trackingFromServer = data.trackingConfig;
+        let localTracking = {};
+        try { localTracking = JSON.parse(localStorage.getItem('sincretismo_tracking_config')) || {}; } catch (e) { }
+        appState.trackingConfig = { ...appState.trackingConfig, ...data.trackingConfig, ...localTracking };
+        if (appState.trackingConfig.dwellDuration !== undefined) {
+          appState.dwellDuration = Number(appState.trackingConfig.dwellDuration);
+        }
+        saveTrackingConfigToStorage();
+        syncTrackingConfigToInputs();
+        console.log('[CONFIG] Tracking & calibración cargados de config.json (semilla) + localStorage.');
       }
     }
     console.log('[CONFIG] Configuración cargada. Total palabras activas en banco:', HUMAN_WORDS_POOL.length);
@@ -4932,34 +4961,45 @@ function setInputMode(mode) {
 // ============================================================================
 function loadTrackingConfigFromStorage() {
   try {
+    let parsed = {};
     const saved = localStorage.getItem('sincretismo_tracking_config');
     if (saved) {
-      const parsed = JSON.parse(saved);
+      parsed = JSON.parse(saved) || {};
       /* MIGRACION de grosores: los valores viejos venian en px "nominales"
          (4 = 1 px real dibujado). Ahora el slider vale px reales, asi que un
          valor viejo > 5 se convierte una sola vez (los nuevos nunca superan 5/7). */
       if (Number(parsed.boneWidth) > 5) parsed.boneWidth = Math.max(0.25, Number(parsed.boneWidth) * 0.25);
       if (Number(parsed.pointRadius) > 7) parsed.pointRadius = Math.max(0.5, Number(parsed.pointRadius) * 0.25);
-      appState.trackingConfig = { ...appState.trackingConfig, ...parsed };
-      if (appState.trackingConfig.silhouetteMinConfidence === undefined || appState.trackingConfig.silhouetteMinConfidence < 0.87) {
-        appState.trackingConfig.silhouetteMinConfidence = 0.87;
-      }
-      if (appState.trackingConfig.silhouetteMinTrackTime === undefined) {
-        appState.trackingConfig.silhouetteMinTrackTime = 3.0;
-      }
-      if (parsed.dwellDuration !== undefined) {
-        appState.dwellDuration = Number(parsed.dwellDuration);
-      } else if (appState.trackingConfig.dwellDuration !== undefined) {
-        appState.dwellDuration = Number(appState.trackingConfig.dwellDuration);
-      }
-      // Merge profundo del selector de puntos: un JSON viejo/parcial no debe
-      // borrar los defaults (mouse + manos).
-      appState.trackingConfig.collisionPoints = {
-        mouse: true, manoIzq: true, manoDer: true,
-        dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false,
-        ...(appState.trackingConfig.collisionPoints || {})
-      }; console.log('[TRACKING] Configuración cargada de localStorage:', appState.trackingConfig);
     }
+    /* PRIORIDAD: defaults de la app  <  config.json del servidor (SEMILLA = lo que se
+       guardó con "Guardar Físicamente en Servidor")  <  localStorage de este navegador.
+       OJO: acá NO hay ningún piso forzado. Antes el "Umbral Mínimo de Silueta Visible"
+       se forzaba a 0.87 al cargar (`< 0.87 → 0.87`), así que bajarlo no se guardaba
+       nunca; el "Tiempo Mínimo de Trackeo" tampoco llegaba al server porque POST /config
+       lo descartaba. Los dos se respetan tal como los dejó el usuario. */
+    const semilla = (appState._trackingFromServer && typeof appState._trackingFromServer === 'object') ? appState._trackingFromServer : {};
+    appState.trackingConfig = { ...appState.trackingConfig, ...semilla, ...parsed };
+    if (appState.trackingConfig.silhouetteMinConfidence === undefined) {
+      appState.trackingConfig.silhouetteMinConfidence = 0.87;
+    }
+    if (appState.trackingConfig.silhouetteMinTrackTime === undefined) {
+      appState.trackingConfig.silhouetteMinTrackTime = 3.0;
+    }
+    if (parsed.dwellDuration !== undefined) {
+      appState.dwellDuration = Number(parsed.dwellDuration);
+    } else if (appState.trackingConfig.dwellDuration !== undefined) {
+      appState.dwellDuration = Number(appState.trackingConfig.dwellDuration);
+    }
+    // Merge profundo del selector de puntos: un JSON viejo/parcial no debe
+    // borrar los defaults (mouse + manos).
+    appState.trackingConfig.collisionPoints = {
+      mouse: true, manoIzq: true, manoDer: true,
+      dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false,
+      ...(appState.trackingConfig.collisionPoints || {})
+    };
+    // Deja el localStorage igual a lo aplicado (incluye la semilla del servidor).
+    saveTrackingConfigToStorage();
+    console.log('[TRACKING] Configuración de tracking aplicada:', appState.trackingConfig);
   } catch (e) { }
   syncTrackingConfigToInputs();
 }
@@ -5866,6 +5906,9 @@ function syncParticlesInputs() {
   if (DOM.valPartFontSizeCenter) DOM.valPartFontSizeCenter.textContent = p.fontSizeCenter;
   if (DOM.cfgPartFontSizePhrase) DOM.cfgPartFontSizePhrase.value = p.fontSizePhrase;
   if (DOM.valPartFontSizePhrase) DOM.valPartFontSizePhrase.textContent = p.fontSizePhrase;
+  const bs = (p.boxScale !== undefined && p.boxScale > 0) ? p.boxScale : 1.0;
+  if (DOM.cfgPartBoxScale) DOM.cfgPartBoxScale.value = bs;
+  if (DOM.valPartBoxScale) DOM.valPartBoxScale.textContent = Number(bs).toFixed(2);
   if (DOM.cfgPartFontFamily) DOM.cfgPartFontFamily.value = p.fontFamily;
   if (DOM.cfgPartColor) DOM.cfgPartColor.value = p.color;
   if (DOM.cfgPartOutline) DOM.cfgPartOutline.value = p.outline;
@@ -10328,6 +10371,15 @@ function setupEventListeners() {
       applyParticlesConfig();
     });
   }
+  // TAMAÑO DE LAS CAJAS de las palabras (contenedor que dibuja el shader).
+  // El shader lo lee por frame (uniform u_wordBoxScale): alcanza con guardar.
+  if (DOM.cfgPartBoxScale) {
+    DOM.cfgPartBoxScale.addEventListener('input', (e) => {
+      appState.particlesConfig.boxScale = parseFloat(e.target.value);
+      if (DOM.valPartBoxScale) DOM.valPartBoxScale.textContent = Number(e.target.value).toFixed(2);
+      saveVisualConfigToStorage();
+    });
+  }
   if (DOM.cfgPartFontFamily) {
     DOM.cfgPartFontFamily.addEventListener('change', (e) => {
       appState.particlesConfig.fontFamily = e.target.value;
@@ -10423,7 +10475,8 @@ function setupEventListeners() {
         lifetimeMax: 10,
         maxWords: 9,
         speed: 1.0,
-        maxSpeed: 2.0
+        maxSpeed: 2.0,
+        boxScale: 1.0
       };
       applyParticlesConfig();
       syncParticlesInputs();

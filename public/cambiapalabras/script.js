@@ -866,7 +866,8 @@ const appState = {
     speed: 1.0,
     maxSpeed: 2.0,
     fontSizeCenter: 56,
-    fontSizePhrase: 48
+    fontSizePhrase: 48,
+    boxScale: 1.0         // TAMAÑO de las CAJAS de las palabras (contenedor del shader)
   },
 
   // Sistema de Física y Colisiones de Palabras (Pestaña FÍSICAS & COLISIÓN)
@@ -1241,6 +1242,8 @@ const DOM = {
   valPartFontSizeCenter: document.getElementById('val-part-fontsize-center'),
   cfgPartFontSizePhrase: document.getElementById('cfg-part-fontsize-phrase'),
   valPartFontSizePhrase: document.getElementById('val-part-fontsize-phrase'),
+  cfgPartBoxScale: document.getElementById('cfg-part-boxscale'),
+  valPartBoxScale: document.getElementById('val-part-boxscale'),
   cfgPartFontFamily: document.getElementById('cfg-part-fontfamily'),
   cfgPartColor: document.getElementById('cfg-part-color'),
   cfgPartOutline: document.getElementById('cfg-part-outline'),
@@ -1696,6 +1699,7 @@ class MasterOutputShader {
       renderJPSHADER: gl.getUniformLocation(this.program, 'renderJPSHADER'),
       wordPositions: gl.getUniformLocation(this.program, 'u_wordPositions'),
       wordWidths: gl.getUniformLocation(this.program, 'u_wordWidths'),
+      wordBoxScale: gl.getUniformLocation(this.program, 'u_wordBoxScale'),
       wordDwell: gl.getUniformLocation(this.program, 'u_wordDwell'),
       wordCount: gl.getUniformLocation(this.program, 'u_wordCount'),
       activeState: gl.getUniformLocation(this.program, 'u_activeState'),
@@ -2009,6 +2013,14 @@ class MasterOutputShader {
     if (this.uniforms.wordWidths) gl.uniform1fv(this.uniforms.wordWidths, widthBuffer);
     if (this.uniforms.wordDwell) gl.uniform1fv(this.uniforms.wordDwell, dwellBuffer);
     gl.uniform1i(this.uniforms.wordCount, wCount);
+
+    // TAMAÑO DE LAS CAJAS de las palabras: slider de la pestaña PARTÍCULAS.
+    // 1.0 = tamaño original del shader; >1 agranda el contenedor (ancho y alto).
+    if (this.uniforms.wordBoxScale) {
+      const bsRaw = Number(appState.particlesConfig && appState.particlesConfig.boxScale);
+      const bs = (isFinite(bsRaw) && bsRaw > 0) ? bsRaw : 1.0;
+      gl.uniform1f(this.uniforms.wordBoxScale, Math.max(0.05, bs));
+    }
 
     // 5) Estados interpolados y Glitch Amount con curva configurable
     let targetState = 'idle';
@@ -2914,6 +2926,23 @@ async function loadConfigFromServer() {
         updatePaletteUi();
         console.log('[CONFIG] Paleta de colores cargada desde config.json del servidor.');
       }
+      /* TRACKING & CALIBRACIÓN (umbral mínimo de silueta visible, tiempo mínimo de
+         trackeo, dwell, etc.): el server lo guarda en config.json cuando se aprieta
+         "Guardar Físicamente en Servidor". Se aplica como SEMILLA de la calibración;
+         el localStorage de este navegador tiene la última palabra sobre lo que el
+         usuario ya configuró acá. */
+      if (data.trackingConfig && typeof data.trackingConfig === 'object') {
+        appState._trackingFromServer = data.trackingConfig;
+        let localTracking = {};
+        try { localTracking = JSON.parse(localStorage.getItem('sincretismo_tracking_config')) || {}; } catch (e) { }
+        appState.trackingConfig = { ...appState.trackingConfig, ...data.trackingConfig, ...localTracking };
+        if (appState.trackingConfig.dwellDuration !== undefined) {
+          appState.dwellDuration = Number(appState.trackingConfig.dwellDuration);
+        }
+        saveTrackingConfigToStorage();
+        syncTrackingConfigToInputs();
+        console.log('[CONFIG] Tracking & calibración cargados de config.json (semilla) + localStorage.');
+      }
     }
     console.log('[CONFIG] Configuración cargada. Total palabras activas en banco:', HUMAN_WORDS_POOL.length);
   } catch (err) {
@@ -3025,6 +3054,7 @@ function syncConfigToModalInputs() {
   DOM.cfgSystemPrompt.value = appState.config.systemPrompt;
   renderWordChips();
   syncTrackingConfigToInputs();
+  sincronizarInputsVentanas();
 }
 
 function renderWordChips() {
@@ -4932,34 +4962,45 @@ function setInputMode(mode) {
 // ============================================================================
 function loadTrackingConfigFromStorage() {
   try {
+    let parsed = {};
     const saved = localStorage.getItem('sincretismo_tracking_config');
     if (saved) {
-      const parsed = JSON.parse(saved);
+      parsed = JSON.parse(saved) || {};
       /* MIGRACION de grosores: los valores viejos venian en px "nominales"
          (4 = 1 px real dibujado). Ahora el slider vale px reales, asi que un
          valor viejo > 5 se convierte una sola vez (los nuevos nunca superan 5/7). */
       if (Number(parsed.boneWidth) > 5) parsed.boneWidth = Math.max(0.25, Number(parsed.boneWidth) * 0.25);
       if (Number(parsed.pointRadius) > 7) parsed.pointRadius = Math.max(0.5, Number(parsed.pointRadius) * 0.25);
-      appState.trackingConfig = { ...appState.trackingConfig, ...parsed };
-      if (appState.trackingConfig.silhouetteMinConfidence === undefined || appState.trackingConfig.silhouetteMinConfidence < 0.87) {
-        appState.trackingConfig.silhouetteMinConfidence = 0.87;
-      }
-      if (appState.trackingConfig.silhouetteMinTrackTime === undefined) {
-        appState.trackingConfig.silhouetteMinTrackTime = 3.0;
-      }
-      if (parsed.dwellDuration !== undefined) {
-        appState.dwellDuration = Number(parsed.dwellDuration);
-      } else if (appState.trackingConfig.dwellDuration !== undefined) {
-        appState.dwellDuration = Number(appState.trackingConfig.dwellDuration);
-      }
-      // Merge profundo del selector de puntos: un JSON viejo/parcial no debe
-      // borrar los defaults (mouse + manos).
-      appState.trackingConfig.collisionPoints = {
-        mouse: true, manoIzq: true, manoDer: true,
-        dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false,
-        ...(appState.trackingConfig.collisionPoints || {})
-      }; console.log('[TRACKING] Configuración cargada de localStorage:', appState.trackingConfig);
     }
+    /* PRIORIDAD: defaults de la app  <  config.json del servidor (SEMILLA = lo que se
+       guardó con "Guardar Físicamente en Servidor")  <  localStorage de este navegador.
+       OJO: acá NO hay ningún piso forzado. Antes el "Umbral Mínimo de Silueta Visible"
+       se forzaba a 0.87 al cargar (`< 0.87 → 0.87`), así que bajarlo no se guardaba
+       nunca; el "Tiempo Mínimo de Trackeo" tampoco llegaba al server porque POST /config
+       lo descartaba. Los dos se respetan tal como los dejó el usuario. */
+    const semilla = (appState._trackingFromServer && typeof appState._trackingFromServer === 'object') ? appState._trackingFromServer : {};
+    appState.trackingConfig = { ...appState.trackingConfig, ...semilla, ...parsed };
+    if (appState.trackingConfig.silhouetteMinConfidence === undefined) {
+      appState.trackingConfig.silhouetteMinConfidence = 0.87;
+    }
+    if (appState.trackingConfig.silhouetteMinTrackTime === undefined) {
+      appState.trackingConfig.silhouetteMinTrackTime = 3.0;
+    }
+    if (parsed.dwellDuration !== undefined) {
+      appState.dwellDuration = Number(parsed.dwellDuration);
+    } else if (appState.trackingConfig.dwellDuration !== undefined) {
+      appState.dwellDuration = Number(appState.trackingConfig.dwellDuration);
+    }
+    // Merge profundo del selector de puntos: un JSON viejo/parcial no debe
+    // borrar los defaults (mouse + manos).
+    appState.trackingConfig.collisionPoints = {
+      mouse: true, manoIzq: true, manoDer: true,
+      dedoIzq: false, dedoDer: false, codoIzq: false, codoDer: false, centroFacial: false,
+      ...(appState.trackingConfig.collisionPoints || {})
+    };
+    // Deja el localStorage igual a lo aplicado (incluye la semilla del servidor).
+    saveTrackingConfigToStorage();
+    console.log('[TRACKING] Configuración de tracking aplicada:', appState.trackingConfig);
   } catch (e) { }
   syncTrackingConfigToInputs();
 }
@@ -5866,6 +5907,9 @@ function syncParticlesInputs() {
   if (DOM.valPartFontSizeCenter) DOM.valPartFontSizeCenter.textContent = p.fontSizeCenter;
   if (DOM.cfgPartFontSizePhrase) DOM.cfgPartFontSizePhrase.value = p.fontSizePhrase;
   if (DOM.valPartFontSizePhrase) DOM.valPartFontSizePhrase.textContent = p.fontSizePhrase;
+  const bs = (p.boxScale !== undefined && p.boxScale > 0) ? p.boxScale : 1.0;
+  if (DOM.cfgPartBoxScale) DOM.cfgPartBoxScale.value = bs;
+  if (DOM.valPartBoxScale) DOM.valPartBoxScale.textContent = Number(bs).toFixed(2);
   if (DOM.cfgPartFontFamily) DOM.cfgPartFontFamily.value = p.fontFamily;
   if (DOM.cfgPartColor) DOM.cfgPartColor.value = p.color;
   if (DOM.cfgPartOutline) DOM.cfgPartOutline.value = p.outline;
@@ -6887,11 +6931,8 @@ function transitionTo(newState) {
 
   // REQUERIMIENTO: En modo haiku no se ven las ventanas de biometría facial, depth map ni manos
   if (isHaikuMode) {
-    PIP_CYCLE_KEYS.forEach((which) => {
-      appState.pipCycleVisible[which] = false;
-      const el = pipElement(which);
-      if (el) el.classList.add('hidden');
-    });
+    PIP_CYCLE_KEYS.forEach((which) => { appState.pipCycleVisible[which] = false; });
+    cerrarTodasLasVentanas('modo-haiku');
   }
 
   if (newState === STATES.IDLE) {
@@ -7583,11 +7624,8 @@ async function startResignificationSequence() {
   DOM.container.classList.add('state-glitching');
   document.body.classList.add('mode-haiku');
   if (DOM.container) DOM.container.classList.add('mode-haiku');
-  PIP_CYCLE_KEYS.forEach((which) => {
-    appState.pipCycleVisible[which] = false;
-    const el = pipElement(which);
-    if (el) el.classList.add('hidden');
-  });
+  PIP_CYCLE_KEYS.forEach((which) => { appState.pipCycleVisible[which] = false; });
+  cerrarTodasLasVentanas('secuestro');
 
   // Fundido de salida para las palabras flotantes sobrantes y reseteo estricto de energía
   appState.targetedWordIndex = -1;
@@ -8739,11 +8777,8 @@ function handleStateReset() {
     DOM.container.classList.remove('words-chosen');
     DOM.container.classList.remove('mode-haiku');
   }
-  PIP_CYCLE_KEYS.forEach((which) => {
-    appState.pipCycleVisible[which] = false;
-    const el = pipElement(which);
-    if (el) el.classList.add('hidden');
-  });
+  PIP_CYCLE_KEYS.forEach((which) => { appState.pipCycleVisible[which] = false; });
+  cerrarTodasLasVentanas('reset');
 
   // SISTEMA UNIFICADO DE PALABRAS: destruir los objetos del ciclo anterior.
   (appState.selectedWordObjects || []).forEach(w => { try { w.destroy(); } catch (e) { } });
@@ -8822,75 +8857,28 @@ function updateIdleCta() {
 // CICLO AUTOMÁTICO DE 15 SEGUNDOS PARA BIOMETRÍA Y DEPTH MAP
 // ============================================================================
 // ============================================================================
-// PARPADEO ALEATORIO DE LOS MONITORES PiP (BIOMETRÍA FACIAL + DEPTH MAP)
-// Cada monitor tiene su PROPIO reloj: se prende por Y segundos y se apaga por Z,
-// con Y y Z sorteados en cada vuelta entre PIP_RANDOM_MIN_S y PIP_RANDOM_MAX_S
-// (5 a 30 s). No se sincronizan entre sí: a veces coinciden, a veces no.
+// RELOJ PROPIO DE CADA VENTANITA: se prende por Y segundos y se apaga por Z,
+// con Y y Z sorteados en cada vuelta (5 a 30 s por defecto). No se sincronizan
+// entre sí. El sorteo y los relojes ahora los lleva el SISTEMA DE VENTANAS; acá
+// quedan estos dos helpers por compatibilidad con llamados viejos.
 // ============================================================================
 function pipRandomMs() {
   const s = PIP_RANDOM_MIN_S + Math.random() * (PIP_RANDOM_MAX_S - PIP_RANDOM_MIN_S);
   return Math.round(s * 1000);
 }
 
+// La posición aleatoria (periferia, sin solaparse) la sortea el propio sistema
+// para CUALQUIER ventana: acá sólo se redirige la llamada.
 function randomizePipPosition(which, pip) {
-  if (!pip) return;
-  const W = window.innerWidth || 1080;
-  const H = window.innerHeight || 1920;
-  const SIZES = { depth: [250, 220], face: [230, 250], leftHand: [220, 215], rightHand: [220, 215] };
-  const dims = SIZES[which] || [230, 230];
-  const cardW = dims[0];
-  const cardH = dims[1];
-
-  // REQUERIMIENTO 1: Posición random lejos del centro.
-  // Dividimos la periferia en 6 zonas perimetrales exteriores evitando la zona central
-  const marginX = 20;
-  const marginY = 45;
-  // Posiciones de TODOS los otros monitores visibles (para no solaparse).
-  const otherPositions = Object.keys(appState.pipCycleVisible || {})
-    .filter(k => k !== which && appState.pipCycleVisible[k] && appState.pipActivePositions && appState.pipActivePositions[k])
-    .map(k => appState.pipActivePositions[k]);
-
-  const candidates = [
-    // Cuadrante superior izquierdo
-    { x: marginX + Math.random() * Math.max(10, W * 0.15), y: marginY + Math.random() * Math.max(10, H * 0.10) },
-    // Cuadrante superior derecho
-    { x: W - cardW - marginX - Math.random() * Math.max(10, W * 0.15), y: marginY + Math.random() * Math.max(10, H * 0.10) },
-    // Cuadrante inferior izquierdo
-    { x: marginX + Math.random() * Math.max(10, W * 0.15), y: H - cardH - marginY - Math.random() * Math.max(10, H * 0.12) },
-    // Cuadrante inferior derecho
-    { x: W - cardW - marginX - Math.random() * Math.max(10, W * 0.15), y: H - cardH - marginY - Math.random() * Math.max(10, H * 0.12) },
-    // Lateral izquierdo medio
-    { x: marginX, y: H * 0.38 + (Math.random() - 0.5) * (H * 0.18) },
-    // Lateral derecho medio
-    { x: W - cardW - marginX, y: H * 0.38 + (Math.random() - 0.5) * (H * 0.18) }
-  ];
-
-  // Si hay algún otro monitor PiP visible, elegir una zona que no se solape
-  let validCandidates = candidates;
-  if (otherPositions.length > 0) {
-    validCandidates = candidates.filter(c => otherPositions.every(otherPos => {
-      const dx = Math.abs((c.x + cardW * 0.5) - (otherPos.x + otherPos.w * 0.5));
-      const dy = Math.abs((c.y + cardH * 0.5) - (otherPos.y + otherPos.h * 0.5));
-      return dx > (cardW * 0.95) || dy > (cardH * 0.95);
-    }));
-    if (validCandidates.length === 0) validCandidates = candidates;
-  }
-
-  const chosen = validCandidates[Math.floor(Math.random() * validCandidates.length)];
-  const posX = Math.max(marginX, Math.min(W - cardW - marginX, Math.round(chosen.x)));
-  const posY = Math.max(marginY, Math.min(H - cardH - marginY, Math.round(chosen.y)));
-
-  appState.pipActivePositions = appState.pipActivePositions || {};
-  appState.pipActivePositions[which] = { x: posX, y: posY, w: cardW, h: cardH };
-
-  pip.style.left = `${posX}px`;
-  pip.style.top = `${posY}px`;
-  pip.style.right = 'auto';
-  pip.style.bottom = 'auto';
+  if (!VENTANAS_SISTEMA) return;
+  const v = VENTANAS_SISTEMA.porId(which);
+  if (v) VENTANAS_SISTEMA.posicionAlAzar(v);
 }
 
-// Mapea la clave del monitor PiP a su tarjeta en el DOM.
+// Mapea la clave del monitor a su tarjeta en el DOM (lo resuelve el SISTEMA
+// DE VENTANAS; se conserva el fallback por si el sistema no cargó).
 function pipElement(which) {
+  if (VENTANAS_SISTEMA) return VENTANAS_SISTEMA.el(which);
   if (which === 'depth') return DOM.depthPip;
   if (which === 'face') return DOM.facePip;
   if (which === 'leftHand') return DOM.leftHandPip;
@@ -8898,56 +8886,54 @@ function pipElement(which) {
   return null;
 }
 
-function setPipVisible(which, visible, now) {
-  // Si no hay humano detectado, o si estamos en modo haiku / procesamiento, nunca activar monitor PiP
-  const isHaikuMode = (appState.currentState === STATES.HIJACK || appState.currentState === STATES.PROCESSING || document.body.classList.contains('mode-haiku'));
-  if (visible && (!appState.hasHuman || isHaikuMode)) {
-    visible = false;
+// Cierra TODAS las ventanitas de la experiencia (modo haiku, reset, sin humano).
+// Reemplaza al viejo barrido de PIP_CYCLE_KEYS: ahora también apaga los MONITORES
+// DE PÁGINA (que sueltan su iframe y no dejan la GPU encendida).
+function cerrarTodasLasVentanas(motivo) {
+  if (VENTANAS_SISTEMA) {
+    // El barrido por "sin humano" respeta las ventanas abiertas a mano.
+    VENTANAS_SISTEMA.cerrarTodas(motivo || 'sistema', (motivo || 'sistema') !== 'sin-humano');
+    return;
   }
-  // Si es monitor de mano, SOLO activar si la mano está trackeada en el jugador asignado
-  if (visible && (which === 'leftHand' || which === 'rightHand')) {
-    const lmIndex = which === 'leftHand' ? 15 : 16;
-    const pIdx = (appState.pipPlayerAssign && appState.pipPlayerAssign[which] !== undefined)
-      ? appState.pipPlayerAssign[which]
-      : (which === 'leftHand' ? 0 : 1);
-    const targetP = (appState.players && appState.players[pIdx]) ? appState.players[pIdx] : (appState.players ? appState.players[0] : null);
-    const lms = targetP ? targetP.landmarks : appState.lastLandmarks;
-    const lm = lms ? lms[lmIndex] : null;
-    const vis = lm && lm.visibility !== undefined ? lm.visibility : (lm ? 0.9 : 0);
-    // MISMA REGLA QUE EN renderHandCameras (pedido del usuario): confianza MUY alta y
-    // muñeca NO pegada a la cabeza; si no, la ventanita se apaga (antes 0.25 dejaba
-    // pasar muñecas mal detectadas sobre la cara).
-    const cabeza = lms ? lms[0] : null;
-    const hombro = lms ? (lms[11] || lms[12]) : null;
-    const anchoRef = (cabeza && hombro) ? Math.hypot(hombro.x - cabeza.x, hombro.y - cabeza.y) : 0.22;
-    const distCara = (lm && cabeza) ? Math.hypot(lm.x - cabeza.x, lm.y - cabeza.y) : 1.0;
-    const pegadaALaCara = distCara < Math.max(MANO_PIP_MIN_DIST_CARA, anchoRef * 0.55);
-    if (!lm || vis < MANO_PIP_MIN_VIS || pegadaALaCara) {
-      visible = false;
-    }
+  PIP_CYCLE_KEYS.forEach((which) => {
+    appState.pipCycleVisible[which] = false;
+    const el = pipElement(which);
+    if (el) el.classList.add('hidden');
+  });
+}
+
+// ---------------------------------------------------------------------------
+// GUARDAS PROPIAS DE LA EXPERIENCIA (las consulta el SISTEMA DE VENTANAS)
+// ---------------------------------------------------------------------------
+// Las ventanas de MANO sólo pueden abrirse si la muñeca de ese lado está MUY
+// bien trackeada y NO está pegada a la cabeza (misma regla que renderHandCameras:
+// antes dejaba pasar muñecas mal detectadas sobre la cara).
+function ventanaManoHabilitada(which) {
+  const lmIndex = which === 'leftHand' ? 15 : 16;
+  const pIdx = (appState.pipPlayerAssign && appState.pipPlayerAssign[which] !== undefined)
+    ? appState.pipPlayerAssign[which]
+    : (which === 'leftHand' ? 0 : 1);
+  const targetP = (appState.players && appState.players[pIdx]) ? appState.players[pIdx] : (appState.players ? appState.players[0] : null);
+  const lms = targetP ? targetP.landmarks : appState.lastLandmarks;
+  const lm = lms ? lms[lmIndex] : null;
+  const vis = lm && lm.visibility !== undefined ? lm.visibility : (lm ? 0.9 : 0);
+  const cabeza = lms ? lms[0] : null;
+  const hombro = lms ? (lms[11] || lms[12]) : null;
+  const anchoRef = (cabeza && hombro) ? Math.hypot(hombro.x - cabeza.x, hombro.y - cabeza.y) : 0.22;
+  const distCara = (lm && cabeza) ? Math.hypot(lm.x - cabeza.x, lm.y - cabeza.y) : 1.0;
+  const pegadaALaCara = distCara < Math.max(MANO_PIP_MIN_DIST_CARA, anchoRef * 0.55);
+  return Boolean(lm) && vis >= MANO_PIP_MIN_VIS && !pegadaALaCara;
+}
+
+// Requerimiento 1: cada vez que se abre un monitor se sortea a qué jugador seguir
+// (Jugador 1 o 2) y se pide la segmentación/inferencia de pose.
+function alAbrirMonitorDeCamara(which) {
+  if (appState.players && appState.players.length > 1) {
+    if (!appState.pipPlayerAssign) appState.pipPlayerAssign = { face: 0, leftHand: 0, rightHand: 1 };
+    appState.pipPlayerAssign[which] = Math.random() < 0.5 ? 0 : 1;
   }
-  if (appState.pipCycleVisible[which] === visible) return;
-  appState.pipCycleVisible[which] = visible;
-  const pip = pipElement(which);
-  if (pip) {
-    if (visible) {
-      // Requerimiento 1: Asignar a veces al Jugador 1 y a veces al Jugador 2
-      if (appState.players && appState.players.length > 1) {
-        if (!appState.pipPlayerAssign) appState.pipPlayerAssign = { face: 0, leftHand: 0, rightHand: 1 };
-        appState.pipPlayerAssign[which] = Math.random() < 0.5 ? 0 : 1;
-      }
-      randomizePipPosition(which, pip);
-      pip.classList.remove('hidden');
-    } else {
-      pip.classList.add('hidden');
-    }
-  }
-  // Cada cambio de estado sortea CUÁNTO dura este tramo (prendido o apagado).
-  appState.pipNextToggleAt[which] = now + pipRandomMs();
-  if (visible) {
-    updatePoseSegmentation();
-    triggerPoseInference();
-  }
+  updatePoseSegmentation();
+  triggerPoseInference();
 }
 
 function updatePipAutoCycle(now) {
@@ -8956,25 +8942,15 @@ function updatePipAutoCycle(now) {
   const isHaikuMode = (appState.currentState === STATES.HIJACK || appState.currentState === STATES.PROCESSING || document.body.classList.contains('mode-haiku'));
 
   // Si la cámara no capta a ningún humano O si estamos en modo haiku:
-  // asegurarse de que NINGÚN monitor PiP aparezca
+  // asegurarse de que NINGUNA ventanita quede abierta
   if (!appState.hasHuman || isHaikuMode) {
-    PIP_CYCLE_KEYS.forEach((which) => {
-      appState.pipCycleVisible[which] = false;
-      const el = pipElement(which);
-      if (el && !el.classList.contains('hidden')) el.classList.add('hidden');
-    });
+    PIP_CYCLE_KEYS.forEach((which) => { appState.pipCycleVisible[which] = false; });
+    cerrarTodasLasVentanas('sin-humano');
     return;
   }
 
-  PIP_CYCLE_KEYS.forEach((which) => {
-    const proximo = appState.pipNextToggleAt[which];
-    if (!proximo) {
-      const desfase = pipRandomMs() * (which === 'depth' ? (0.25 + 0.75 * Math.random()) : 1);
-      appState.pipNextToggleAt[which] = now + Math.round(desfase);
-      return;
-    }
-    if (now >= proximo) setPipVisible(which, !appState.pipCycleVisible[which], now);
-  });
+  // Ciclo automático: lo lleva el sistema, ventana por ventana, con su reloj.
+  VENTANAS_SISTEMA.actualizarCiclo(now);
 
   // Si el monitor facial está en su tramo visible y hay humano detectado
   if (appState.pipCycleVisible.face && DOM.faceCanvas && DOM.video && DOM.video.readyState >= 2) {
@@ -8988,6 +8964,276 @@ function updatePipAutoCycle(now) {
     DOM.video && DOM.video.readyState >= 2 && appState.lastLandmarks && appState.lastLandmarks.length > 0) {
     renderHandCameras(appState.lastLandmarks);
   }
+}
+
+// ============================================================================
+// SISTEMA DE VENTANAS (CLASE MAESTRA) — REGISTRO DE ESTA EXPERIENCIA
+// ----------------------------------------------------------------------------
+// Las 6 ventanitas de Sicre2 se declaran UNA sola vez acá, cada una con su
+// descriptor completo (título, tamaño, tipo de contenido, reloj propio,
+// controles). El sistema (js/ventanas/sistemaVentanas.js) se encarga del resto:
+// abrir/cerrar, posición aleatoria en la periferia, AGARRE y ARRASTRE con los
+// puntos de las manos de OpenPose y CIERRE por dwell sobre la ✕.
+//
+//   CÁMARA  · depth · face · leftHand · rightHand   (canvas que pinta esta página)
+//   PÁGINA  · cosmos · log                          (mini-monitor de la página real)
+// ============================================================================
+const VENTANAS_SISTEMA = (function registrarVentanasSistema() {
+  const SV = window.SistemaVentanas;
+  if (!SV) {
+    console.warn('[Ventanas] sistemaVentanas.js no cargó: no hay sistema de ventanas.');
+    return null;
+  }
+
+  /* --- Monitores de CÁMARA: el contenido lo sigue pintando esta página ------ */
+  const VENTANAS_CAMARA = [
+    {
+      id: 'depth', titulo: 'DEPTH MAP', tipo: 'canvas',
+      el: '#depth-map-pip', barra: '#depth-map-pip .pip-header',
+      btnCerrar: '#btn-close-depth-pip', contenido: '#depth-map-pip .pip-canvas-wrapper',
+      tamano: { ancho: 250, alto: 220 },
+      descripcion: 'Mapa de profundidad Z de la silueta (entrada del shader maestro).',
+      alAbrir: () => alAbrirMonitorDeCamara('depth'),
+      alCambiarVisible: (v, visible) => { appState.pipCycleVisible.depth = visible; }
+    },
+    {
+      id: 'face', titulo: 'BIOMETRÍA FACIAL', tipo: 'canvas',
+      el: '#face-cam-pip', barra: '#face-cam-pip .pip-header',
+      btnCerrar: '#btn-close-face-pip', contenido: '#face-cam-pip .pip-canvas-wrapper',
+      tamano: { ancho: 230, alto: 250 },
+      descripcion: 'Encuadre biométrico del rostro trackeado.',
+      alAbrir: () => alAbrirMonitorDeCamara('face'),
+      alCambiarVisible: (v, visible) => { appState.pipCycleVisible.face = visible; }
+    },
+    {
+      id: 'leftHand', titulo: 'MANO IZQUIERDA', tipo: 'canvas',
+      el: '#left-hand-pip', barra: '#left-hand-pip .pip-header',
+      btnCerrar: '#btn-close-left-hand-pip', contenido: '#left-hand-pip .pip-canvas-wrapper',
+      tamano: { ancho: 220, alto: 215 },
+      descripcion: 'Recorte de cámara sobre la muñeca izquierda.',
+      // Sólo si la muñeca izquierda está bien trackeada y lejos de la cara.
+      requiere: () => ventanaManoHabilitada('leftHand'),
+      alAbrir: () => alAbrirMonitorDeCamara('leftHand'),
+      alCambiarVisible: (v, visible) => { appState.pipCycleVisible.leftHand = visible; }
+    },
+    {
+      id: 'rightHand', titulo: 'MANO DERECHA', tipo: 'canvas',
+      el: '#right-hand-pip', barra: '#right-hand-pip .pip-header',
+      btnCerrar: '#btn-close-right-hand-pip', contenido: '#right-hand-pip .pip-canvas-wrapper',
+      tamano: { ancho: 220, alto: 215 },
+      descripcion: 'Recorte de cámara sobre la muñeca derecha.',
+      requiere: () => ventanaManoHabilitada('rightHand'),
+      alAbrir: () => alAbrirMonitorDeCamara('rightHand'),
+      alCambiarVisible: (v, visible) => { appState.pipCycleVisible.rightHand = visible; }
+    }
+  ];
+
+  /* --- Monitores de PÁGINA: muestran la página real como mini-monitor ------
+     El iframe se monta al abrirse y se destruye al cerrarse (así el cosmos 3D
+     no queda consumiendo GPU mientras la ventanita está apagada). Van de a uno
+     por vez (grupo 'monitores') para no encender dos WebGL a la vez. */
+  const VENTANAS_PAGINA = [
+    {
+      id: 'cosmos', titulo: 'UNIVERSO 3D POR CÚMULOS', tipo: 'iframe',
+      el: '#cosmos-clusters-ventana', barra: '#cosmos-clusters-ventana .pip-header',
+      btnCerrar: '#btn-close-cosmos-ventana', contenido: '#cosmos-ventana-contenido',
+      tamano: { ancho: 400, alto: 302 },
+      ciclo: { activo: true, min: 10, max: 26 },
+      grupo: 'monitores', maxEnGrupo: 1, anunciar: true, zona: 'pie',
+      iframe: { src: './cosmos-clusters.html?embed=1', virtual: { ancho: 1024, alto: 640 }, interactivo: false },
+      descripcion: 'El universo de cúmulos en vivo: recibe las órdenes de Sicre2 en tiempo real.'
+    },
+    {
+      id: 'log', titulo: 'LOG DE SUCESOS', tipo: 'iframe',
+      el: '#log-ventana', barra: '#log-ventana .pip-header',
+      btnCerrar: '#btn-close-log-ventana', contenido: '#log-ventana-contenido',
+      tamano: { ancho: 420, alto: 314 },
+      ciclo: { activo: true, min: 10, max: 26 },
+      grupo: 'monitores', maxEnGrupo: 1, anunciar: true, zona: 'pie',
+      iframe: { src: './log.html?embed=1', virtual: { ancho: 1024, alto: 640 }, interactivo: false },
+      descripcion: 'Manifiesto, pensamiento del agente y telemetría del bus semántico.'
+    }
+  ];
+
+  SV.registrar(VENTANAS_CAMARA);
+  SV.registrar(VENTANAS_PAGINA);
+
+  /* --- Condición global: sólo con humano delante y fuera del modo haiku ---- */
+  SV.condicionGlobal = function () {
+    const enHaiku = (appState.currentState === STATES.HIJACK ||
+      appState.currentState === STATES.PROCESSING ||
+      document.body.classList.contains('mode-haiku'));
+    if (enHaiku) return false;
+    if (!appState.hasHuman) return false;
+    return true;
+  };
+
+  /* --- Cada apertura/cierre de un MONITOR DE PÁGINA queda en el bus -------- */
+  SV.alCambiar = function (ventana, visible, motivo) {
+    if (!ventana.desc || ventana.desc.anunciar !== true) return;
+    emitAgentEvent('ventana',
+      'ventana ' + (visible ? 'abierta' : 'cerrada') + ': ' + ventana.titulo + (motivo ? ' · ' + motivo : ''),
+      visible ? 'ok' : 'info',
+      { ventana: ventana.id, visible: Boolean(visible), motivo: motivo || '' });
+    marcarFilaVentana(ventana.id, visible);
+  };
+
+  return SV;
+})();
+
+/* Config del sistema de ventanas: vive dentro de trackingConfig (se guarda con
+   el resto de la calibración en config.json). */
+const VENTANAS_CONFIG_DEFAULT = {
+  activo: true,          // control por puntos de las manos
+  puntosMano: true,      // acepta los puntos de OpenPose
+  puntosMouse: false,    // el puntero del mouse agarra por hover
+  dwellCierre: 1.2,      // s con la mano sobre la ✕ para cerrar
+  dwellAgarre: 0.18,     // s con la mano apoyada en la barra para agarrar
+  requiereHumano: true   // sin humano no se abre nada
+};
+
+function aplicarConfigVentanas() {
+  if (!VENTANAS_SISTEMA) return;
+  const guardada = (appState.trackingConfig && appState.trackingConfig.ventanas) || {};
+  const cfg = { ...VENTANAS_CONFIG_DEFAULT, ...guardada };
+  appState.trackingConfig.ventanas = cfg;
+  VENTANAS_SISTEMA.control.activo = cfg.activo !== false;
+  VENTANAS_SISTEMA.control.puntosMano = cfg.puntosMano !== false;
+  VENTANAS_SISTEMA.control.puntosMouse = cfg.puntosMouse === true;
+  VENTANAS_SISTEMA.control.dwellCierre = Number(cfg.dwellCierre);
+  VENTANAS_SISTEMA.control.dwellAgarre = Number(cfg.dwellAgarre);
+  VENTANAS_SISTEMA.control.requiereHumano = cfg.requiereHumano !== false;
+}
+
+function guardarConfigVentanas(parcial) {
+  if (!appState.trackingConfig) appState.trackingConfig = {};
+  appState.trackingConfig.ventanas = { ...VENTANAS_CONFIG_DEFAULT, ...(appState.trackingConfig.ventanas || {}), ...parcial };
+  aplicarConfigVentanas();
+  sincronizarInputsVentanas();
+}
+
+/* Fila de la lista de la pestaña VENTANAS (se marca sola al abrir/cerrarse). */
+function marcarFilaVentana(id, visible) {
+  const fila = document.querySelector('.ventana-fila[data-ventana-id="' + id + '"]');
+  if (!fila) return;
+  fila.classList.toggle('activa', Boolean(visible));
+  const btn = fila.querySelector('.ventana-fila-btn');
+  if (btn) btn.textContent = visible ? 'Cerrar' : 'Abrir';
+}
+
+/* La pestaña VENTANAS se arma desde el REGISTRO: una fila por ventana con su
+   título, tipo de contenido y descripción, más los controles del sistema. */
+function construirPanelVentanas() {
+  const lista = document.getElementById('ventanas-lista');
+  if (!lista || !VENTANAS_SISTEMA) return;
+  lista.innerHTML = '';
+
+  VENTANAS_SISTEMA.lista().forEach((v) => {
+    const fila = document.createElement('div');
+    fila.className = 'ventana-fila';
+    fila.dataset.ventanaId = v.id;
+
+    const punto = document.createElement('span');
+    punto.className = 'ventana-fila-dot';
+
+    const info = document.createElement('div');
+    info.className = 'ventana-fila-info';
+    const titulo = document.createElement('span');
+    titulo.className = 'ventana-fila-titulo';
+    titulo.textContent = v.titulo;
+    const sub = document.createElement('span');
+    sub.className = 'ventana-fila-sub';
+    const ciclo = v.desc.ciclo || {};
+    const reloj = (ciclo.activo === false) ? 'SIN CICLO' : ((ciclo.min || 5) + '-' + (ciclo.max || 30) + 's');
+    sub.textContent = (v.tipo === 'iframe' ? 'MONITOR DE PÁGINA' : 'MONITOR DE CÁMARA') + ' · ' + reloj;
+    info.appendChild(titulo);
+    info.appendChild(sub);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ventana-fila-btn';
+    btn.textContent = v.visible ? 'Cerrar' : 'Abrir';
+    btn.addEventListener('click', () => {
+      VENTANAS_SISTEMA.toggle(v.id, 'panel', true);
+      marcarFilaVentana(v.id, VENTANAS_SISTEMA.visible(v.id));
+    });
+
+    fila.appendChild(punto);
+    fila.appendChild(info);
+    fila.appendChild(btn);
+    lista.appendChild(fila);
+    marcarFilaVentana(v.id, v.visible);
+  });
+
+  const btnTodas = document.getElementById('btn-ventanas-todas');
+  if (btnTodas) btnTodas.addEventListener('click', () => {
+    // Cierre explícito: se lleva TODO, incluso lo abierto a mano desde el panel.
+    VENTANAS_SISTEMA.cerrarTodas('panel', true);
+    VENTANAS_SISTEMA.lista().forEach((v) => marcarFilaVentana(v.id, false));
+  });
+
+  const btnAzar = document.getElementById('btn-ventanas-azar');
+  if (btnAzar) btnAzar.addEventListener('click', () => {
+    VENTANAS_SISTEMA.abrirAleatoria('panel', true);
+    VENTANAS_SISTEMA.lista().forEach((v) => marcarFilaVentana(v.id, v.visible));
+  });
+
+  const btnPesadas = document.getElementById('btn-ventanas-pesadas');
+  if (btnPesadas) btnPesadas.addEventListener('click', () => {
+    const candidatas = VENTANAS_SISTEMA.lista().filter((v) => v.tipo === 'iframe');
+    if (!candidatas.length) return;
+    const elegida = candidatas[Math.floor(Math.random() * candidatas.length)];
+    if (elegida.tipo === 'iframe' && !elegida.visible) {
+      // Los monitores de PÁGINA van de a uno: al abrir uno se cierra el otro.
+      VENTANAS_SISTEMA.lista().forEach((o) => { if (o.tipo === 'iframe' && o !== elegida) VENTANAS_SISTEMA.cerrar(o.id, 'panel'); });
+    }
+    VENTANAS_SISTEMA.toggle(elegida.id, 'panel', true);
+    VENTANAS_SISTEMA.lista().forEach((v) => marcarFilaVentana(v.id, v.visible));
+  });
+
+  const chkManos = document.getElementById('cfg-ventanas-manos');
+  if (chkManos) chkManos.addEventListener('change', () => guardarConfigVentanas({ puntosMano: chkManos.checked }));
+
+  const chkMouse = document.getElementById('cfg-ventanas-mouse');
+  if (chkMouse) chkMouse.addEventListener('change', () => guardarConfigVentanas({ puntosMouse: chkMouse.checked }));
+
+  const chkHumano = document.getElementById('cfg-ventanas-humano');
+  if (chkHumano) chkHumano.addEventListener('change', () => guardarConfigVentanas({ requiereHumano: chkHumano.checked }));
+
+  const rangoDwell = document.getElementById('cfg-ventanas-dwell');
+  if (rangoDwell) rangoDwell.addEventListener('input', () => {
+    const v = Number(rangoDwell.value);
+    const etq = document.getElementById('val-ventanas-dwell');
+    if (etq) etq.textContent = v.toFixed(1);
+    guardarConfigVentanas({ dwellCierre: v });
+  });
+
+  const rangoAgarre = document.getElementById('cfg-ventanas-agarre');
+  if (rangoAgarre) rangoAgarre.addEventListener('input', () => {
+    const v = Number(rangoAgarre.value);
+    const etq = document.getElementById('val-ventanas-agarre');
+    if (etq) etq.textContent = v.toFixed(2);
+    guardarConfigVentanas({ dwellAgarre: v });
+  });
+
+  sincronizarInputsVentanas();
+}
+
+function sincronizarInputsVentanas() {
+  if (!appState.trackingConfig) return;
+  const cfg = { ...VENTANAS_CONFIG_DEFAULT, ...(appState.trackingConfig.ventanas || {}) };
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.checked = Boolean(val); };
+  set('cfg-ventanas-manos', cfg.puntosMano !== false);
+  set('cfg-ventanas-mouse', cfg.puntosMouse === true);
+  set('cfg-ventanas-humano', cfg.requiereHumano !== false);
+  const rd = document.getElementById('cfg-ventanas-dwell');
+  if (rd) rd.value = String(cfg.dwellCierre);
+  const etqD = document.getElementById('val-ventanas-dwell');
+  if (etqD) etqD.textContent = Number(cfg.dwellCierre).toFixed(1);
+  const ra = document.getElementById('cfg-ventanas-agarre');
+  if (ra) ra.value = String(cfg.dwellAgarre);
+  const etqA = document.getElementById('val-ventanas-agarre');
+  if (etqA) etqA.textContent = Number(cfg.dwellAgarre).toFixed(2);
 }
 
 function mainLoop(currentTimestamp) {
@@ -9032,6 +9278,10 @@ function mainLoop(currentTimestamp) {
 
   // 3. Evaluar colisiones / proximidad (con timestamp para throttle de audio)
   handleProximityAndInteractions(dt, currentTimestamp);
+
+  // 3.1 SISTEMA DE VENTANAS: los puntos de las manos (OpenPose) AGARRAN y
+  // ARRASTRAN las ventanitas y las CIERRAN dejándose apoyar sobre la ✕.
+  if (VENTANAS_SISTEMA) VENTANAS_SISTEMA.controlPuntos(appState.activeInteractionPoints, dt);
 
   // 3.b Call to action por inactividad
   updateIdleCta();
@@ -9764,7 +10014,7 @@ function setupEventListeners() {
     DOM.btnCloseDepthPip.addEventListener('click', () => {
       appState.pipCycleDisabledByUser = true;
       appState.trackingConfig.showDepthMap = false;
-      if (DOM.depthPip) DOM.depthPip.classList.add('hidden');
+      VENTANAS_SISTEMA.cerrar('depth', 'usuario');
       if (DOM.cfgTrackDepth) DOM.cfgTrackDepth.checked = false;
       saveTrackingConfigToStorage();
       showToast('Monitor Depth Map ocultado', 'info');
@@ -9775,7 +10025,7 @@ function setupEventListeners() {
     DOM.btnCloseFacePip.addEventListener('click', () => {
       appState.pipCycleDisabledByUser = true;
       appState.trackingConfig.showFaceCamera = false;
-      if (DOM.facePip) DOM.facePip.classList.add('hidden');
+      VENTANAS_SISTEMA.cerrar('face', 'usuario');
       if (DOM.cfgTrackFace) DOM.cfgTrackFace.checked = false;
       saveTrackingConfigToStorage();
       showToast('Monitor Cámara Facial ocultado', 'info');
@@ -9787,7 +10037,7 @@ function setupEventListeners() {
       appState.pipCycleDisabledByUser = true;
       appState.trackingConfig.showLeftHand = false;
       appState.renderConfig.leftHandEnabled = false;
-      if (DOM.leftHandPip) DOM.leftHandPip.classList.add('hidden');
+      VENTANAS_SISTEMA.cerrar('leftHand', 'usuario');
       if (DOM.cfgTrackLeftHand) DOM.cfgTrackLeftHand.checked = false;
       if (DOM.cfgRenderLeftHandToggle) DOM.cfgRenderLeftHandToggle.checked = false;
       saveTrackingConfigToStorage();
@@ -9800,7 +10050,7 @@ function setupEventListeners() {
       appState.pipCycleDisabledByUser = true;
       appState.trackingConfig.showRightHand = false;
       appState.renderConfig.rightHandEnabled = false;
-      if (DOM.rightHandPip) DOM.rightHandPip.classList.add('hidden');
+      VENTANAS_SISTEMA.cerrar('rightHand', 'usuario');
       if (DOM.cfgTrackRightHand) DOM.cfgTrackRightHand.checked = false;
       if (DOM.cfgRenderRightHandToggle) DOM.cfgRenderRightHandToggle.checked = false;
       saveTrackingConfigToStorage();
@@ -10328,6 +10578,15 @@ function setupEventListeners() {
       applyParticlesConfig();
     });
   }
+  // TAMAÑO DE LAS CAJAS de las palabras (contenedor que dibuja el shader).
+  // El shader lo lee por frame (uniform u_wordBoxScale): alcanza con guardar.
+  if (DOM.cfgPartBoxScale) {
+    DOM.cfgPartBoxScale.addEventListener('input', (e) => {
+      appState.particlesConfig.boxScale = parseFloat(e.target.value);
+      if (DOM.valPartBoxScale) DOM.valPartBoxScale.textContent = Number(e.target.value).toFixed(2);
+      saveVisualConfigToStorage();
+    });
+  }
   if (DOM.cfgPartFontFamily) {
     DOM.cfgPartFontFamily.addEventListener('change', (e) => {
       appState.particlesConfig.fontFamily = e.target.value;
@@ -10423,7 +10682,8 @@ function setupEventListeners() {
         lifetimeMax: 10,
         maxWords: 9,
         speed: 1.0,
-        maxSpeed: 2.0
+        maxSpeed: 2.0,
+        boxScale: 1.0
       };
       applyParticlesConfig();
       syncParticlesInputs();
@@ -10550,6 +10810,8 @@ function setupEventListeners() {
       appState.dwellDuration = 1.5;
       saveTrackingConfigToStorage();
       syncTrackingConfigToInputs();
+      aplicarConfigVentanas();
+      sincronizarInputsVentanas();
       showToast('↺ Calibración restablecida a valores predeterminados', 'info');
     });
   }
@@ -10798,6 +11060,10 @@ async function init() {
 
   // 2.9 Garantizar Modo Mouse por defecto en arranque (MediaPipe en standby pasivo a 60 FPS)
   setInputMode('mouse');
+
+  // 2.95 SISTEMA DE VENTANAS: aplicar la config guardada y armar su pestaña (tecla P)
+  aplicarConfigVentanas();
+  construirPanelVentanas();
 
   // 3. Cargar lista de modelos detectados en Ollama local y monitoreo LIVE
   fetchAndPopulateOllamaModels();

@@ -710,6 +710,18 @@ app.post('/config', (req, res) => {
         if (typeof prev.uiPalette === 'string') mergedConfig.uiPalette = prev.uiPalette;
       } catch (e) {}
     }
+    /* TRACKING & CALIBRACIÓN (pestaña TRACKING & CALIBRACIÓN): umbral mínimo de silueta
+       visible, tiempo mínimo de trackeo, dwell, puntos de colisión, etc. Sin esto el
+       botón "Guardar Físicamente en Servidor" los descartaba y no se guardaban. Se
+       preserva lo que ya estaba si el payload no trae trackingConfig. */
+    if (newConfig.trackingConfig && typeof newConfig.trackingConfig === 'object') {
+      mergedConfig.trackingConfig = newConfig.trackingConfig;
+    } else {
+      try {
+        const prev = JSON.parse(fs.readFileSync(rootConfigPath, 'utf-8'));
+        if (prev.trackingConfig && typeof prev.trackingConfig === 'object') mergedConfig.trackingConfig = prev.trackingConfig;
+      } catch (e) {}
+    }
 
     fs.writeFileSync(rootConfigPath, JSON.stringify(mergedConfig, null, 2), 'utf-8');
     registrarJsonGuardado('CONFIG DEL JUEGO (raiz)', rootConfigPath, mergedConfig);
