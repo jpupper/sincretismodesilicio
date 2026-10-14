@@ -14,9 +14,7 @@ APP_ROOT="sincretismodesilicio-root"   # puerto 3000 (slot raiz del dominio)
 
 cd "$APP_DIR" || { echo "[ERROR] No existe $APP_DIR"; exit 1; }
 
-# 0. Limpieza de CRLF (el repo vive en Windows)
-sed -i 's/\r$//' deploy_scripts/server_update.sh 2>/dev/null
-
+# 0. (los CRLF del checkout de Windows los limpia run_deploy.bat antes de llamar aca)
 # La carpeta venia de un tar de Windows: git se queja de "dubious ownership"
 git config --global --add safe.directory "$APP_DIR" 2>/dev/null
 

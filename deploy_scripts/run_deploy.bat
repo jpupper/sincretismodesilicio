@@ -46,7 +46,7 @@ if !ERRORLEVEL! neq 0 (
 echo.
 echo [2/3] DESPLEGANDO EN EL VPS !VPS_USER!@!VPS_HOST!:!VPS_PORT! POR SSH...
 echo.
-ssh -p !VPS_PORT! !VPS_USER!@!VPS_HOST! "cd /root/sincretismodesilicio 2>/dev/null || mkdir -p /root/sincretismodesilicio && cd /root/sincretismodesilicio && git config --global --add safe.directory /root/sincretismodesilicio 2>/dev/null; (git remote set-url origin git@github.com:!GITHUB_REPO!.git 2>/dev/null || (git init -q && git remote add origin git@github.com:!GITHUB_REPO!.git)) && git fetch -q origin main && git checkout -f -B main origin/main && echo 'Repo actualizado:' && git log --oneline -1 && bash deploy_scripts/server_update.sh"
+ssh -p !VPS_PORT! !VPS_USER!@!VPS_HOST! "cd /root/sincretismodesilicio 2>/dev/null || mkdir -p /root/sincretismodesilicio; cd /root/sincretismodesilicio && git config --global --add safe.directory /root/sincretismodesilicio 2>/dev/null; (git remote set-url origin git@github.com:!GITHUB_REPO!.git 2>/dev/null || (git init -q && git remote add origin git@github.com:!GITHUB_REPO!.git)) && git fetch -q origin main && git checkout -f -B main origin/main && echo 'Repo actualizado:' && git log --oneline -1 && sed -i 's/\r$//' deploy_scripts/server_update.sh && bash deploy_scripts/server_update.sh"
 if !ERRORLEVEL! neq 0 (
     echo [ERROR] Fallo el deploy del backend en el VPS.
     pause
