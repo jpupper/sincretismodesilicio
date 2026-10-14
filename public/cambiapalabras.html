@@ -33,22 +33,32 @@
         var st = JSON.parse(localStorage.getItem('jpsi:config') || '{}');
         if (st && st.baseManual && st.base) elegido = st.base;
       } catch (e) { }
-      // 100% LOCAL: en la maquina de la instalacion el engine sale del
-      // jpshadereditor LOCAL (puerto 3250), no del VPS. Sin esto la app
-      // dependia de internet para dibujar el fondo de nodos.
-      var LOCAL_EDITOR = 'http://localhost:3250/jpshadereditor';
-      var base = elegido || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
-        ? LOCAL_EDITOR
-        : 'https://vps-4455523-x.dattaweb.com/jpshadereditor');
+      // WEB por defecto: el engine sale del JP Shader Editor del VPS, asi la app
+      // NO depende de tener el editor local levantado (run.bat ya no lo arranca
+      // solo). Para usar el editor LOCAL: tecla S -> servidor: LOCAL (queda
+      // guardado en localStorage y gana sobre este default).
+      var LOCAL_EDITOR = location.origin + '/jpshadereditor';
+      var WEB_EDITOR = 'https://vps-4455523-x.dattaweb.com/jpshadereditor';
+      var base = elegido || WEB_EDITOR;
+      var reintentado = false;   // el failover WEB -> LOCAL se intenta una sola vez
 
       function loadScript(url, next) {
         var s = document.createElement('script');
         s.src = url;
         s.async = false;
         s.onload = next;
-        // 100% LOCAL: sin fallback a internet. Si el engine local no esta, se
-        // sigue sin fondo en vez de pedirle el include al VPS.
-        s.onerror = function () { next(); };
+        // Si el engine WEB no carga (sin internet), reintenta con el LOCAL
+        // (lo sirve este mismo servidor desde el repo del editor).
+        s.onerror = function () {
+          if (!reintentado && base === WEB_EDITOR) {
+            reintentado = true;
+            base = LOCAL_EDITOR;
+            console.warn('[JPShaderEditor] El engine WEB no respondio: sigo con el LOCAL (' + LOCAL_EDITOR + ').');
+            loadScript(LOCAL_EDITOR + '/js/lib/jp-pointers.js', next);
+            return;
+          }
+          next();
+        };
         document.head.appendChild(s);
       }
 
