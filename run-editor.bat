@@ -32,7 +32,6 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%EDITOR_PORT% " ^| findstr 
 if defined EDITOR_PID (
     echo   [OK] Ya esta escuchando en el puerto %EDITOR_PORT% ^(PID %EDITOR_PID%^).
     echo        http://localhost:%EDITOR_PORT%/jpshadereditor/
-    start "" "http://localhost:%EDITOR_PORT%/jpshadereditor/"
     goto :fin
 )
 
@@ -61,7 +60,7 @@ set "EDITOR_PID="
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":%EDITOR_PORT% " ^| findstr "LISTENING"') do set "EDITOR_PID=%%a"
 if defined EDITOR_PID (
     echo   [OK] Escuchando en http://localhost:%EDITOR_PORT%/jpshadereditor/ ^(PID %EDITOR_PID%^)
-    start "" "http://localhost:%EDITOR_PORT%/jpshadereditor/"
+    echo        En la app: tecla S -^> servidor: LOCAL
     goto :fin
 )
 set /a ESPERA+=1
