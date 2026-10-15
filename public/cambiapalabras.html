@@ -17,7 +17,7 @@
 
   <!-- Google Fonts: Redondeada orgánica (Plus Jakarta Sans) + Monospace Cibernética (Share Tech Mono / Space Mono) -->
   <link rel="stylesheet" href="css/fonts-local.css?v=1">
-  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.82">
+  <link rel="stylesheet" href="cambiapalabras/style.css?v=3.83">
 
   <!-- MediaPipe Pose CDN (Librerías oficiales) -->
   <script src="vendor/mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -346,6 +346,34 @@
       <div class="pip-footer">
         <span>ZOOM: <span id="right-hand-footer-zoom">2.6x</span></span>
         <span>RECORTE: MUÑECA DER</span>
+      </div>
+    </div>
+
+    <!-- Capa 7.a: VENTANA DE TRACKING (LO QUE VE EL TRACKER) — ARRIBA A LA IZQUIERDA
+         Cámara + esqueleto de OpenPose + caja de la CARA + las DOS MANOS (muñecas
+         15/16), para ver en vivo qué está detectando. Va fija en la esquina
+         superior izquierda: el sistema la respeta (zona: 'arriba-izquierda' en el
+         registro de VENTANAS_CAMARA) y la pinta renderTrackingPip(). -->
+    <div id="tracking-pip" class="tactical-pip-card pip-top-left hidden">
+      <div class="pip-header">
+        <div class="pip-title">
+          <span class="pip-status-dot"></span>
+          <span class="pip-title-text">TRACKING // CARAS + MANOS</span>
+        </div>
+        <div class="pip-actions">
+          <span class="pip-tag" id="tracking-pip-status">LIVE</span>
+          <button type="button" class="pip-close-btn" id="btn-close-tracking-pip"
+            title="Ocultar ventana de tracking (Configurable en P)">✕</button>
+        </div>
+      </div>
+      <div class="pip-canvas-wrapper">
+        <canvas id="tracking-canvas" width="270" height="200"></canvas>
+        <div class="pip-paleta-tint" id="tracking-pip-tint"></div>
+        <div class="pip-scanline"></div>
+      </div>
+      <div class="pip-footer">
+        <span>CARAS: <span id="tracking-footer-faces">0</span></span>
+        <span>MANOS: <span id="tracking-footer-hands">0</span></span>
       </div>
     </div>
 
@@ -1801,9 +1829,9 @@
   </div>
 
   <!-- Sistema de ventanas (clase maestra): se carga ANTES del script del juego -->
-  <script src="js/ventanas/sistemaVentanas.js?v=1.1"></script>
+  <script src="js/ventanas/sistemaVentanas.js?v=1.2"></script>
   <!-- Script principal del juego -->
-  <script src="cambiapalabras/script.js?v=3.85"></script>
+  <script src="cambiapalabras/script.js?v=3.86"></script>
 </body>
 
 </html>

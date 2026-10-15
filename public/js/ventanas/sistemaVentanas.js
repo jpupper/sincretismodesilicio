@@ -405,6 +405,11 @@
       var cardW = v.w;
       var cardH = v.h;
 
+      // ZONAS FIJAS pedidas por el proyecto: la ventana NO se sortea, vive
+      // siempre en esa esquina (mismo mecanismo que zona:'pie' de más abajo).
+      if (v.desc.zona === 'arriba-izquierda') { v.posicionar(MARGEN_X, MARGEN_Y); return; }
+      if (v.desc.zona === 'arriba-derecha') { v.posicionar(W - cardW - MARGEN_X, MARGEN_Y); return; }
+
       var otras = this.visibles()
         .filter((o) => o !== v)
         .map((o) => o.rect());

@@ -2717,6 +2717,14 @@ body.mode-haiku .tactical-pip-card,
   width: 220px;
 }
 
+/* Ventana de TRACKING: vive ARRIBA A LA IZQUIERDA (lo pide el proyecto: ver el
+   tracking de caras y manos mientras se capturan las palabras de abajo). */
+.pip-top-left {
+  top: 45px;
+  left: 20px;
+  width: 270px;
+}
+
 .pip-header {
   display: flex;
   align-items: center;

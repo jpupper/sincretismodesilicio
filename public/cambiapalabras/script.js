@@ -588,7 +588,7 @@ const PIP_RANDOM_MIN_S = 5;
 const PIP_RANDOM_MAX_S = 30;
 
 // Claves de los monitores PiP que parpadean solos (cada uno con su propio reloj).
-const PIP_CYCLE_KEYS = ['face', 'depth', 'leftHand', 'rightHand'];
+const PIP_CYCLE_KEYS = ['face', 'depth', 'leftHand', 'rightHand', 'tracking'];
 
 
 
@@ -918,7 +918,7 @@ const appState = {
   depthFrameId: 0,
   drawStaticNoise: null,
   // Estado del parpadeo de los monitores PiP (lo maneja updatePipAutoCycle).
-  pipCycleVisible: { face: false, depth: false, leftHand: false, rightHand: false },
+  pipCycleVisible: { face: false, depth: false, leftHand: false, rightHand: false, tracking: false },
   pipNextToggleAt: { face: 0, depth: 0, leftHand: 0, rightHand: 0 },
   pipCycleDisabledByUser: false,
 
@@ -1154,6 +1154,14 @@ const DOM = {
   btnCloseRightHandPip: document.getElementById('btn-close-right-hand-pip'),
   rightHandPipStatus: document.getElementById('right-hand-pip-status'),
   rightHandFooterZoom: document.getElementById('right-hand-footer-zoom'),
+
+  // Ventana de TRACKING (arriba a la izquierda): cámara + esqueleto + cara + manos
+  trackingPip: document.getElementById('tracking-pip'),
+  trackingCanvas: document.getElementById('tracking-canvas'),
+  btnCloseTrackingPip: document.getElementById('btn-close-tracking-pip'),
+  trackingPipStatus: document.getElementById('tracking-pip-status'),
+  trackingFooterFaces: document.getElementById('tracking-footer-faces'),
+  trackingFooterHands: document.getElementById('tracking-footer-hands'),
 
   // HUD
   hudTimestamp: document.getElementById('hud-timestamp'),
@@ -3961,6 +3969,171 @@ function renderSilhouetteCutout(results) {
 }
 
 // ============================================================================
+// VENTANA DE TRACKING (ARRIBA A LA IZQUIERDA) — LO QUE VE EL TRACKER
+// ----------------------------------------------------------------------------
+// Cámara + esqueleto de OpenPose + caja de la CARA (landmarks 0..10) + las DOS
+// MANOS (muñecas 15 = izquierda / 16 = derecha), en vivo. La pinta el proyecto
+// (tipo 'canvas' del sistema de ventanas) y NO toca el suavizado del overlay
+// maestro (appState.playerSmoothing): dibuja los landmarks crudos del frame.
+// El espejado es el mismo del overlay y de los otros monitores: x' = (1 - x).
+// ============================================================================
+function renderTrackingPip(landmarks) {
+  const canvas = DOM.trackingCanvas;
+  if (!canvas || !DOM.trackingPip) return;
+
+  if (!appState.hasHuman) {
+    if (!DOM.trackingPip.classList.contains('hidden')) DOM.trackingPip.classList.add('hidden');
+    return;
+  }
+
+  let lms = landmarks || appState.lastLandmarks || [];
+  const pIdx = (appState.pipPlayerAssign && appState.pipPlayerAssign.face !== undefined)
+    ? appState.pipPlayerAssign.face
+    : 0;
+  if (appState.players && appState.players.length > 0) {
+    const pl = appState.players[pIdx] || appState.players[0];
+    if (pl && pl.landmarks && pl.landmarks.length > 0) lms = pl.landmarks;
+  }
+
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  const espejoX = (x) => (1 - x) * w;
+  const vis = (p) => (p && p.visibility !== undefined ? p.visibility : 1);
+  const minConf = Math.max(0.05, Math.min(0.5, Number(appState.trackingConfig.minConfidence ?? 0.2)));
+  const cyan = '#00f0ff';
+  const rosa = '#ff0055';
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#050a12';
+  ctx.fillRect(0, 0, w, h);
+
+  // --- cámara: encuadre tipo espejo que cubre todo el canvas ---
+  if (appState.cameraReady && DOM.video && DOM.video.readyState >= 2) {
+    const vw = DOM.video.videoWidth || 1280;
+    const vh = DOM.video.videoHeight || 720;
+    const esc = Math.max(w / vw, h / vh);
+    const dw = vw * esc;
+    const dh = vh * esc;
+    ctx.save();
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+    ctx.globalAlpha = 0.62;
+    ctx.drawImage(DOM.video, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '11px Share Tech Mono, monospace';
+    ctx.fillText('ESPERANDO SEÑAL...', 12, h / 2);
+    if (DOM.trackingFooterFaces) DOM.trackingFooterFaces.textContent = '0';
+    if (DOM.trackingFooterHands) DOM.trackingFooterHands.textContent = '0';
+    if (DOM.trackingPipStatus) DOM.trackingPipStatus.textContent = 'STANDBY';
+    return;
+  }
+
+  // --- esqueleto (misma topología que el overlay maestro) ---
+  if (lms.length > 10) {
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(0,240,255,0.75)';
+    ctx.shadowColor = cyan;
+    ctx.shadowBlur = 4;
+    for (let i = 0; i < POSE_CONNECTIONS.length; i++) {
+      const c = POSE_CONNECTIONS[i];
+      const a = lms[c.from];
+      const b = lms[c.to];
+      if (!a || !b) continue;
+      if (vis(a) < minConf || vis(b) < minConf) continue;
+      ctx.beginPath();
+      ctx.moveTo(espejoX(a.x), a.y * h);
+      ctx.lineTo(espejoX(b.x), b.y * h);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(220,168,118,0.9)';
+    for (let i = 0; i < lms.length; i++) {
+      const p = lms[i];
+      if (!p || vis(p) < minConf) continue;
+      ctx.beginPath();
+      ctx.arc(espejoX(p.x), p.y * h, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // --- CAJA DE LA CARA (landmarks 0..10 del rostro) ---
+  let caras = 0;
+  if (lms.length > 10) {
+    let minX = 1, maxX = 0, minY = 1, maxY = 0, sumaConf = 0, n = 0;
+    for (let i = 0; i <= 10; i++) {
+      const p = lms[i];
+      if (!p || vis(p) < minConf) continue;
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+      sumaConf += vis(p);
+      n++;
+    }
+    if (n >= 4) {
+      caras = 1;
+      const caraConf = Math.round((sumaConf / n) * 100);
+      const lado = Math.max(maxX - minX, maxY - minY, 0.06) * 1.35;
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const xa = espejoX(Math.min(1, cx + lado / 2));
+      const xb = espejoX(Math.max(0, cx - lado / 2));
+      const y0 = Math.max(0, (cy - lado / 2) * h);
+      const y1 = Math.min(h, (cy + lado / 2) * h);
+      const rx = Math.min(xa, xb);
+      ctx.strokeStyle = rosa;
+      ctx.lineWidth = 1.4;
+      ctx.shadowColor = rosa;
+      ctx.shadowBlur = 6;
+      ctx.strokeRect(rx, y0, Math.abs(xa - xb), y1 - y0);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = rosa;
+      ctx.font = 'bold 10px Share Tech Mono, monospace';
+      ctx.fillText('CARA ' + caraConf + '%', rx + 2, Math.max(10, y0 - 3));
+    }
+  }
+
+  // --- LAS DOS MANOS (muñecas 15 y 16) ---
+  const MANOS = [{ idx: 15, nombre: 'MANO IZQ' }, { idx: 16, nombre: 'MANO DER' }];
+  let manosOk = 0;
+  MANOS.forEach((m) => {
+    const p = lms[m.idx];
+    if (!p || vis(p) < minConf) return;
+    manosOk++;
+    const px = espejoX(p.x);
+    const py = p.y * h;
+    ctx.strokeStyle = cyan;
+    ctx.lineWidth = 1.6;
+    ctx.shadowColor = cyan;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(px, py, 12, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(px - 18, py); ctx.lineTo(px - 4, py);
+    ctx.moveTo(px + 4, py); ctx.lineTo(px + 18, py);
+    ctx.moveTo(px, py - 18); ctx.lineTo(px, py - 4);
+    ctx.moveTo(px, py + 4); ctx.lineTo(px, py + 18);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = cyan;
+    ctx.font = 'bold 9px Share Tech Mono, monospace';
+    const etiqueta = m.nombre + ' ' + Math.round(vis(p) * 100) + '%';
+    const ancho = ctx.measureText(etiqueta).width;
+    ctx.fillText(etiqueta, Math.min(w - ancho - 2, Math.max(2, px + 14)), Math.max(10, py - 16));
+  });
+
+  if (DOM.trackingFooterFaces) DOM.trackingFooterFaces.textContent = String(caras);
+  if (DOM.trackingFooterHands) DOM.trackingFooterHands.textContent = String(manosOk);
+  if (DOM.trackingPipStatus) DOM.trackingPipStatus.textContent = 'LIVE';
+}
+
+// ============================================================================
 // SISTEMA 2: RENDER DE DEPTH MAP (MONITOR PiP DE SEGMENTACIÓN - GPU WebGL)
 // ============================================================================
 function renderDepthMap(results, landmarks) {
@@ -4897,6 +5070,8 @@ function onPoseResults(results) {
   renderDepthMap(results, landmarks);
   renderFaceCamera(landmarks);
   renderHandCameras(landmarks);
+  // Ventana de TRACKING (arriba a la izquierda): lo que ve el tracker ahora mismo.
+  if (appState.pipCycleVisible.tracking) renderTrackingPip(landmarks);
 
   // 3. Control del Cursor de Juego (Solo si NO se está usando el mouse)
   if (appState.isUsingMouse) return;
@@ -9025,6 +9200,20 @@ const VENTANAS_SISTEMA = (function registrarVentanasSistema() {
       requiere: () => ventanaManoHabilitada('rightHand'),
       alAbrir: () => alAbrirMonitorDeCamara('rightHand'),
       alCambiarVisible: (v, visible) => { appState.pipCycleVisible.rightHand = visible; }
+    },
+    {
+      // LO QUE VE EL TRACKER: cámara + esqueleto + caja de la CARA + las DOS MANOS.
+      // Va SIEMPRE arriba a la izquierda (zona fija, no se sortea) y se queda un
+      // rato largo a la vista (20-40 s); desde el panel P queda fija (manual).
+      id: 'tracking', titulo: 'TRACKING // CARAS + MANOS', tipo: 'canvas',
+      el: '#tracking-pip', barra: '#tracking-pip .pip-header',
+      btnCerrar: '#btn-close-tracking-pip', contenido: '#tracking-pip .pip-canvas-wrapper',
+      tamano: { ancho: 270, alto: 240 },
+      zona: 'arriba-izquierda',
+      ciclo: { activo: true, min: 20, max: 40 },
+      descripcion: 'Lo que está detectando el tracker: cámara + esqueleto, caja de la cara y las dos manos.',
+      alAbrir: () => { updatePoseSegmentation(); triggerPoseInference(); },
+      alCambiarVisible: (v, visible) => { appState.pipCycleVisible.tracking = visible; }
     }
   ];
 
